@@ -119,7 +119,7 @@ function Landing() {
       <footer className="footer-curve mx-auto mt-8 max-w-6xl px-8 py-10">
         <p className="text-lg font-extrabold">ProgressTutors</p>
         <p className="text-xs opacity-85">
-          Prototype for stakeholder and development review · No authentication, payments or live data.
+          Shared operational demo · Sign-in required · Real records are stored, no card payments are taken.
         </p>
       </footer>
     </div>
