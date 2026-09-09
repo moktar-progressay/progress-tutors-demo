@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate, type LinkProps } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate, type LinkProps } from "@tanstack/react-router";
 import { GraduationCap, Home, Users, Wallet } from "lucide-react";
 import { useDemo } from "@/lib/demo-store";
 import type { Role } from "@/lib/demo-data";
