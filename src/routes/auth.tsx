@@ -44,7 +44,7 @@ function AuthPage() {
           email,
           password,
           options: {
-            emailRedirectTo: `${window.location.origin}${import.meta.env.BASE_URL}#/auth`,
+            emailRedirectTo: `${window.location.origin}${import.meta.env.BASE_URL}auth`,
           },
         });
         if (error) throw error;
