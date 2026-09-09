@@ -17,8 +17,14 @@ import { Route as AdminPaymentsRouteImport } from './routes/admin.payments'
 import { Route as AdminReportsRouteImport } from './routes/admin.reports'
 import { Route as AdminStudentsRouteImport } from './routes/admin.students'
 import { Route as AdminTutorsRouteImport } from './routes/admin.tutors'
+import { Route as TutorDashboardRouteImport } from './routes/tutor.dashboard'
+import { Route as TutorEarningsRouteImport } from './routes/tutor.earnings'
+import { Route as TutorLessonsRouteImport } from './routes/tutor.lessons'
+import { Route as TutorPaymentRequestsRouteImport } from './routes/tutor.payment-requests'
 import { Route as AdminClassesIndexRouteImport } from './routes/admin.classes.index'
 import { Route as AdminClassesIdRouteImport } from './routes/admin.classes.$id'
+import { Route as TutorLessonIdIndexRouteImport } from './routes/tutor.lesson.$id.index'
+import { Route as TutorLessonIdReviewRouteImport } from './routes/tutor.lesson.$id.review'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -60,6 +66,26 @@ const AdminTutorsRoute = AdminTutorsRouteImport.update({
   path: '/admin/tutors',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TutorDashboardRoute = TutorDashboardRouteImport.update({
+  id: '/tutor/dashboard',
+  path: '/tutor/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TutorEarningsRoute = TutorEarningsRouteImport.update({
+  id: '/tutor/earnings',
+  path: '/tutor/earnings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TutorLessonsRoute = TutorLessonsRouteImport.update({
+  id: '/tutor/lessons',
+  path: '/tutor/lessons',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TutorPaymentRequestsRoute = TutorPaymentRequestsRouteImport.update({
+  id: '/tutor/payment-requests',
+  path: '/tutor/payment-requests',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminClassesIndexRoute = AdminClassesIndexRouteImport.update({
   id: '/admin/classes/',
   path: '/admin/classes/',
@@ -68,6 +94,16 @@ const AdminClassesIndexRoute = AdminClassesIndexRouteImport.update({
 const AdminClassesIdRoute = AdminClassesIdRouteImport.update({
   id: '/admin/classes/$id',
   path: '/admin/classes/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TutorLessonIdIndexRoute = TutorLessonIdIndexRouteImport.update({
+  id: '/tutor/lesson/$id/',
+  path: '/tutor/lesson/$id/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TutorLessonIdReviewRoute = TutorLessonIdReviewRouteImport.update({
+  id: '/tutor/lesson/$id/review',
+  path: '/tutor/lesson/$id/review',
   getParentRoute: () => rootRouteImport,
 } as any)
 
@@ -80,8 +116,14 @@ export interface FileRoutesByFullPath {
   '/admin/reports': typeof AdminReportsRoute
   '/admin/students': typeof AdminStudentsRoute
   '/admin/tutors': typeof AdminTutorsRoute
+  '/tutor/dashboard': typeof TutorDashboardRoute
+  '/tutor/earnings': typeof TutorEarningsRoute
+  '/tutor/lessons': typeof TutorLessonsRoute
+  '/tutor/payment-requests': typeof TutorPaymentRequestsRoute
   '/admin/classes/$id': typeof AdminClassesIdRoute
   '/admin/classes/': typeof AdminClassesIndexRoute
+  '/tutor/lesson/$id/review': typeof TutorLessonIdReviewRoute
+  '/tutor/lesson/$id/': typeof TutorLessonIdIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -92,8 +134,14 @@ export interface FileRoutesByTo {
   '/admin/reports': typeof AdminReportsRoute
   '/admin/students': typeof AdminStudentsRoute
   '/admin/tutors': typeof AdminTutorsRoute
+  '/tutor/dashboard': typeof TutorDashboardRoute
+  '/tutor/earnings': typeof TutorEarningsRoute
+  '/tutor/lessons': typeof TutorLessonsRoute
+  '/tutor/payment-requests': typeof TutorPaymentRequestsRoute
   '/admin/classes/$id': typeof AdminClassesIdRoute
   '/admin/classes': typeof AdminClassesIndexRoute
+  '/tutor/lesson/$id/review': typeof TutorLessonIdReviewRoute
+  '/tutor/lesson/$id': typeof TutorLessonIdIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -105,8 +153,14 @@ export interface FileRoutesById {
   '/admin/reports': typeof AdminReportsRoute
   '/admin/students': typeof AdminStudentsRoute
   '/admin/tutors': typeof AdminTutorsRoute
+  '/tutor/dashboard': typeof TutorDashboardRoute
+  '/tutor/earnings': typeof TutorEarningsRoute
+  '/tutor/lessons': typeof TutorLessonsRoute
+  '/tutor/payment-requests': typeof TutorPaymentRequestsRoute
   '/admin/classes/$id': typeof AdminClassesIdRoute
   '/admin/classes/': typeof AdminClassesIndexRoute
+  '/tutor/lesson/$id/review': typeof TutorLessonIdReviewRoute
+  '/tutor/lesson/$id/': typeof TutorLessonIdIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -119,8 +173,14 @@ export interface FileRouteTypes {
     | '/admin/reports'
     | '/admin/students'
     | '/admin/tutors'
+    | '/tutor/dashboard'
+    | '/tutor/earnings'
+    | '/tutor/lessons'
+    | '/tutor/payment-requests'
     | '/admin/classes/$id'
     | '/admin/classes/'
+    | '/tutor/lesson/$id/review'
+    | '/tutor/lesson/$id/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -131,8 +191,14 @@ export interface FileRouteTypes {
     | '/admin/reports'
     | '/admin/students'
     | '/admin/tutors'
+    | '/tutor/dashboard'
+    | '/tutor/earnings'
+    | '/tutor/lessons'
+    | '/tutor/payment-requests'
     | '/admin/classes/$id'
     | '/admin/classes'
+    | '/tutor/lesson/$id/review'
+    | '/tutor/lesson/$id'
   id:
     | '__root__'
     | '/'
@@ -143,8 +209,14 @@ export interface FileRouteTypes {
     | '/admin/reports'
     | '/admin/students'
     | '/admin/tutors'
+    | '/tutor/dashboard'
+    | '/tutor/earnings'
+    | '/tutor/lessons'
+    | '/tutor/payment-requests'
     | '/admin/classes/$id'
     | '/admin/classes/'
+    | '/tutor/lesson/$id/review'
+    | '/tutor/lesson/$id/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -156,8 +228,14 @@ export interface RootRouteChildren {
   AdminReportsRoute: typeof AdminReportsRoute
   AdminStudentsRoute: typeof AdminStudentsRoute
   AdminTutorsRoute: typeof AdminTutorsRoute
+  TutorDashboardRoute: typeof TutorDashboardRoute
+  TutorEarningsRoute: typeof TutorEarningsRoute
+  TutorLessonsRoute: typeof TutorLessonsRoute
+  TutorPaymentRequestsRoute: typeof TutorPaymentRequestsRoute
   AdminClassesIdRoute: typeof AdminClassesIdRoute
   AdminClassesIndexRoute: typeof AdminClassesIndexRoute
+  TutorLessonIdReviewRoute: typeof TutorLessonIdReviewRoute
+  TutorLessonIdIndexRoute: typeof TutorLessonIdIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -218,6 +296,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminTutorsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/tutor/dashboard': {
+      id: '/tutor/dashboard'
+      path: '/tutor/dashboard'
+      fullPath: '/tutor/dashboard'
+      preLoaderRoute: typeof TutorDashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/tutor/earnings': {
+      id: '/tutor/earnings'
+      path: '/tutor/earnings'
+      fullPath: '/tutor/earnings'
+      preLoaderRoute: typeof TutorEarningsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/tutor/lessons': {
+      id: '/tutor/lessons'
+      path: '/tutor/lessons'
+      fullPath: '/tutor/lessons'
+      preLoaderRoute: typeof TutorLessonsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/tutor/payment-requests': {
+      id: '/tutor/payment-requests'
+      path: '/tutor/payment-requests'
+      fullPath: '/tutor/payment-requests'
+      preLoaderRoute: typeof TutorPaymentRequestsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/classes/': {
       id: '/admin/classes/'
       path: '/admin/classes'
@@ -232,6 +338,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminClassesIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/tutor/lesson/$id/': {
+      id: '/tutor/lesson/$id/'
+      path: '/tutor/lesson/$id'
+      fullPath: '/tutor/lesson/$id/'
+      preLoaderRoute: typeof TutorLessonIdIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/tutor/lesson/$id/review': {
+      id: '/tutor/lesson/$id/review'
+      path: '/tutor/lesson/$id/review'
+      fullPath: '/tutor/lesson/$id/review'
+      preLoaderRoute: typeof TutorLessonIdReviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -244,8 +364,14 @@ const rootRouteChildren: RootRouteChildren = {
   AdminReportsRoute: AdminReportsRoute,
   AdminStudentsRoute: AdminStudentsRoute,
   AdminTutorsRoute: AdminTutorsRoute,
+  TutorDashboardRoute: TutorDashboardRoute,
+  TutorEarningsRoute: TutorEarningsRoute,
+  TutorLessonsRoute: TutorLessonsRoute,
+  TutorPaymentRequestsRoute: TutorPaymentRequestsRoute,
   AdminClassesIdRoute: AdminClassesIdRoute,
   AdminClassesIndexRoute: AdminClassesIndexRoute,
+  TutorLessonIdReviewRoute: TutorLessonIdReviewRoute,
+  TutorLessonIdIndexRoute: TutorLessonIdIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
