@@ -8,6 +8,16 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      const basePath = "/progress-tutors-demo";
+      const cleanPath = window.location.pathname.startsWith(`${basePath}/`)
+        ? window.location.pathname.slice(basePath.length) || "/"
+        : window.location.pathname;
+
+      if (!window.location.hash && cleanPath !== "/") {
+        window.location.replace(`${basePath}/#${cleanPath}${window.location.search}`);
+      }
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
