@@ -2,231 +2,249 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Page } from "@/components/AppShell";
-import { Avatar, CapacityPill, Field, PageHeader, Pill, Section } from "@/components/kit";
+import { Empty, PageHeader, Pill, Section, StatCard } from "@/components/kit";
+import { FormDialog, SelectField, TextAreaField, TextField } from "@/components/form-kit";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { CLASSES, DAYS, SITES, TUTORS, site, tutor } from "@/lib/demo-data";
+import { capacityTone, fullName, hhmm, useTable, useUpsert, WEEKDAYS } from "@/lib/db";
 
 export const Route = createFileRoute("/_authenticated/admin/classes/")({
   head: () => ({
     meta: [
-      { title: "Classes — ProgressTutors" },
-      {
-        name: "description",
-        content: "Browse every recurring class with site, day, tutor, capacity and GoProgress sync status.",
-      },
-      { property: "og:title", content: "Classes — ProgressTutors" },
-      { property: "og:description", content: "Filter classes by site, day, subject, level, tutor and status." },
+      { title: "Classes & Groups — ProgressTutors" },
+      { name: "description", content: "Create classes and groups inside each weekly schedule block and assign tutors." },
+      { property: "og:title", content: "Classes & Groups — ProgressTutors" },
+      { property: "og:description", content: "Shared class and group records." },
+      { name: "robots", content: "noindex" },
     ],
   }),
-  component: Classes,
+  component: ClassesPage,
 });
 
-function Classes() {
-  const [siteF, setSiteF] = useState("All sites");
-  const [dayF, setDayF] = useState("All days");
-  const [subjectF, setSubjectF] = useState("All subjects");
-  const [levelF, setLevelF] = useState("All levels");
-  const [tutorF, setTutorF] = useState("All tutors");
-  const [statusF, setStatusF] = useState("All statuses");
-  const [q, setQ] = useState("");
-  const [view, setView] = useState<"Cards" | "List" | "Timetable">("Cards");
+const BLANK = {
+  name: "",
+  programme_id: "",
+  site_id: "",
+  schedule_block_id: "",
+  tutor_id: "",
+  subject: "",
+  level: "",
+  age_group: "",
+  weekday: "Saturday",
+  start_time: "10:00",
+  end_time: "12:00",
+  capacity: "12",
+  room: "",
+  delivery_mode: "in_person",
+  goprogress_course_url: "",
+  session_rate: "",
+  price_per_session: "",
+  notes: "",
+};
 
-  const subjects = Array.from(new Set(CLASSES.map((c) => c.subject)));
-  const levels = Array.from(new Set(CLASSES.map((c) => c.level)));
+function ClassesPage() {
+  const classes = useTable("classes", "name");
+  const sites = useTable("sites", "name");
+  const programmes = useTable("programmes", "name");
+  const blocks = useTable("recurring_schedule_blocks", "weekday");
+  const tutors = useTable("tutors", "first_name");
+  const enrolments = useTable("class_enrolments");
+  const create = useUpsert("classes");
 
-  const filtered = CLASSES.filter((c) => {
-    const t = tutor(c.tutorId);
-    const text = `${c.subject} ${c.code} ${t?.name ?? ""}`.toLowerCase();
-    return (
-      (siteF === "All sites" || site(c.siteId)?.name === siteF) &&
-      (dayF === "All days" || c.day === dayF) &&
-      (subjectF === "All subjects" || c.subject === subjectF) &&
-      (levelF === "All levels" || c.level === levelF) &&
-      (tutorF === "All tutors" || t?.name === tutorF) &&
-      (statusF === "All statuses" || c.status === statusF) &&
-      (q === "" || text.includes(q.toLowerCase()))
-    );
-  });
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState(BLANK);
+
+  const rows = classes.data ?? [];
+  const enrolList = (enrolments.data ?? []).filter((e) => e.status === "active");
+  const withoutTutor = rows.filter((c) => !c.tutor_id).length;
+
+  function openNew(blockId?: string) {
+    const block = (blocks.data ?? []).find((b) => b.id === blockId);
+    setForm({
+      ...BLANK,
+      schedule_block_id: block?.id ?? "",
+      programme_id: block?.programme_id ?? "",
+      site_id: block?.site_id ?? "",
+      weekday: block?.weekday ?? "Saturday",
+      start_time: hhmm(block?.start_time) === "—" ? "10:00" : hhmm(block?.start_time),
+      end_time: hhmm(block?.end_time) === "—" ? "12:00" : hhmm(block?.end_time),
+    });
+    setOpen(true);
+  }
+
+  async function save() {
+    try {
+      await create.mutateAsync({
+        name: form.name,
+        programme_id: form.programme_id || null,
+        site_id: form.site_id || null,
+        schedule_block_id: form.schedule_block_id || null,
+        tutor_id: form.tutor_id || null,
+        subject: form.subject || null,
+        level: form.level || null,
+        age_group: form.age_group || null,
+        weekday: form.weekday,
+        start_time: form.start_time,
+        end_time: form.end_time,
+        capacity: Number(form.capacity) || 0,
+        room: form.room || null,
+        delivery_mode: form.delivery_mode,
+        goprogress_course_url: form.goprogress_course_url || null,
+        session_rate: form.session_rate ? Number(form.session_rate) : null,
+        price_per_session: form.price_per_session ? Number(form.price_per_session) : null,
+        notes: form.notes || null,
+      });
+      toast.success("Class created");
+      setOpen(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not create the class");
+    }
+  }
 
   return (
     <Page>
       <PageHeader
-        title="Classes"
-        subtitle="12 active classes · 96 students"
-        actions={
-          <>
-            <Button variant="secondary" onClick={() => toast.success("Demo: Add Class form would open")}>
-              Add Class
-            </Button>
-            <Button asChild>
-              <Link to="/admin/operations">Operations Planner</Link>
-            </Button>
-          </>
-        }
+        title="Classes & Groups"
+        subtitle="Shared operational demo · Live data"
+        actions={<Button onClick={() => openNew()}>Add Class</Button>}
       />
 
-      <div className="surface space-y-3 p-4">
-        <div className="flex flex-wrap gap-3">
-          <Field label="Site" value={siteF} onChange={setSiteF} options={["All sites", ...SITES.map((s) => s.name)]} />
-          <Field label="Day" value={dayF} onChange={setDayF} options={["All days", ...DAYS]} />
-          <Field label="Subject" value={subjectF} onChange={setSubjectF} options={["All subjects", ...subjects]} />
-          <Field label="Level" value={levelF} onChange={setLevelF} options={["All levels", ...levels]} />
-          <Field label="Tutor" value={tutorF} onChange={setTutorF} options={["All tutors", ...TUTORS.map((t) => t.name)]} />
-          <Field
-            label="Status"
-            value={statusF}
-            onChange={setStatusF}
-            options={["All statuses", "Active", "Needs tutor", "Draft"]}
-          />
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <Input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Search classes, tutors or codes"
-            className="h-10 max-w-sm rounded-xl"
-          />
-          <div className="flex rounded-xl bg-muted p-1">
-            {(["Cards", "List", "Timetable"] as const).map((v) => (
-              <button
-                key={v}
-                type="button"
-                onClick={() => setView(v)}
-                className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${
-                  view === v ? "bg-card text-primary shadow-sm" : "text-muted-foreground"
-                }`}
-              >
-                {v}
-              </button>
-            ))}
-          </div>
-          <span className="text-xs text-muted-foreground">{filtered.length} results</span>
-        </div>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatCard label="Classes" value={String(rows.length)} tone="pink" />
+        <StatCard label="Enrolled places" value={String(enrolList.length)} tone="blue" />
+        <StatCard label="Without a tutor" value={String(withoutTutor)} tone="amber" />
+        <StatCard label="Schedule blocks" value={String((blocks.data ?? []).length)} tone="purple" />
       </div>
 
-      {view === "Cards" ? (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {filtered.map((c) => {
-            const t = tutor(c.tutorId);
-            const spaces = c.capacity - c.enrolled;
-            return (
-              <article key={c.id} className="surface flex flex-col gap-3 p-5">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <h2 className="text-lg font-extrabold">{c.subject}</h2>
-                    <p className="text-xs text-muted-foreground">
-                      {c.type} · {site(c.siteId)?.name}
-                    </p>
-                  </div>
-                  <Pill tone={c.status === "Active" ? "green" : "amber"}>{c.status}</Pill>
-                </div>
-                <p className="text-sm font-semibold">
-                  {c.day} {c.start}–{c.end}
-                </p>
-                <div className="flex items-center gap-2">
-                  <Avatar initials={t?.initials ?? "?"} size="sm" tone={t ? "pink" : "amber"} />
-                  <span className="text-sm font-semibold">{t?.name ?? "Tutor needed"}</span>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Pill tone="blue">
-                    {c.enrolled}/{c.capacity} students
-                  </Pill>
-                  <CapacityPill enrolled={c.enrolled} capacity={c.capacity} />
-                  {spaces > 0 ? (
-                    <span className="text-xs text-muted-foreground">
-                      {spaces} space{spaces === 1 ? "" : "s"} left
-                    </span>
-                  ) : null}
-                </div>
-                <p className="text-xs font-semibold text-muted-foreground">
-                  GoProgress {c.goprogress ? "✓ Connected" : "· Not connected"}
-                </p>
-                <Button asChild variant="secondary" className="mt-auto rounded-full">
-                  <Link to="/admin/classes/$id" params={{ id: c.id }}>
-                    View Class
-                  </Link>
-                </Button>
-              </article>
-            );
-          })}
-        </div>
-      ) : null}
-
-      {view === "List" ? (
-        <Section id="class-list" title="All classes">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px] text-sm">
-              <thead>
-                <tr className="text-left text-xs text-muted-foreground">
-                  {["Class", "Code", "Site", "Schedule", "Tutor", "Students", "Status", ""].map((h) => (
-                    <th key={h} className="pb-2 font-semibold">
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((c) => (
-                  <tr key={c.id} className="border-t border-border">
-                    <td className="py-3 font-semibold">{c.subject}</td>
-                    <td className="py-3 text-muted-foreground">{c.code}</td>
-                    <td className="py-3">{site(c.siteId)?.name}</td>
-                    <td className="py-3">
-                      {c.day} {c.start}
-                    </td>
-                    <td className="py-3">{tutor(c.tutorId)?.name ?? "—"}</td>
-                    <td className="py-3">
-                      {c.enrolled}/{c.capacity}
-                    </td>
-                    <td className="py-3">
-                      <CapacityPill enrolled={c.enrolled} capacity={c.capacity} />
-                    </td>
-                    <td className="py-3 text-right">
-                      <Button size="sm" variant="ghost" asChild>
-                        <Link to="/admin/classes/$id" params={{ id: c.id }}>
-                          View
+      {(blocks.data ?? []).map((b) => {
+        const site = (sites.data ?? []).find((s) => s.id === b.site_id);
+        const programme = (programmes.data ?? []).find((p) => p.id === b.programme_id);
+        const inBlock = rows.filter((c) => c.schedule_block_id === b.id);
+        return (
+          <Section
+            key={b.id}
+            id={`block-${b.id}`}
+            title={b.title}
+            subtitle={`${b.weekday} ${hhmm(b.start_time)}–${hhmm(b.end_time)} · ${site?.name ?? "Venue to confirm"} · ${
+              programme?.name ?? "Programme"
+            }${b.status === "coming_soon" ? " · Coming soon" : b.start_date ? ` · from ${b.start_date}` : ""}`}
+            action={
+              <Button size="sm" variant="secondary" onClick={() => openNew(b.id)}>
+                Add class here
+              </Button>
+            }
+          >
+            {inBlock.length === 0 ? (
+              <Empty>No classes created in this block yet — 0 enrolled, tutor not assigned.</Empty>
+            ) : (
+              <ul className="space-y-2">
+                {inBlock.map((c) => {
+                  const count = enrolList.filter((e) => e.class_id === c.id).length;
+                  const tutor = (tutors.data ?? []).find((t) => t.id === c.tutor_id);
+                  return (
+                    <li key={c.id} className="flex flex-wrap items-center gap-3 rounded-2xl border border-border px-4 py-3">
+                      <div className="min-w-0 flex-1">
+                        <Link to="/admin/classes/$id" params={{ id: c.id }} className="text-sm font-bold hover:text-primary">
+                          {c.name}
                         </Link>
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Section>
-      ) : null}
+                        <p className="text-xs text-muted-foreground">
+                          {hhmm(c.start_time)}–{hhmm(c.end_time)} · {c.room ?? "Room to confirm"} ·{" "}
+                          {tutor ? fullName(tutor) : "Tutor not assigned"}
+                        </p>
+                      </div>
+                      <Pill tone={capacityTone(count, c.capacity)}>
+                        {count}/{c.capacity} enrolled
+                      </Pill>
+                      {!c.tutor_id ? <Pill tone="amber">Tutor not assigned</Pill> : null}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </Section>
+        );
+      })}
 
-      {view === "Timetable" ? (
-        <Section id="class-timetable" title="Timetable view" subtitle="Grouped by day">
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {DAYS.filter((d) => filtered.some((c) => c.day === d)).map((d) => (
-              <div key={d} className="rounded-2xl border border-border p-4">
-                <p className="text-sm font-extrabold">{d}</p>
-                <ul className="mt-2 space-y-2">
-                  {filtered
-                    .filter((c) => c.day === d)
-                    .map((c) => (
-                      <li key={c.id}>
-                        <Link
-                          to="/admin/classes/$id"
-                          params={{ id: c.id }}
-                          className="block rounded-xl bg-muted/60 px-3 py-2 hover:bg-secondary"
-                        >
-                          <p className="text-sm font-bold">{c.subject}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {c.start}–{c.end} · {tutor(c.tutorId)?.name ?? "Tutor needed"} · {c.enrolled}/
-                            {c.capacity}
-                          </p>
-                        </Link>
-                      </li>
-                    ))}
-                </ul>
-              </div>
-            ))}
-          </div>
-        </Section>
-      ) : null}
+      <FormDialog
+        open={open}
+        onOpenChange={setOpen}
+        wide
+        title="Add class or group"
+        onSubmit={save}
+        busy={create.isPending}
+      >
+        <TextField label="Class name" value={form.name} onChange={(v) => setForm({ ...form, name: v })} required full />
+        <SelectField
+          label="Programme"
+          value={form.programme_id}
+          onChange={(v) => setForm({ ...form, programme_id: v })}
+          options={[{ value: "", label: "None" }, ...(programmes.data ?? []).map((p) => ({ value: p.id, label: p.name }))]}
+        />
+        <SelectField
+          label="Site"
+          value={form.site_id}
+          onChange={(v) => setForm({ ...form, site_id: v })}
+          options={[{ value: "", label: "None" }, ...(sites.data ?? []).map((s) => ({ value: s.id, label: s.name }))]}
+        />
+        <SelectField
+          label="Schedule block"
+          value={form.schedule_block_id}
+          onChange={(v) => setForm({ ...form, schedule_block_id: v })}
+          options={[
+            { value: "", label: "Not in a block" },
+            ...(blocks.data ?? []).map((b) => ({ value: b.id, label: b.title })),
+          ]}
+        />
+        <SelectField
+          label="Tutor / coach"
+          value={form.tutor_id}
+          onChange={(v) => setForm({ ...form, tutor_id: v })}
+          options={[
+            { value: "", label: "Not assigned" },
+            ...(tutors.data ?? []).map((t) => ({ value: t.id, label: fullName(t) })),
+          ]}
+        />
+        <TextField label="Subject / activity" value={form.subject} onChange={(v) => setForm({ ...form, subject: v })} />
+        <TextField label="Level" value={form.level} onChange={(v) => setForm({ ...form, level: v })} />
+        <TextField label="Age group" value={form.age_group} onChange={(v) => setForm({ ...form, age_group: v })} />
+        <SelectField
+          label="Day"
+          value={form.weekday}
+          onChange={(v) => setForm({ ...form, weekday: v })}
+          options={WEEKDAYS.map((d) => ({ value: d, label: d }))}
+        />
+        <TextField label="Start time" type="time" value={form.start_time} onChange={(v) => setForm({ ...form, start_time: v })} />
+        <TextField label="End time" type="time" value={form.end_time} onChange={(v) => setForm({ ...form, end_time: v })} />
+        <TextField label="Capacity" type="number" value={form.capacity} onChange={(v) => setForm({ ...form, capacity: v })} />
+        <TextField label="Room / pitch" value={form.room} onChange={(v) => setForm({ ...form, room: v })} />
+        <SelectField
+          label="Format"
+          value={form.delivery_mode}
+          onChange={(v) => setForm({ ...form, delivery_mode: v })}
+          options={[
+            { value: "in_person", label: "In person" },
+            { value: "online", label: "Online" },
+            { value: "hybrid", label: "Hybrid" },
+          ]}
+        />
+        <TextField
+          label="GoProgress course link"
+          value={form.goprogress_course_url}
+          onChange={(v) => setForm({ ...form, goprogress_course_url: v })}
+        />
+        <TextField
+          label="Agreed tutor amount per session (£)"
+          type="number"
+          value={form.session_rate}
+          onChange={(v) => setForm({ ...form, session_rate: v })}
+        />
+        <TextField
+          label="Price per session (£)"
+          type="number"
+          value={form.price_per_session}
+          onChange={(v) => setForm({ ...form, price_per_session: v })}
+        />
+        <TextAreaField label="Notes" value={form.notes} onChange={(v) => setForm({ ...form, notes: v })} />
+      </FormDialog>
     </Page>
   );
 }
