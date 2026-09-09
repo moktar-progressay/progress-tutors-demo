@@ -16,7 +16,7 @@ export const Route = createFileRoute("/admin/students")({
       { property: "og:description", content: "Student roster with attendance and parent contacts." },
     ],
   }),
-  component: Students;
+  component: Students,
 });
 
 function Students() {
