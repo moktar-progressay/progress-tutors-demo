@@ -1,24 +1,121 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, type LinkProps } from "@tanstack/react-router";
+import { GraduationCap, Home, Users, Wallet } from "lucide-react";
+import { useDemo } from "@/lib/demo-store";
+import type { Role } from "@/lib/demo-data";
 
-// No head() here: the home route inherits title/description/og/twitter from
-// __root.tsx, and ships no og:image so serve-time hosting can inject the
-// project's social preview (explicit og:image or latest screenshot).
 export const Route = createFileRoute("/")({
-  component: Index,
+  head: () => ({
+    meta: [
+      { title: "ProgressTutors — Interactive Tuition Management Demo" },
+      {
+        name: "description",
+        content:
+          "Clickable ProgressTutors prototype: pick a role — admin, tutor, parent or student — and explore tuition operations, payments and progress.",
+      },
+      { property: "og:title", content: "ProgressTutors — Interactive Tuition Management Demo" },
+      {
+        property: "og:description",
+        content: "Explore tuition operations, tutor payment requests, parent billing and student progress.",
+      },
+    ],
+  }),
+  component: Landing,
 });
 
-// IMPORTANT: Replace this placeholder. See ./README.md for routing conventions.
-function Index() {
+const CARDS: {
+  role: Role;
+  to: LinkProps["to"];
+  title: string;
+  body: string;
+  icon: typeof Home;
+  tone: string;
+}[] = [
+  {
+    role: "admin",
+    to: "/admin/dashboard",
+    title: "School / Tuition Admin",
+    body: "Run sites, classes, tutors, capacity, client billing and tutor Payment Requests.",
+    icon: Home,
+    tone: "bg-tile-pink text-tile-pink-ink",
+  },
+  {
+    role: "tutor",
+    to: "/tutor/dashboard",
+    title: "Tutor",
+    body: "See where and who you teach, sign in to lessons, submit reviews and get paid.",
+    icon: Users,
+    tone: "bg-tile-blue text-tile-blue-ink",
+  },
+  {
+    role: "parent",
+    to: "/parent/dashboard",
+    title: "Parent",
+    body: "Track every child's lessons, homework and payments, and join new classes.",
+    icon: Wallet,
+    tone: "bg-tile-green text-tile-green-ink",
+  },
+  {
+    role: "student",
+    to: "/student/dashboard",
+    title: "Student",
+    body: "Next lessons, homework, XP, streaks, badges and rewards.",
+    icon: GraduationCap,
+    tone: "bg-tile-purple text-tile-purple-ink",
+  },
+];
+
+function Landing() {
+  const { setRole } = useDemo();
+  const navigate = useNavigate();
+
   return (
-    <div
-      className="flex min-h-screen items-center justify-center"
-      style={{ backgroundColor: "#fcfbf8" }}
-    >
-      <img
-        data-lovable-blank-page-placeholder="REMOVE_THIS"
-        src="https://cdn.gpteng.co/blank-app-v1.svg"
-        alt="Your app will live here!"
-      />
+    <div className="min-h-screen bg-background">
+      <div className="hero-curve px-6 py-16 sm:px-10 sm:py-24">
+        <div className="relative z-10 mx-auto max-w-5xl">
+          <span className="inline-flex rounded-full bg-white/20 px-3 py-1 text-xs font-bold">
+            Interactive product demo · Sample data only
+          </span>
+          <h1 className="mt-5 text-4xl font-extrabold sm:text-6xl">ProgressTutors</h1>
+          <p className="mt-4 max-w-2xl text-base opacity-90 sm:text-lg">
+            Tuition management for multi-site schools: operations planning, tutor pay, client billing and
+            gamified student progress — with GoProgress connected for learning and attendance.
+          </p>
+        </div>
+      </div>
+
+      <main className="mx-auto max-w-5xl px-6 py-12">
+        <h2 className="text-xl font-extrabold">Choose a demo role</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          No sign-in needed. You can switch role at any time from the bar at the top.
+        </p>
+        <div className="mt-6 grid gap-4 sm:grid-cols-2">
+          {CARDS.map((c) => (
+            <button
+              key={c.role}
+              type="button"
+              onClick={() => {
+                setRole(c.role);
+                navigate({ to: c.to });
+              }}
+              className="surface p-6 text-left transition-shadow hover:shadow-md"
+            >
+              <span className={`inline-flex h-11 w-11 items-center justify-center rounded-2xl ${c.tone}`}>
+                <c.icon className="h-5 w-5" />
+              </span>
+              <h3 className="mt-4 text-lg font-extrabold">{c.title}</h3>
+              <p className="mt-1 text-sm text-muted-foreground">{c.body}</p>
+              <span className="mt-4 inline-block text-sm font-bold text-primary">Enter demo →</span>
+            </button>
+          ))}
+        </div>
+      </main>
+
+      <footer className="footer-curve mx-auto mt-8 max-w-6xl px-8 py-10">
+        <p className="text-lg font-extrabold">ProgressTutors</p>
+        <p className="text-xs opacity-85">
+          Prototype for stakeholder and development review · No authentication, payments or live data.
+        </p>
+      </footer>
     </div>
   );
 }
