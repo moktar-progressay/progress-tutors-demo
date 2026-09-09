@@ -17,12 +17,17 @@ import { Route as AdminPaymentsRouteImport } from './routes/admin.payments'
 import { Route as AdminReportsRouteImport } from './routes/admin.reports'
 import { Route as AdminStudentsRouteImport } from './routes/admin.students'
 import { Route as AdminTutorsRouteImport } from './routes/admin.tutors'
+import { Route as ParentDashboardRouteImport } from './routes/parent.dashboard'
+import { Route as ParentPaymentsRouteImport } from './routes/parent.payments'
 import { Route as TutorDashboardRouteImport } from './routes/tutor.dashboard'
 import { Route as TutorEarningsRouteImport } from './routes/tutor.earnings'
 import { Route as TutorLessonsRouteImport } from './routes/tutor.lessons'
 import { Route as TutorPaymentRequestsRouteImport } from './routes/tutor.payment-requests'
 import { Route as AdminClassesIndexRouteImport } from './routes/admin.classes.index'
 import { Route as AdminClassesIdRouteImport } from './routes/admin.classes.$id'
+import { Route as ParentChildrenIdRouteImport } from './routes/parent.children.$id'
+import { Route as ParentClassesIndexRouteImport } from './routes/parent.classes.index'
+import { Route as ParentClassesIdRouteImport } from './routes/parent.classes.$id'
 import { Route as TutorLessonIdIndexRouteImport } from './routes/tutor.lesson.$id.index'
 import { Route as TutorLessonIdReviewRouteImport } from './routes/tutor.lesson.$id.review'
 
@@ -66,6 +71,16 @@ const AdminTutorsRoute = AdminTutorsRouteImport.update({
   path: '/admin/tutors',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ParentDashboardRoute = ParentDashboardRouteImport.update({
+  id: '/parent/dashboard',
+  path: '/parent/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ParentPaymentsRoute = ParentPaymentsRouteImport.update({
+  id: '/parent/payments',
+  path: '/parent/payments',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TutorDashboardRoute = TutorDashboardRouteImport.update({
   id: '/tutor/dashboard',
   path: '/tutor/dashboard',
@@ -96,6 +111,21 @@ const AdminClassesIdRoute = AdminClassesIdRouteImport.update({
   path: '/admin/classes/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ParentChildrenIdRoute = ParentChildrenIdRouteImport.update({
+  id: '/parent/children/$id',
+  path: '/parent/children/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ParentClassesIndexRoute = ParentClassesIndexRouteImport.update({
+  id: '/parent/classes/',
+  path: '/parent/classes/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ParentClassesIdRoute = ParentClassesIdRouteImport.update({
+  id: '/parent/classes/$id',
+  path: '/parent/classes/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TutorLessonIdIndexRoute = TutorLessonIdIndexRouteImport.update({
   id: '/tutor/lesson/$id/',
   path: '/tutor/lesson/$id/',
@@ -116,12 +146,17 @@ export interface FileRoutesByFullPath {
   '/admin/reports': typeof AdminReportsRoute
   '/admin/students': typeof AdminStudentsRoute
   '/admin/tutors': typeof AdminTutorsRoute
+  '/parent/dashboard': typeof ParentDashboardRoute
+  '/parent/payments': typeof ParentPaymentsRoute
   '/tutor/dashboard': typeof TutorDashboardRoute
   '/tutor/earnings': typeof TutorEarningsRoute
   '/tutor/lessons': typeof TutorLessonsRoute
   '/tutor/payment-requests': typeof TutorPaymentRequestsRoute
   '/admin/classes/$id': typeof AdminClassesIdRoute
+  '/parent/children/$id': typeof ParentChildrenIdRoute
+  '/parent/classes/$id': typeof ParentClassesIdRoute
   '/admin/classes/': typeof AdminClassesIndexRoute
+  '/parent/classes/': typeof ParentClassesIndexRoute
   '/tutor/lesson/$id/review': typeof TutorLessonIdReviewRoute
   '/tutor/lesson/$id/': typeof TutorLessonIdIndexRoute
 }
@@ -134,12 +169,17 @@ export interface FileRoutesByTo {
   '/admin/reports': typeof AdminReportsRoute
   '/admin/students': typeof AdminStudentsRoute
   '/admin/tutors': typeof AdminTutorsRoute
+  '/parent/dashboard': typeof ParentDashboardRoute
+  '/parent/payments': typeof ParentPaymentsRoute
   '/tutor/dashboard': typeof TutorDashboardRoute
   '/tutor/earnings': typeof TutorEarningsRoute
   '/tutor/lessons': typeof TutorLessonsRoute
   '/tutor/payment-requests': typeof TutorPaymentRequestsRoute
   '/admin/classes/$id': typeof AdminClassesIdRoute
+  '/parent/children/$id': typeof ParentChildrenIdRoute
+  '/parent/classes/$id': typeof ParentClassesIdRoute
   '/admin/classes': typeof AdminClassesIndexRoute
+  '/parent/classes': typeof ParentClassesIndexRoute
   '/tutor/lesson/$id/review': typeof TutorLessonIdReviewRoute
   '/tutor/lesson/$id': typeof TutorLessonIdIndexRoute
 }
@@ -153,12 +193,17 @@ export interface FileRoutesById {
   '/admin/reports': typeof AdminReportsRoute
   '/admin/students': typeof AdminStudentsRoute
   '/admin/tutors': typeof AdminTutorsRoute
+  '/parent/dashboard': typeof ParentDashboardRoute
+  '/parent/payments': typeof ParentPaymentsRoute
   '/tutor/dashboard': typeof TutorDashboardRoute
   '/tutor/earnings': typeof TutorEarningsRoute
   '/tutor/lessons': typeof TutorLessonsRoute
   '/tutor/payment-requests': typeof TutorPaymentRequestsRoute
   '/admin/classes/$id': typeof AdminClassesIdRoute
+  '/parent/children/$id': typeof ParentChildrenIdRoute
+  '/parent/classes/$id': typeof ParentClassesIdRoute
   '/admin/classes/': typeof AdminClassesIndexRoute
+  '/parent/classes/': typeof ParentClassesIndexRoute
   '/tutor/lesson/$id/review': typeof TutorLessonIdReviewRoute
   '/tutor/lesson/$id/': typeof TutorLessonIdIndexRoute
 }
@@ -173,12 +218,17 @@ export interface FileRouteTypes {
     | '/admin/reports'
     | '/admin/students'
     | '/admin/tutors'
+    | '/parent/dashboard'
+    | '/parent/payments'
     | '/tutor/dashboard'
     | '/tutor/earnings'
     | '/tutor/lessons'
     | '/tutor/payment-requests'
     | '/admin/classes/$id'
+    | '/parent/children/$id'
+    | '/parent/classes/$id'
     | '/admin/classes/'
+    | '/parent/classes/'
     | '/tutor/lesson/$id/review'
     | '/tutor/lesson/$id/'
   fileRoutesByTo: FileRoutesByTo
@@ -191,12 +241,17 @@ export interface FileRouteTypes {
     | '/admin/reports'
     | '/admin/students'
     | '/admin/tutors'
+    | '/parent/dashboard'
+    | '/parent/payments'
     | '/tutor/dashboard'
     | '/tutor/earnings'
     | '/tutor/lessons'
     | '/tutor/payment-requests'
     | '/admin/classes/$id'
+    | '/parent/children/$id'
+    | '/parent/classes/$id'
     | '/admin/classes'
+    | '/parent/classes'
     | '/tutor/lesson/$id/review'
     | '/tutor/lesson/$id'
   id:
@@ -209,12 +264,17 @@ export interface FileRouteTypes {
     | '/admin/reports'
     | '/admin/students'
     | '/admin/tutors'
+    | '/parent/dashboard'
+    | '/parent/payments'
     | '/tutor/dashboard'
     | '/tutor/earnings'
     | '/tutor/lessons'
     | '/tutor/payment-requests'
     | '/admin/classes/$id'
+    | '/parent/children/$id'
+    | '/parent/classes/$id'
     | '/admin/classes/'
+    | '/parent/classes/'
     | '/tutor/lesson/$id/review'
     | '/tutor/lesson/$id/'
   fileRoutesById: FileRoutesById
@@ -228,12 +288,17 @@ export interface RootRouteChildren {
   AdminReportsRoute: typeof AdminReportsRoute
   AdminStudentsRoute: typeof AdminStudentsRoute
   AdminTutorsRoute: typeof AdminTutorsRoute
+  ParentDashboardRoute: typeof ParentDashboardRoute
+  ParentPaymentsRoute: typeof ParentPaymentsRoute
   TutorDashboardRoute: typeof TutorDashboardRoute
   TutorEarningsRoute: typeof TutorEarningsRoute
   TutorLessonsRoute: typeof TutorLessonsRoute
   TutorPaymentRequestsRoute: typeof TutorPaymentRequestsRoute
   AdminClassesIdRoute: typeof AdminClassesIdRoute
+  ParentChildrenIdRoute: typeof ParentChildrenIdRoute
+  ParentClassesIdRoute: typeof ParentClassesIdRoute
   AdminClassesIndexRoute: typeof AdminClassesIndexRoute
+  ParentClassesIndexRoute: typeof ParentClassesIndexRoute
   TutorLessonIdReviewRoute: typeof TutorLessonIdReviewRoute
   TutorLessonIdIndexRoute: typeof TutorLessonIdIndexRoute
 }
@@ -296,6 +361,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminTutorsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/parent/dashboard': {
+      id: '/parent/dashboard'
+      path: '/parent/dashboard'
+      fullPath: '/parent/dashboard'
+      preLoaderRoute: typeof ParentDashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/parent/payments': {
+      id: '/parent/payments'
+      path: '/parent/payments'
+      fullPath: '/parent/payments'
+      preLoaderRoute: typeof ParentPaymentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/tutor/dashboard': {
       id: '/tutor/dashboard'
       path: '/tutor/dashboard'
@@ -338,6 +417,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminClassesIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/parent/children/$id': {
+      id: '/parent/children/$id'
+      path: '/parent/children/$id'
+      fullPath: '/parent/children/$id'
+      preLoaderRoute: typeof ParentChildrenIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/parent/classes/': {
+      id: '/parent/classes/'
+      path: '/parent/classes'
+      fullPath: '/parent/classes/'
+      preLoaderRoute: typeof ParentClassesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/parent/classes/$id': {
+      id: '/parent/classes/$id'
+      path: '/parent/classes/$id'
+      fullPath: '/parent/classes/$id'
+      preLoaderRoute: typeof ParentClassesIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/tutor/lesson/$id/': {
       id: '/tutor/lesson/$id/'
       path: '/tutor/lesson/$id'
@@ -364,12 +464,17 @@ const rootRouteChildren: RootRouteChildren = {
   AdminReportsRoute: AdminReportsRoute,
   AdminStudentsRoute: AdminStudentsRoute,
   AdminTutorsRoute: AdminTutorsRoute,
+  ParentDashboardRoute: ParentDashboardRoute,
+  ParentPaymentsRoute: ParentPaymentsRoute,
   TutorDashboardRoute: TutorDashboardRoute,
   TutorEarningsRoute: TutorEarningsRoute,
   TutorLessonsRoute: TutorLessonsRoute,
   TutorPaymentRequestsRoute: TutorPaymentRequestsRoute,
   AdminClassesIdRoute: AdminClassesIdRoute,
+  ParentChildrenIdRoute: ParentChildrenIdRoute,
+  ParentClassesIdRoute: ParentClassesIdRoute,
   AdminClassesIndexRoute: AdminClassesIndexRoute,
+  ParentClassesIndexRoute: ParentClassesIndexRoute,
   TutorLessonIdReviewRoute: TutorLessonIdReviewRoute,
   TutorLessonIdIndexRoute: TutorLessonIdIndexRoute,
 }
