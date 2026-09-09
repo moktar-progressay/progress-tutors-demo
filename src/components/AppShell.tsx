@@ -139,8 +139,8 @@ export function AppShell({ children }: { children: ReactNode }) {
       <div className="sticky top-0 z-40 bg-primary text-primary-foreground">
         <div className="mx-auto flex max-w-[1500px] flex-wrap items-center justify-between gap-2 px-4 py-2">
           <p className="flex items-center gap-2 text-[11px] font-semibold sm:text-xs">
-            <Sparkles className="h-3.5 w-3.5" />
-            Shared operational demo · Live data
+            <Sparkles className="h-3.5 w-3.5 shrink-0" />
+            Shared operational demo — data entered here is visible to authorised Progressay testers.
           </p>
           <div className="flex items-center gap-2">
             <span className="hidden text-[11px] font-semibold opacity-80 sm:inline">View as</span>
