@@ -27,8 +27,12 @@ export type ClientPaymentRow = Row<"client_payments">;
 export type HomeworkRow = Row<"homework_items">;
 export type ProgressRow = Row<"progress_records">;
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/** Loosely typed handle: table names are generic here, results are cast back to generated row types. */
+const sb = supabase as any;
+
 async function selectAll<T extends keyof Tables>(table: T, order?: string): Promise<Row<T>[]> {
-  const query = supabase.from(table as string).select("*");
+  const query = sb.from(table as string).select("*");
   const { data, error } = await (order ? query.order(order) : query);
   if (error) throw error;
   return (data ?? []) as Row<T>[];
