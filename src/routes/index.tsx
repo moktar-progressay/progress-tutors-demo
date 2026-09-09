@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate, type LinkProps } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate, type LinkProps } from "@tanstack/react-router";
 import { GraduationCap, Home, Users, Wallet } from "lucide-react";
 import { useDemo } from "@/lib/demo-store";
 import type { Role } from "@/lib/demo-data";
@@ -73,20 +73,26 @@ function Landing() {
       <div className="hero-curve px-6 py-16 sm:px-10 sm:py-24">
         <div className="relative z-10 mx-auto max-w-5xl">
           <span className="inline-flex rounded-full bg-white/20 px-3 py-1 text-xs font-bold">
-            Interactive product demo · Sample data only
+            Shared operational demo · Live data · Sign-in required
           </span>
           <h1 className="mt-5 text-4xl font-extrabold sm:text-6xl">ProgressTutors</h1>
           <p className="mt-4 max-w-2xl text-base opacity-90 sm:text-lg">
-            Tuition management for multi-site schools: operations planning, tutor pay, client billing and
-            gamified student progress — with GoProgress connected for learning and attendance.
+            Tuition and football management across sites: schedules, registers, tutor pay, family billing and
+            student progress — with GoProgress connected for learning and attendance.
           </p>
+          <Link
+            to="/auth"
+            className="mt-6 inline-flex rounded-xl bg-white px-5 py-3 text-sm font-bold text-primary"
+          >
+            Sign in to the demo
+          </Link>
         </div>
       </div>
 
       <main className="mx-auto max-w-5xl px-6 py-12">
-        <h2 className="text-xl font-extrabold">Choose a demo role</h2>
+        <h2 className="text-xl font-extrabold">Choose a view</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          No sign-in needed. You can switch role at any time from the bar at the top.
+          Everyone signed in shares the same records. You can switch view at any time from the bar at the top.
         </p>
         <div className="mt-6 grid gap-4 sm:grid-cols-2">
           {CARDS.map((c) => (
@@ -113,7 +119,7 @@ function Landing() {
       <footer className="footer-curve mx-auto mt-8 max-w-6xl px-8 py-10">
         <p className="text-lg font-extrabold">ProgressTutors</p>
         <p className="text-xs opacity-85">
-          Prototype for stakeholder and development review · No authentication, payments or live data.
+          Shared operational demo · Sign-in required · Real records are stored, no card payments are taken.
         </p>
       </footer>
     </div>

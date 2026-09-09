@@ -15,8 +15,9 @@ import {
   Users,
   Wallet,
 } from "lucide-react";
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
 import { useDemo } from "@/lib/demo-store";
 import { ORG, type Role } from "@/lib/demo-data";
 
@@ -69,12 +70,30 @@ const ROLE_HOME: Record<Role, ToPath> = {
   student: "/student/dashboard",
 };
 
-const ROLE_USER: Record<Role, { name: string; sub: string; initials: string }> = {
-  admin: { name: "Moktar A.", sub: "Operations Admin", initials: "MA" },
-  tutor: { name: "Sarah Ahmed", sub: "Tutor", initials: "SA" },
-  parent: { name: "Sarah Khan", sub: "Parent · 3 children", initials: "SK" },
-  student: { name: "Aisha Khan", sub: "Year 10 · Level 7", initials: "AK" },
+const ROLE_LABEL: Record<Role, string> = {
+  admin: "Admin view",
+  tutor: "Tutor view",
+  parent: "Parent view",
+  student: "Student view",
 };
+
+function useSignedInUser() {
+  const [email, setEmail] = useState("");
+  useEffect(() => {
+    let active = true;
+    void supabase.auth.getSession().then(({ data }) => {
+      if (active) setEmail(data.session?.user.email ?? "");
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
+      setEmail(session?.user.email ?? "");
+    });
+    return () => {
+      active = false;
+      sub.subscription.unsubscribe();
+    };
+  }, []);
+  return email;
+}
 
 const ROLES: Role[] = ["admin", "tutor", "parent", "student"];
 
@@ -105,24 +124,26 @@ function RoleSwitcher() {
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { role } = useDemo();
+  const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const items = NAV[role];
-  const user = ROLE_USER[role];
-  const isLanding = pathname === "/";
+  const email = useSignedInUser();
+  const initials = (email.slice(0, 2) || "PT").toUpperCase();
+  const isPublic = pathname === "/" || pathname === "/auth";
 
-  if (isLanding) return <>{children}</>;
+  if (isPublic) return <>{children}</>;
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Demo banner + role switcher */}
+      {/* Live-data banner + role switcher */}
       <div className="sticky top-0 z-40 bg-primary text-primary-foreground">
         <div className="mx-auto flex max-w-[1500px] flex-wrap items-center justify-between gap-2 px-4 py-2">
           <p className="flex items-center gap-2 text-[11px] font-semibold sm:text-xs">
             <Sparkles className="h-3.5 w-3.5" />
-            Interactive ProgressTutors product demo · Sample data only
+            Shared operational demo · Live data
           </p>
           <div className="flex items-center gap-2">
-            <span className="hidden text-[11px] font-semibold opacity-80 sm:inline">Demo role</span>
+            <span className="hidden text-[11px] font-semibold opacity-80 sm:inline">View as</span>
             <RoleSwitcher />
           </div>
         </div>
@@ -156,14 +177,26 @@ export function AppShell({ children }: { children: ReactNode }) {
             ))}
           </nav>
 
-          <div className="mt-4 flex items-center gap-3 rounded-2xl bg-secondary px-3 py-3">
-            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
-              {user.initials}
-            </span>
-            <span className="min-w-0">
-              <span className="block truncate text-sm font-bold">{user.name}</span>
-              <span className="block truncate text-[11px] text-muted-foreground">{user.sub}</span>
-            </span>
+          <div className="mt-4 rounded-2xl bg-secondary px-3 py-3">
+            <div className="flex items-center gap-3">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+                {initials}
+              </span>
+              <span className="min-w-0">
+                <span className="block truncate text-sm font-bold">{email || "Signed in"}</span>
+                <span className="block truncate text-[11px] text-muted-foreground">{ROLE_LABEL[role]}</span>
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={async () => {
+                await supabase.auth.signOut();
+                navigate({ to: "/auth" });
+              }}
+              className="mt-3 w-full rounded-xl bg-card px-3 py-2 text-xs font-bold text-foreground hover:bg-background"
+            >
+              Sign out
+            </button>
           </div>
         </aside>
 
@@ -177,9 +210,16 @@ export function AppShell({ children }: { children: ReactNode }) {
               </span>
               <span className="text-sm font-extrabold">ProgressTutors</span>
             </Link>
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-secondary text-[11px] font-bold text-primary">
-              {user.initials}
-            </span>
+            <button
+              type="button"
+              onClick={async () => {
+                await supabase.auth.signOut();
+                navigate({ to: "/auth" });
+              }}
+              className="flex h-8 items-center justify-center rounded-full bg-secondary px-3 text-[11px] font-bold text-primary"
+            >
+              {initials} · Sign out
+            </button>
           </div>
 
           {children}
@@ -192,7 +232,9 @@ export function AppShell({ children }: { children: ReactNode }) {
                   Tuition management for schools, tutors, parents and students.
                 </p>
               </div>
-              <p className="text-xs opacity-85">Prototype only · No real data, payments or accounts</p>
+              <p className="text-xs opacity-85">
+                Shared operational demo · Sign-in required · Real records, no card payments
+              </p>
             </div>
           </footer>
         </main>
