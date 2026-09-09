@@ -20,8 +20,10 @@ import { cn } from "@/lib/utils";
 import { useDemo } from "@/lib/demo-store";
 import { ORG, type Role } from "@/lib/demo-data";
 
+type ToPath = NonNullable<LinkProps["to"]>;
+
 interface NavItem {
-  to: LinkProps["to"];
+  to: ToPath;
   label: string;
   icon: ReactNode;
 }
@@ -59,7 +61,7 @@ export const NAV: Record<Role, NavItem[]> = {
   ],
 };
 
-const ROLE_HOME: Record<Role, LinkProps["to"]> = {
+const ROLE_HOME: Record<Role, ToPath> = {
   admin: "/admin/dashboard",
   tutor: "/tutor/dashboard",
   parent: "/parent/dashboard",
