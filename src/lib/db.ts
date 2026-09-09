@@ -49,8 +49,11 @@ export function useTable<T extends keyof Tables>(table: T, order?: string) {
 export function useInvalidate() {
   const qc = useQueryClient();
   return (...tables: (keyof Tables)[]) => {
-    if (tables.length === 0) return qc.invalidateQueries();
-    tables.forEach((t) => qc.invalidateQueries({ queryKey: [t] }));
+    if (tables.length === 0) {
+      void qc.invalidateQueries();
+      return;
+    }
+    tables.forEach((t) => void qc.invalidateQueries({ queryKey: [t] }));
   };
 }
 
