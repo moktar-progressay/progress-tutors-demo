@@ -69,12 +69,30 @@ const ROLE_HOME: Record<Role, ToPath> = {
   student: "/student/dashboard",
 };
 
-const ROLE_USER: Record<Role, { name: string; sub: string; initials: string }> = {
-  admin: { name: "Moktar A.", sub: "Operations Admin", initials: "MA" },
-  tutor: { name: "Sarah Ahmed", sub: "Tutor", initials: "SA" },
-  parent: { name: "Sarah Khan", sub: "Parent · 3 children", initials: "SK" },
-  student: { name: "Aisha Khan", sub: "Year 10 · Level 7", initials: "AK" },
+const ROLE_LABEL: Record<Role, string> = {
+  admin: "Admin view",
+  tutor: "Tutor view",
+  parent: "Parent view",
+  student: "Student view",
 };
+
+function useSignedInUser() {
+  const [email, setEmail] = useState("");
+  useEffect(() => {
+    let active = true;
+    void supabase.auth.getSession().then(({ data }) => {
+      if (active) setEmail(data.session?.user.email ?? "");
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
+      setEmail(session?.user.email ?? "");
+    });
+    return () => {
+      active = false;
+      sub.subscription.unsubscribe();
+    };
+  }, []);
+  return email;
+}
 
 const ROLES: Role[] = ["admin", "tutor", "parent", "student"];
 
