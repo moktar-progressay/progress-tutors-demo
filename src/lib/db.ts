@@ -59,7 +59,7 @@ export function useUpsert<T extends keyof Tables>(table: T, invalidates: (keyof 
   const invalidate = useInvalidate();
   return useMutation({
     mutationFn: async (values: Insert<T> | Insert<T>[]) => {
-      const { data, error } = await supabase
+      const { data, error } = await sb
         .from(table as string)
         .insert(values as never)
         .select();
@@ -74,7 +74,7 @@ export function useUpdateRow<T extends keyof Tables>(table: T, invalidates: (key
   const invalidate = useInvalidate();
   return useMutation({
     mutationFn: async ({ id, values }: { id: string; values: Update<T> }) => {
-      const { error } = await supabase
+      const { error } = await sb
         .from(table as string)
         .update(values as never)
         .eq("id", id);
@@ -88,7 +88,7 @@ export function useDeleteRow<T extends keyof Tables>(table: T, invalidates: (key
   const invalidate = useInvalidate();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from(table as string).delete().eq("id", id);
+      const { error } = await sb.from(table as string).delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => invalidate(table, ...invalidates),
