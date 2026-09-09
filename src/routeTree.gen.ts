@@ -12,6 +12,9 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminDashboardRouteImport } from './routes/admin.dashboard'
 import { Route as AdminOperationsRouteImport } from './routes/admin.operations'
+import { Route as AdminPaymentRequestsRouteImport } from './routes/admin.payment-requests'
+import { Route as AdminPaymentsRouteImport } from './routes/admin.payments'
+import { Route as AdminReportsRouteImport } from './routes/admin.reports'
 import { Route as AdminStudentsRouteImport } from './routes/admin.students'
 import { Route as AdminTutorsRouteImport } from './routes/admin.tutors'
 import { Route as AdminClassesIndexRouteImport } from './routes/admin.classes.index'
@@ -30,6 +33,21 @@ const AdminDashboardRoute = AdminDashboardRouteImport.update({
 const AdminOperationsRoute = AdminOperationsRouteImport.update({
   id: '/admin/operations',
   path: '/admin/operations',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminPaymentRequestsRoute = AdminPaymentRequestsRouteImport.update({
+  id: '/admin/payment-requests',
+  path: '/admin/payment-requests',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminPaymentsRoute = AdminPaymentsRouteImport.update({
+  id: '/admin/payments',
+  path: '/admin/payments',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminReportsRoute = AdminReportsRouteImport.update({
+  id: '/admin/reports',
+  path: '/admin/reports',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminStudentsRoute = AdminStudentsRouteImport.update({
@@ -57,6 +75,9 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/operations': typeof AdminOperationsRoute
+  '/admin/payment-requests': typeof AdminPaymentRequestsRoute
+  '/admin/payments': typeof AdminPaymentsRoute
+  '/admin/reports': typeof AdminReportsRoute
   '/admin/students': typeof AdminStudentsRoute
   '/admin/tutors': typeof AdminTutorsRoute
   '/admin/classes/$id': typeof AdminClassesIdRoute
@@ -66,6 +87,9 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/operations': typeof AdminOperationsRoute
+  '/admin/payment-requests': typeof AdminPaymentRequestsRoute
+  '/admin/payments': typeof AdminPaymentsRoute
+  '/admin/reports': typeof AdminReportsRoute
   '/admin/students': typeof AdminStudentsRoute
   '/admin/tutors': typeof AdminTutorsRoute
   '/admin/classes/$id': typeof AdminClassesIdRoute
@@ -76,6 +100,9 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/operations': typeof AdminOperationsRoute
+  '/admin/payment-requests': typeof AdminPaymentRequestsRoute
+  '/admin/payments': typeof AdminPaymentsRoute
+  '/admin/reports': typeof AdminReportsRoute
   '/admin/students': typeof AdminStudentsRoute
   '/admin/tutors': typeof AdminTutorsRoute
   '/admin/classes/$id': typeof AdminClassesIdRoute
@@ -87,6 +114,9 @@ export interface FileRouteTypes {
     | '/'
     | '/admin/dashboard'
     | '/admin/operations'
+    | '/admin/payment-requests'
+    | '/admin/payments'
+    | '/admin/reports'
     | '/admin/students'
     | '/admin/tutors'
     | '/admin/classes/$id'
@@ -96,6 +126,9 @@ export interface FileRouteTypes {
     | '/'
     | '/admin/dashboard'
     | '/admin/operations'
+    | '/admin/payment-requests'
+    | '/admin/payments'
+    | '/admin/reports'
     | '/admin/students'
     | '/admin/tutors'
     | '/admin/classes/$id'
@@ -105,6 +138,9 @@ export interface FileRouteTypes {
     | '/'
     | '/admin/dashboard'
     | '/admin/operations'
+    | '/admin/payment-requests'
+    | '/admin/payments'
+    | '/admin/reports'
     | '/admin/students'
     | '/admin/tutors'
     | '/admin/classes/$id'
@@ -115,6 +151,9 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminDashboardRoute: typeof AdminDashboardRoute
   AdminOperationsRoute: typeof AdminOperationsRoute
+  AdminPaymentRequestsRoute: typeof AdminPaymentRequestsRoute
+  AdminPaymentsRoute: typeof AdminPaymentsRoute
+  AdminReportsRoute: typeof AdminReportsRoute
   AdminStudentsRoute: typeof AdminStudentsRoute
   AdminTutorsRoute: typeof AdminTutorsRoute
   AdminClassesIdRoute: typeof AdminClassesIdRoute
@@ -142,6 +181,27 @@ declare module '@tanstack/react-router' {
       path: '/admin/operations'
       fullPath: '/admin/operations'
       preLoaderRoute: typeof AdminOperationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/payment-requests': {
+      id: '/admin/payment-requests'
+      path: '/admin/payment-requests'
+      fullPath: '/admin/payment-requests'
+      preLoaderRoute: typeof AdminPaymentRequestsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/payments': {
+      id: '/admin/payments'
+      path: '/admin/payments'
+      fullPath: '/admin/payments'
+      preLoaderRoute: typeof AdminPaymentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/reports': {
+      id: '/admin/reports'
+      path: '/admin/reports'
+      fullPath: '/admin/reports'
+      preLoaderRoute: typeof AdminReportsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/students': {
@@ -179,6 +239,9 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminDashboardRoute: AdminDashboardRoute,
   AdminOperationsRoute: AdminOperationsRoute,
+  AdminPaymentRequestsRoute: AdminPaymentRequestsRoute,
+  AdminPaymentsRoute: AdminPaymentsRoute,
+  AdminReportsRoute: AdminReportsRoute,
   AdminStudentsRoute: AdminStudentsRoute,
   AdminTutorsRoute: AdminTutorsRoute,
   AdminClassesIdRoute: AdminClassesIdRoute,
