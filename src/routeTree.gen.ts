@@ -19,6 +19,11 @@ import { Route as AdminStudentsRouteImport } from './routes/admin.students'
 import { Route as AdminTutorsRouteImport } from './routes/admin.tutors'
 import { Route as ParentDashboardRouteImport } from './routes/parent.dashboard'
 import { Route as ParentPaymentsRouteImport } from './routes/parent.payments'
+import { Route as StudentDashboardRouteImport } from './routes/student.dashboard'
+import { Route as StudentHomeworkRouteImport } from './routes/student.homework'
+import { Route as StudentLessonsRouteImport } from './routes/student.lessons'
+import { Route as StudentProgressRouteImport } from './routes/student.progress'
+import { Route as StudentRewardsRouteImport } from './routes/student.rewards'
 import { Route as TutorDashboardRouteImport } from './routes/tutor.dashboard'
 import { Route as TutorEarningsRouteImport } from './routes/tutor.earnings'
 import { Route as TutorLessonsRouteImport } from './routes/tutor.lessons'
@@ -79,6 +84,31 @@ const ParentDashboardRoute = ParentDashboardRouteImport.update({
 const ParentPaymentsRoute = ParentPaymentsRouteImport.update({
   id: '/parent/payments',
   path: '/parent/payments',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StudentDashboardRoute = StudentDashboardRouteImport.update({
+  id: '/student/dashboard',
+  path: '/student/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StudentHomeworkRoute = StudentHomeworkRouteImport.update({
+  id: '/student/homework',
+  path: '/student/homework',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StudentLessonsRoute = StudentLessonsRouteImport.update({
+  id: '/student/lessons',
+  path: '/student/lessons',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StudentProgressRoute = StudentProgressRouteImport.update({
+  id: '/student/progress',
+  path: '/student/progress',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StudentRewardsRoute = StudentRewardsRouteImport.update({
+  id: '/student/rewards',
+  path: '/student/rewards',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TutorDashboardRoute = TutorDashboardRouteImport.update({
@@ -148,6 +178,11 @@ export interface FileRoutesByFullPath {
   '/admin/tutors': typeof AdminTutorsRoute
   '/parent/dashboard': typeof ParentDashboardRoute
   '/parent/payments': typeof ParentPaymentsRoute
+  '/student/dashboard': typeof StudentDashboardRoute
+  '/student/homework': typeof StudentHomeworkRoute
+  '/student/lessons': typeof StudentLessonsRoute
+  '/student/progress': typeof StudentProgressRoute
+  '/student/rewards': typeof StudentRewardsRoute
   '/tutor/dashboard': typeof TutorDashboardRoute
   '/tutor/earnings': typeof TutorEarningsRoute
   '/tutor/lessons': typeof TutorLessonsRoute
@@ -171,6 +206,11 @@ export interface FileRoutesByTo {
   '/admin/tutors': typeof AdminTutorsRoute
   '/parent/dashboard': typeof ParentDashboardRoute
   '/parent/payments': typeof ParentPaymentsRoute
+  '/student/dashboard': typeof StudentDashboardRoute
+  '/student/homework': typeof StudentHomeworkRoute
+  '/student/lessons': typeof StudentLessonsRoute
+  '/student/progress': typeof StudentProgressRoute
+  '/student/rewards': typeof StudentRewardsRoute
   '/tutor/dashboard': typeof TutorDashboardRoute
   '/tutor/earnings': typeof TutorEarningsRoute
   '/tutor/lessons': typeof TutorLessonsRoute
@@ -195,6 +235,11 @@ export interface FileRoutesById {
   '/admin/tutors': typeof AdminTutorsRoute
   '/parent/dashboard': typeof ParentDashboardRoute
   '/parent/payments': typeof ParentPaymentsRoute
+  '/student/dashboard': typeof StudentDashboardRoute
+  '/student/homework': typeof StudentHomeworkRoute
+  '/student/lessons': typeof StudentLessonsRoute
+  '/student/progress': typeof StudentProgressRoute
+  '/student/rewards': typeof StudentRewardsRoute
   '/tutor/dashboard': typeof TutorDashboardRoute
   '/tutor/earnings': typeof TutorEarningsRoute
   '/tutor/lessons': typeof TutorLessonsRoute
@@ -220,6 +265,11 @@ export interface FileRouteTypes {
     | '/admin/tutors'
     | '/parent/dashboard'
     | '/parent/payments'
+    | '/student/dashboard'
+    | '/student/homework'
+    | '/student/lessons'
+    | '/student/progress'
+    | '/student/rewards'
     | '/tutor/dashboard'
     | '/tutor/earnings'
     | '/tutor/lessons'
@@ -243,6 +293,11 @@ export interface FileRouteTypes {
     | '/admin/tutors'
     | '/parent/dashboard'
     | '/parent/payments'
+    | '/student/dashboard'
+    | '/student/homework'
+    | '/student/lessons'
+    | '/student/progress'
+    | '/student/rewards'
     | '/tutor/dashboard'
     | '/tutor/earnings'
     | '/tutor/lessons'
@@ -266,6 +321,11 @@ export interface FileRouteTypes {
     | '/admin/tutors'
     | '/parent/dashboard'
     | '/parent/payments'
+    | '/student/dashboard'
+    | '/student/homework'
+    | '/student/lessons'
+    | '/student/progress'
+    | '/student/rewards'
     | '/tutor/dashboard'
     | '/tutor/earnings'
     | '/tutor/lessons'
@@ -290,6 +350,11 @@ export interface RootRouteChildren {
   AdminTutorsRoute: typeof AdminTutorsRoute
   ParentDashboardRoute: typeof ParentDashboardRoute
   ParentPaymentsRoute: typeof ParentPaymentsRoute
+  StudentDashboardRoute: typeof StudentDashboardRoute
+  StudentHomeworkRoute: typeof StudentHomeworkRoute
+  StudentLessonsRoute: typeof StudentLessonsRoute
+  StudentProgressRoute: typeof StudentProgressRoute
+  StudentRewardsRoute: typeof StudentRewardsRoute
   TutorDashboardRoute: typeof TutorDashboardRoute
   TutorEarningsRoute: typeof TutorEarningsRoute
   TutorLessonsRoute: typeof TutorLessonsRoute
@@ -373,6 +438,41 @@ declare module '@tanstack/react-router' {
       path: '/parent/payments'
       fullPath: '/parent/payments'
       preLoaderRoute: typeof ParentPaymentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/student/dashboard': {
+      id: '/student/dashboard'
+      path: '/student/dashboard'
+      fullPath: '/student/dashboard'
+      preLoaderRoute: typeof StudentDashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/student/homework': {
+      id: '/student/homework'
+      path: '/student/homework'
+      fullPath: '/student/homework'
+      preLoaderRoute: typeof StudentHomeworkRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/student/lessons': {
+      id: '/student/lessons'
+      path: '/student/lessons'
+      fullPath: '/student/lessons'
+      preLoaderRoute: typeof StudentLessonsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/student/progress': {
+      id: '/student/progress'
+      path: '/student/progress'
+      fullPath: '/student/progress'
+      preLoaderRoute: typeof StudentProgressRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/student/rewards': {
+      id: '/student/rewards'
+      path: '/student/rewards'
+      fullPath: '/student/rewards'
+      preLoaderRoute: typeof StudentRewardsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/tutor/dashboard': {
@@ -466,6 +566,11 @@ const rootRouteChildren: RootRouteChildren = {
   AdminTutorsRoute: AdminTutorsRoute,
   ParentDashboardRoute: ParentDashboardRoute,
   ParentPaymentsRoute: ParentPaymentsRoute,
+  StudentDashboardRoute: StudentDashboardRoute,
+  StudentHomeworkRoute: StudentHomeworkRoute,
+  StudentLessonsRoute: StudentLessonsRoute,
+  StudentProgressRoute: StudentProgressRoute,
+  StudentRewardsRoute: StudentRewardsRoute,
   TutorDashboardRoute: TutorDashboardRoute,
   TutorEarningsRoute: TutorEarningsRoute,
   TutorLessonsRoute: TutorLessonsRoute,
