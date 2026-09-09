@@ -10,6 +10,8 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
+import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedAdminDashboardRouteImport } from './routes/_authenticated/admin.dashboard'
 import { Route as AuthenticatedAdminOperationsRouteImport } from './routes/_authenticated/admin.operations'
 import { Route as AuthenticatedAdminPaymentRequestsRouteImport } from './routes/_authenticated/admin.payment-requests'
@@ -41,159 +43,169 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
+  id: '/_authenticated',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedAdminDashboardRoute =
   AuthenticatedAdminDashboardRouteImport.update({
-    id: '/_authenticated/admin/dashboard',
+    id: '/admin/dashboard',
     path: '/admin/dashboard',
-    getParentRoute: () => rootRouteImport,
+    getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedAdminOperationsRoute =
   AuthenticatedAdminOperationsRouteImport.update({
-    id: '/_authenticated/admin/operations',
+    id: '/admin/operations',
     path: '/admin/operations',
-    getParentRoute: () => rootRouteImport,
+    getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedAdminPaymentRequestsRoute =
   AuthenticatedAdminPaymentRequestsRouteImport.update({
-    id: '/_authenticated/admin/payment-requests',
+    id: '/admin/payment-requests',
     path: '/admin/payment-requests',
-    getParentRoute: () => rootRouteImport,
+    getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedAdminPaymentsRoute =
   AuthenticatedAdminPaymentsRouteImport.update({
-    id: '/_authenticated/admin/payments',
+    id: '/admin/payments',
     path: '/admin/payments',
-    getParentRoute: () => rootRouteImport,
+    getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedAdminReportsRoute =
   AuthenticatedAdminReportsRouteImport.update({
-    id: '/_authenticated/admin/reports',
+    id: '/admin/reports',
     path: '/admin/reports',
-    getParentRoute: () => rootRouteImport,
+    getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedAdminStudentsRoute =
   AuthenticatedAdminStudentsRouteImport.update({
-    id: '/_authenticated/admin/students',
+    id: '/admin/students',
     path: '/admin/students',
-    getParentRoute: () => rootRouteImport,
+    getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedAdminTutorsRoute =
   AuthenticatedAdminTutorsRouteImport.update({
-    id: '/_authenticated/admin/tutors',
+    id: '/admin/tutors',
     path: '/admin/tutors',
-    getParentRoute: () => rootRouteImport,
+    getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedParentDashboardRoute =
   AuthenticatedParentDashboardRouteImport.update({
-    id: '/_authenticated/parent/dashboard',
+    id: '/parent/dashboard',
     path: '/parent/dashboard',
-    getParentRoute: () => rootRouteImport,
+    getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedParentPaymentsRoute =
   AuthenticatedParentPaymentsRouteImport.update({
-    id: '/_authenticated/parent/payments',
+    id: '/parent/payments',
     path: '/parent/payments',
-    getParentRoute: () => rootRouteImport,
+    getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedStudentDashboardRoute =
   AuthenticatedStudentDashboardRouteImport.update({
-    id: '/_authenticated/student/dashboard',
+    id: '/student/dashboard',
     path: '/student/dashboard',
-    getParentRoute: () => rootRouteImport,
+    getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedStudentHomeworkRoute =
   AuthenticatedStudentHomeworkRouteImport.update({
-    id: '/_authenticated/student/homework',
+    id: '/student/homework',
     path: '/student/homework',
-    getParentRoute: () => rootRouteImport,
+    getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedStudentLessonsRoute =
   AuthenticatedStudentLessonsRouteImport.update({
-    id: '/_authenticated/student/lessons',
+    id: '/student/lessons',
     path: '/student/lessons',
-    getParentRoute: () => rootRouteImport,
+    getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedStudentProgressRoute =
   AuthenticatedStudentProgressRouteImport.update({
-    id: '/_authenticated/student/progress',
+    id: '/student/progress',
     path: '/student/progress',
-    getParentRoute: () => rootRouteImport,
+    getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedStudentRewardsRoute =
   AuthenticatedStudentRewardsRouteImport.update({
-    id: '/_authenticated/student/rewards',
+    id: '/student/rewards',
     path: '/student/rewards',
-    getParentRoute: () => rootRouteImport,
+    getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedTutorDashboardRoute =
   AuthenticatedTutorDashboardRouteImport.update({
-    id: '/_authenticated/tutor/dashboard',
+    id: '/tutor/dashboard',
     path: '/tutor/dashboard',
-    getParentRoute: () => rootRouteImport,
+    getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedTutorEarningsRoute =
   AuthenticatedTutorEarningsRouteImport.update({
-    id: '/_authenticated/tutor/earnings',
+    id: '/tutor/earnings',
     path: '/tutor/earnings',
-    getParentRoute: () => rootRouteImport,
+    getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedTutorLessonsRoute =
   AuthenticatedTutorLessonsRouteImport.update({
-    id: '/_authenticated/tutor/lessons',
+    id: '/tutor/lessons',
     path: '/tutor/lessons',
-    getParentRoute: () => rootRouteImport,
+    getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedTutorPaymentRequestsRoute =
   AuthenticatedTutorPaymentRequestsRouteImport.update({
-    id: '/_authenticated/tutor/payment-requests',
+    id: '/tutor/payment-requests',
     path: '/tutor/payment-requests',
-    getParentRoute: () => rootRouteImport,
+    getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedAdminClassesIndexRoute =
   AuthenticatedAdminClassesIndexRouteImport.update({
-    id: '/_authenticated/admin/classes/',
+    id: '/admin/classes/',
     path: '/admin/classes/',
-    getParentRoute: () => rootRouteImport,
+    getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedAdminClassesIdRoute =
   AuthenticatedAdminClassesIdRouteImport.update({
-    id: '/_authenticated/admin/classes/$id',
+    id: '/admin/classes/$id',
     path: '/admin/classes/$id',
-    getParentRoute: () => rootRouteImport,
+    getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedParentChildrenIdRoute =
   AuthenticatedParentChildrenIdRouteImport.update({
-    id: '/_authenticated/parent/children/$id',
+    id: '/parent/children/$id',
     path: '/parent/children/$id',
-    getParentRoute: () => rootRouteImport,
+    getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedParentClassesIndexRoute =
   AuthenticatedParentClassesIndexRouteImport.update({
-    id: '/_authenticated/parent/classes/',
+    id: '/parent/classes/',
     path: '/parent/classes/',
-    getParentRoute: () => rootRouteImport,
+    getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedParentClassesIdRoute =
   AuthenticatedParentClassesIdRouteImport.update({
-    id: '/_authenticated/parent/classes/$id',
+    id: '/parent/classes/$id',
     path: '/parent/classes/$id',
-    getParentRoute: () => rootRouteImport,
+    getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedTutorLessonIdIndexRoute =
   AuthenticatedTutorLessonIdIndexRouteImport.update({
-    id: '/_authenticated/tutor/lesson/$id/',
+    id: '/tutor/lesson/$id/',
     path: '/tutor/lesson/$id/',
-    getParentRoute: () => rootRouteImport,
+    getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedTutorLessonIdReviewRoute =
   AuthenticatedTutorLessonIdReviewRouteImport.update({
-    id: '/_authenticated/tutor/lesson/$id/review',
+    id: '/tutor/lesson/$id/review',
     path: '/tutor/lesson/$id/review',
-    getParentRoute: () => rootRouteImport,
+    getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
   '/admin/dashboard': typeof AuthenticatedAdminDashboardRoute
   '/admin/operations': typeof AuthenticatedAdminOperationsRoute
   '/admin/payment-requests': typeof AuthenticatedAdminPaymentRequestsRoute
@@ -222,6 +234,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
   '/admin/dashboard': typeof AuthenticatedAdminDashboardRoute
   '/admin/operations': typeof AuthenticatedAdminOperationsRoute
   '/admin/payment-requests': typeof AuthenticatedAdminPaymentRequestsRoute
@@ -251,6 +264,8 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
+  '/auth': typeof AuthRoute
   '/_authenticated/admin/dashboard': typeof AuthenticatedAdminDashboardRoute
   '/_authenticated/admin/operations': typeof AuthenticatedAdminOperationsRoute
   '/_authenticated/admin/payment-requests': typeof AuthenticatedAdminPaymentRequestsRoute
@@ -281,6 +296,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/auth'
     | '/admin/dashboard'
     | '/admin/operations'
     | '/admin/payment-requests'
@@ -309,6 +325,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/auth'
     | '/admin/dashboard'
     | '/admin/operations'
     | '/admin/payment-requests'
@@ -337,6 +354,8 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/_authenticated'
+    | '/auth'
     | '/_authenticated/admin/dashboard'
     | '/_authenticated/admin/operations'
     | '/_authenticated/admin/payment-requests'
@@ -366,6 +385,212 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
+  AuthRoute: typeof AuthRoute
+}
+
+declare module '@tanstack/react-router' {
+  interface FileRoutesByPath {
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated': {
+      id: '/_authenticated'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/admin/dashboard': {
+      id: '/_authenticated/admin/dashboard'
+      path: '/admin/dashboard'
+      fullPath: '/admin/dashboard'
+      preLoaderRoute: typeof AuthenticatedAdminDashboardRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/admin/operations': {
+      id: '/_authenticated/admin/operations'
+      path: '/admin/operations'
+      fullPath: '/admin/operations'
+      preLoaderRoute: typeof AuthenticatedAdminOperationsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/admin/payment-requests': {
+      id: '/_authenticated/admin/payment-requests'
+      path: '/admin/payment-requests'
+      fullPath: '/admin/payment-requests'
+      preLoaderRoute: typeof AuthenticatedAdminPaymentRequestsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/admin/payments': {
+      id: '/_authenticated/admin/payments'
+      path: '/admin/payments'
+      fullPath: '/admin/payments'
+      preLoaderRoute: typeof AuthenticatedAdminPaymentsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/admin/reports': {
+      id: '/_authenticated/admin/reports'
+      path: '/admin/reports'
+      fullPath: '/admin/reports'
+      preLoaderRoute: typeof AuthenticatedAdminReportsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/admin/students': {
+      id: '/_authenticated/admin/students'
+      path: '/admin/students'
+      fullPath: '/admin/students'
+      preLoaderRoute: typeof AuthenticatedAdminStudentsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/admin/tutors': {
+      id: '/_authenticated/admin/tutors'
+      path: '/admin/tutors'
+      fullPath: '/admin/tutors'
+      preLoaderRoute: typeof AuthenticatedAdminTutorsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/parent/dashboard': {
+      id: '/_authenticated/parent/dashboard'
+      path: '/parent/dashboard'
+      fullPath: '/parent/dashboard'
+      preLoaderRoute: typeof AuthenticatedParentDashboardRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/parent/payments': {
+      id: '/_authenticated/parent/payments'
+      path: '/parent/payments'
+      fullPath: '/parent/payments'
+      preLoaderRoute: typeof AuthenticatedParentPaymentsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/student/dashboard': {
+      id: '/_authenticated/student/dashboard'
+      path: '/student/dashboard'
+      fullPath: '/student/dashboard'
+      preLoaderRoute: typeof AuthenticatedStudentDashboardRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/student/homework': {
+      id: '/_authenticated/student/homework'
+      path: '/student/homework'
+      fullPath: '/student/homework'
+      preLoaderRoute: typeof AuthenticatedStudentHomeworkRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/student/lessons': {
+      id: '/_authenticated/student/lessons'
+      path: '/student/lessons'
+      fullPath: '/student/lessons'
+      preLoaderRoute: typeof AuthenticatedStudentLessonsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/student/progress': {
+      id: '/_authenticated/student/progress'
+      path: '/student/progress'
+      fullPath: '/student/progress'
+      preLoaderRoute: typeof AuthenticatedStudentProgressRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/student/rewards': {
+      id: '/_authenticated/student/rewards'
+      path: '/student/rewards'
+      fullPath: '/student/rewards'
+      preLoaderRoute: typeof AuthenticatedStudentRewardsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/tutor/dashboard': {
+      id: '/_authenticated/tutor/dashboard'
+      path: '/tutor/dashboard'
+      fullPath: '/tutor/dashboard'
+      preLoaderRoute: typeof AuthenticatedTutorDashboardRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/tutor/earnings': {
+      id: '/_authenticated/tutor/earnings'
+      path: '/tutor/earnings'
+      fullPath: '/tutor/earnings'
+      preLoaderRoute: typeof AuthenticatedTutorEarningsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/tutor/lessons': {
+      id: '/_authenticated/tutor/lessons'
+      path: '/tutor/lessons'
+      fullPath: '/tutor/lessons'
+      preLoaderRoute: typeof AuthenticatedTutorLessonsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/tutor/payment-requests': {
+      id: '/_authenticated/tutor/payment-requests'
+      path: '/tutor/payment-requests'
+      fullPath: '/tutor/payment-requests'
+      preLoaderRoute: typeof AuthenticatedTutorPaymentRequestsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/admin/classes/': {
+      id: '/_authenticated/admin/classes/'
+      path: '/admin/classes'
+      fullPath: '/admin/classes/'
+      preLoaderRoute: typeof AuthenticatedAdminClassesIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/admin/classes/$id': {
+      id: '/_authenticated/admin/classes/$id'
+      path: '/admin/classes/$id'
+      fullPath: '/admin/classes/$id'
+      preLoaderRoute: typeof AuthenticatedAdminClassesIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/parent/children/$id': {
+      id: '/_authenticated/parent/children/$id'
+      path: '/parent/children/$id'
+      fullPath: '/parent/children/$id'
+      preLoaderRoute: typeof AuthenticatedParentChildrenIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/parent/classes/': {
+      id: '/_authenticated/parent/classes/'
+      path: '/parent/classes'
+      fullPath: '/parent/classes/'
+      preLoaderRoute: typeof AuthenticatedParentClassesIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/parent/classes/$id': {
+      id: '/_authenticated/parent/classes/$id'
+      path: '/parent/classes/$id'
+      fullPath: '/parent/classes/$id'
+      preLoaderRoute: typeof AuthenticatedParentClassesIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/tutor/lesson/$id/': {
+      id: '/_authenticated/tutor/lesson/$id/'
+      path: '/tutor/lesson/$id'
+      fullPath: '/tutor/lesson/$id/'
+      preLoaderRoute: typeof AuthenticatedTutorLessonIdIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/tutor/lesson/$id/review': {
+      id: '/_authenticated/tutor/lesson/$id/review'
+      path: '/tutor/lesson/$id/review'
+      fullPath: '/tutor/lesson/$id/review'
+      preLoaderRoute: typeof AuthenticatedTutorLessonIdReviewRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+  }
+}
+
+interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminDashboardRoute: typeof AuthenticatedAdminDashboardRoute
   AuthenticatedAdminOperationsRoute: typeof AuthenticatedAdminOperationsRoute
   AuthenticatedAdminPaymentRequestsRoute: typeof AuthenticatedAdminPaymentRequestsRoute
@@ -393,195 +618,7 @@ export interface RootRouteChildren {
   AuthenticatedTutorLessonIdIndexRoute: typeof AuthenticatedTutorLessonIdIndexRoute
 }
 
-declare module '@tanstack/react-router' {
-  interface FileRoutesByPath {
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/_authenticated/admin/dashboard': {
-      id: '/_authenticated/admin/dashboard'
-      path: '/admin/dashboard'
-      fullPath: '/admin/dashboard'
-      preLoaderRoute: typeof AuthenticatedAdminDashboardRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/_authenticated/admin/operations': {
-      id: '/_authenticated/admin/operations'
-      path: '/admin/operations'
-      fullPath: '/admin/operations'
-      preLoaderRoute: typeof AuthenticatedAdminOperationsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/_authenticated/admin/payment-requests': {
-      id: '/_authenticated/admin/payment-requests'
-      path: '/admin/payment-requests'
-      fullPath: '/admin/payment-requests'
-      preLoaderRoute: typeof AuthenticatedAdminPaymentRequestsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/_authenticated/admin/payments': {
-      id: '/_authenticated/admin/payments'
-      path: '/admin/payments'
-      fullPath: '/admin/payments'
-      preLoaderRoute: typeof AuthenticatedAdminPaymentsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/_authenticated/admin/reports': {
-      id: '/_authenticated/admin/reports'
-      path: '/admin/reports'
-      fullPath: '/admin/reports'
-      preLoaderRoute: typeof AuthenticatedAdminReportsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/_authenticated/admin/students': {
-      id: '/_authenticated/admin/students'
-      path: '/admin/students'
-      fullPath: '/admin/students'
-      preLoaderRoute: typeof AuthenticatedAdminStudentsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/_authenticated/admin/tutors': {
-      id: '/_authenticated/admin/tutors'
-      path: '/admin/tutors'
-      fullPath: '/admin/tutors'
-      preLoaderRoute: typeof AuthenticatedAdminTutorsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/_authenticated/parent/dashboard': {
-      id: '/_authenticated/parent/dashboard'
-      path: '/parent/dashboard'
-      fullPath: '/parent/dashboard'
-      preLoaderRoute: typeof AuthenticatedParentDashboardRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/_authenticated/parent/payments': {
-      id: '/_authenticated/parent/payments'
-      path: '/parent/payments'
-      fullPath: '/parent/payments'
-      preLoaderRoute: typeof AuthenticatedParentPaymentsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/_authenticated/student/dashboard': {
-      id: '/_authenticated/student/dashboard'
-      path: '/student/dashboard'
-      fullPath: '/student/dashboard'
-      preLoaderRoute: typeof AuthenticatedStudentDashboardRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/_authenticated/student/homework': {
-      id: '/_authenticated/student/homework'
-      path: '/student/homework'
-      fullPath: '/student/homework'
-      preLoaderRoute: typeof AuthenticatedStudentHomeworkRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/_authenticated/student/lessons': {
-      id: '/_authenticated/student/lessons'
-      path: '/student/lessons'
-      fullPath: '/student/lessons'
-      preLoaderRoute: typeof AuthenticatedStudentLessonsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/_authenticated/student/progress': {
-      id: '/_authenticated/student/progress'
-      path: '/student/progress'
-      fullPath: '/student/progress'
-      preLoaderRoute: typeof AuthenticatedStudentProgressRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/_authenticated/student/rewards': {
-      id: '/_authenticated/student/rewards'
-      path: '/student/rewards'
-      fullPath: '/student/rewards'
-      preLoaderRoute: typeof AuthenticatedStudentRewardsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/_authenticated/tutor/dashboard': {
-      id: '/_authenticated/tutor/dashboard'
-      path: '/tutor/dashboard'
-      fullPath: '/tutor/dashboard'
-      preLoaderRoute: typeof AuthenticatedTutorDashboardRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/_authenticated/tutor/earnings': {
-      id: '/_authenticated/tutor/earnings'
-      path: '/tutor/earnings'
-      fullPath: '/tutor/earnings'
-      preLoaderRoute: typeof AuthenticatedTutorEarningsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/_authenticated/tutor/lessons': {
-      id: '/_authenticated/tutor/lessons'
-      path: '/tutor/lessons'
-      fullPath: '/tutor/lessons'
-      preLoaderRoute: typeof AuthenticatedTutorLessonsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/_authenticated/tutor/payment-requests': {
-      id: '/_authenticated/tutor/payment-requests'
-      path: '/tutor/payment-requests'
-      fullPath: '/tutor/payment-requests'
-      preLoaderRoute: typeof AuthenticatedTutorPaymentRequestsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/_authenticated/admin/classes/': {
-      id: '/_authenticated/admin/classes/'
-      path: '/admin/classes'
-      fullPath: '/admin/classes/'
-      preLoaderRoute: typeof AuthenticatedAdminClassesIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/_authenticated/admin/classes/$id': {
-      id: '/_authenticated/admin/classes/$id'
-      path: '/admin/classes/$id'
-      fullPath: '/admin/classes/$id'
-      preLoaderRoute: typeof AuthenticatedAdminClassesIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/_authenticated/parent/children/$id': {
-      id: '/_authenticated/parent/children/$id'
-      path: '/parent/children/$id'
-      fullPath: '/parent/children/$id'
-      preLoaderRoute: typeof AuthenticatedParentChildrenIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/_authenticated/parent/classes/': {
-      id: '/_authenticated/parent/classes/'
-      path: '/parent/classes'
-      fullPath: '/parent/classes/'
-      preLoaderRoute: typeof AuthenticatedParentClassesIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/_authenticated/parent/classes/$id': {
-      id: '/_authenticated/parent/classes/$id'
-      path: '/parent/classes/$id'
-      fullPath: '/parent/classes/$id'
-      preLoaderRoute: typeof AuthenticatedParentClassesIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/_authenticated/tutor/lesson/$id/': {
-      id: '/_authenticated/tutor/lesson/$id/'
-      path: '/tutor/lesson/$id'
-      fullPath: '/tutor/lesson/$id/'
-      preLoaderRoute: typeof AuthenticatedTutorLessonIdIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/_authenticated/tutor/lesson/$id/review': {
-      id: '/_authenticated/tutor/lesson/$id/review'
-      path: '/tutor/lesson/$id/review'
-      fullPath: '/tutor/lesson/$id/review'
-      preLoaderRoute: typeof AuthenticatedTutorLessonIdReviewRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-  }
-}
-
-const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
+const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminDashboardRoute: AuthenticatedAdminDashboardRoute,
   AuthenticatedAdminOperationsRoute: AuthenticatedAdminOperationsRoute,
   AuthenticatedAdminPaymentRequestsRoute:
@@ -609,6 +646,15 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedParentClassesIndexRoute: AuthenticatedParentClassesIndexRoute,
   AuthenticatedTutorLessonIdReviewRoute: AuthenticatedTutorLessonIdReviewRoute,
   AuthenticatedTutorLessonIdIndexRoute: AuthenticatedTutorLessonIdIndexRoute,
+}
+
+const AuthenticatedRouteRouteWithChildren =
+  AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
+
+const rootRouteChildren: RootRouteChildren = {
+  IndexRoute: IndexRoute,
+  AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
+  AuthRoute: AuthRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
