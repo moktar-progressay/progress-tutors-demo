@@ -1,107 +1,201 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useState } from "react";
 import { toast } from "sonner";
 import { Page } from "@/components/AppShell";
-import { Avatar, PageHeader, Pill, Section, StatCard } from "@/components/kit";
+import { Avatar, Empty, PageHeader, Pill, Section, StatCard } from "@/components/kit";
+import { FormDialog, SelectField, TextAreaField, TextField } from "@/components/form-kit";
 import { Button } from "@/components/ui/button";
-import { CLASSES, TUTORS, money, site } from "@/lib/demo-data";
+import { Input } from "@/components/ui/input";
+import { fullName, initialsOf, money, num, useTable, useUpdateRow, useUpsert, type TutorRow } from "@/lib/db";
 
 export const Route = createFileRoute("/_authenticated/admin/tutors")({
   head: () => ({
     meta: [
-      { title: "Tutors — ProgressTutors" },
-      {
-        name: "description",
-        content: "Tutor availability, attendance, lesson reviews, assigned classes and pay rates.",
-      },
-      { property: "og:title", content: "Tutors — ProgressTutors" },
-      { property: "og:description", content: "Manage tutors, assignments and pay rates across sites." },
+      { title: "Tutors & Coaches — ProgressTutors" },
+      { name: "description", content: "Manage tutor and coach records, subjects, levels and pay rates." },
+      { property: "og:title", content: "Tutors & Coaches — ProgressTutors" },
+      { property: "og:description", content: "Shared tutor and coach records." },
+      { name: "robots", content: "noindex" },
     ],
   }),
-  component: Tutors,
+  component: TutorsPage,
 });
 
-function Tutors() {
+const BLANK = {
+  first_name: "",
+  last_name: "",
+  email: "",
+  phone: "",
+  subjects: "",
+  levels: "",
+  hourly_rate: "",
+  pay_notes: "",
+  status: "active",
+  notes: "",
+};
+
+function TutorsPage() {
+  const tutors = useTable("tutors", "first_name");
+  const classes = useTable("classes", "name");
+  const create = useUpsert("tutors");
+  const update = useUpdateRow("tutors");
+
+  const [q, setQ] = useState("");
+  const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<TutorRow | null>(null);
+  const [form, setForm] = useState(BLANK);
+
+  const rows = (tutors.data ?? []).filter(
+    (t) =>
+      q === "" ||
+      fullName(t).toLowerCase().includes(q.toLowerCase()) ||
+      (t.subjects ?? []).join(" ").toLowerCase().includes(q.toLowerCase()),
+  );
+  const classList = classes.data ?? [];
+  const unassignedClasses = classList.filter((c) => !c.tutor_id && c.active).length;
+
+  function openNew() {
+    setEditing(null);
+    setForm(BLANK);
+    setOpen(true);
+  }
+
+  function openEdit(t: TutorRow) {
+    setEditing(t);
+    setForm({
+      first_name: t.first_name,
+      last_name: t.last_name ?? "",
+      email: t.email ?? "",
+      phone: t.phone ?? "",
+      subjects: (t.subjects ?? []).join(", "),
+      levels: (t.levels ?? []).join(", "),
+      hourly_rate: t.hourly_rate === null ? "" : String(t.hourly_rate),
+      pay_notes: t.pay_notes ?? "",
+      status: t.status,
+      notes: t.notes ?? "",
+    });
+    setOpen(true);
+  }
+
+  async function save() {
+    const payload = {
+      first_name: form.first_name,
+      last_name: form.last_name || null,
+      email: form.email || null,
+      phone: form.phone || null,
+      subjects: form.subjects ? form.subjects.split(",").map((s) => s.trim()).filter(Boolean) : [],
+      levels: form.levels ? form.levels.split(",").map((s) => s.trim()).filter(Boolean) : [],
+      hourly_rate: form.hourly_rate ? Number(form.hourly_rate) : null,
+      pay_notes: form.pay_notes || null,
+      status: form.status,
+      notes: form.notes || null,
+    };
+    try {
+      if (editing) await update.mutateAsync({ id: editing.id, values: payload });
+      else await create.mutateAsync(payload);
+      toast.success(editing ? "Tutor updated" : "Tutor added");
+      setOpen(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not save");
+    }
+  }
+
   return (
     <Page>
       <PageHeader
-        title="Tutors"
-        subtitle="8 tutors · 2 tutor gaps this week"
-        actions={<Button onClick={() => toast.success("Demo: Add Tutor form would open")}>Add Tutor</Button>}
+        title="Tutors & Coaches"
+        subtitle="Shared operational demo · Live data"
+        actions={<Button onClick={openNew}>Add Tutor</Button>}
       />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard label="Active tutors" value="8" tone="pink" />
-        <StatCard label="Avg attendance" value="93%" tone="green" />
-        <StatCard label="Reviews this month" value="119" tone="blue" />
-        <StatCard label="Pay pending" value={money(2480)} tone="amber" />
+        <StatCard label="Active" value={String((tutors.data ?? []).filter((t) => t.status === "active").length)} tone="green" />
+        <StatCard label="All records" value={String((tutors.data ?? []).length)} tone="pink" />
+        <StatCard label="Classes" value={String(classList.length)} tone="blue" />
+        <StatCard label="Classes without a tutor" value={String(unassignedClasses)} tone="amber" />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {TUTORS.map((t) => {
-          const assigned = CLASSES.filter((c) => c.tutorId === t.id);
-          return (
-            <article key={t.id} className="surface p-5">
-              <div className="flex items-center gap-3">
-                <Avatar initials={t.initials} size="lg" />
-                <div>
-                  <h2 className="text-lg font-extrabold">{t.name}</h2>
-                  <p className="text-xs text-muted-foreground">{t.subjects.join(" · ")}</p>
-                </div>
-              </div>
-              <div className="mt-4 grid grid-cols-3 gap-2 text-center">
-                <div className="rounded-xl bg-tile-green px-2 py-2 text-tile-green-ink">
-                  <p className="text-base font-extrabold">{t.attendance}%</p>
-                  <p className="text-[10px] font-semibold">Attendance</p>
-                </div>
-                <div className="rounded-xl bg-tile-blue px-2 py-2 text-tile-blue-ink">
-                  <p className="text-base font-extrabold">{t.reviews}</p>
-                  <p className="text-[10px] font-semibold">Reviews</p>
-                </div>
-                <div className="rounded-xl bg-tile-purple px-2 py-2 text-tile-purple-ink">
-                  <p className="text-base font-extrabold">{t.lessons}</p>
-                  <p className="text-[10px] font-semibold">Lessons</p>
-                </div>
-              </div>
-              <p className="mt-4 text-xs font-semibold text-muted-foreground">Assigned classes</p>
-              <div className="mt-1 flex flex-wrap gap-1">
-                {assigned.length === 0 ? (
-                  <Pill tone="amber">No classes assigned</Pill>
-                ) : (
-                  assigned.map((c) => (
-                    <Pill key={c.id} tone="blue">
-                      {c.subject} · {site(c.siteId)?.name}
-                    </Pill>
-                  ))
-                )}
-              </div>
-              <div className="mt-4 flex items-center justify-between">
-                <span className="text-sm font-bold">{money(t.rate)}/hour</span>
-                <Button size="sm" variant="secondary" onClick={() => toast.success(`Demo: message ${t.name}`)}>
-                  Message
-                </Button>
-              </div>
-            </article>
-          );
-        })}
+      <div className="surface p-4">
+        <Input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Search tutors or subjects"
+          className="h-10 max-w-xs rounded-xl"
+        />
       </div>
 
-      <Section id="tutor-gaps" title="Tutor gaps" subtitle="Sessions still needing a tutor">
-        <ul className="space-y-2">
-          {CLASSES.filter((c) => !c.tutorId).map((c) => (
-            <li key={c.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-border px-4 py-3">
-              <span className="flex-1 text-sm font-bold">
-                {c.subject} · {site(c.siteId)?.name}
-              </span>
-              <span className="text-xs text-muted-foreground">
-                {c.day} {c.start}–{c.end}
-              </span>
-              <Button size="sm" onClick={() => toast.success(`Demo: tutor assigned to ${c.subject}`)}>
-                Assign Tutor
-              </Button>
-            </li>
-          ))}
-        </ul>
+      <Section id="tutors-list" title="Tutor records" subtitle={`${rows.length} shown`}>
+        {rows.length === 0 ? (
+          <Empty>No tutors or coaches yet. Add the first one to assign them to a class.</Empty>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {rows.map((t) => {
+              const name = fullName(t);
+              const theirClasses = classList.filter((c) => c.tutor_id === t.id);
+              return (
+                <article key={t.id} className="surface p-5">
+                  <div className="flex items-center gap-3">
+                    <Avatar initials={initialsOf(name)} tone="pink" />
+                    <div className="min-w-0">
+                      <p className="truncate font-extrabold">{name}</p>
+                      <p className="truncate text-xs text-muted-foreground">{t.email ?? "No email"}</p>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-1">
+                    {(t.subjects ?? []).map((s) => (
+                      <Pill key={s} tone="blue">
+                        {s}
+                      </Pill>
+                    ))}
+                    <Pill tone={t.status === "active" ? "green" : "neutral"}>{t.status}</Pill>
+                  </div>
+                  <p className="mt-3 text-sm">
+                    Rate: <span className="font-bold">{t.hourly_rate === null ? "Not set" : `${money(num(t.hourly_rate))}/hr`}</span>
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {theirClasses.length === 0 ? "No classes assigned" : `${theirClasses.length} class(es) assigned`}
+                  </p>
+                  <Button size="sm" variant="ghost" className="mt-3" onClick={() => openEdit(t)}>
+                    Edit
+                  </Button>
+                </article>
+              );
+            })}
+          </div>
+        )}
       </Section>
+
+      <FormDialog
+        open={open}
+        onOpenChange={setOpen}
+        title={editing ? `Edit ${fullName(editing)}` : "Add tutor or coach"}
+        onSubmit={save}
+        busy={create.isPending || update.isPending}
+      >
+        <TextField label="First name" value={form.first_name} onChange={(v) => setForm({ ...form, first_name: v })} required />
+        <TextField label="Last name" value={form.last_name} onChange={(v) => setForm({ ...form, last_name: v })} />
+        <TextField label="Email" type="email" value={form.email} onChange={(v) => setForm({ ...form, email: v })} />
+        <TextField label="Phone" value={form.phone} onChange={(v) => setForm({ ...form, phone: v })} />
+        <TextField
+          label="Subjects / activities (comma separated)"
+          value={form.subjects}
+          onChange={(v) => setForm({ ...form, subjects: v })}
+          full
+        />
+        <TextField label="Levels (comma separated)" value={form.levels} onChange={(v) => setForm({ ...form, levels: v })} full />
+        <TextField label="Hourly rate (£)" type="number" value={form.hourly_rate} onChange={(v) => setForm({ ...form, hourly_rate: v })} />
+        <SelectField
+          label="Status"
+          value={form.status}
+          onChange={(v) => setForm({ ...form, status: v })}
+          options={[
+            { value: "active", label: "Active" },
+            { value: "inactive", label: "Inactive" },
+          ]}
+        />
+        <TextAreaField label="Pay notes" value={form.pay_notes} onChange={(v) => setForm({ ...form, pay_notes: v })} />
+        <TextAreaField label="Notes" value={form.notes} onChange={(v) => setForm({ ...form, notes: v })} />
+      </FormDialog>
     </Page>
   );
 }
