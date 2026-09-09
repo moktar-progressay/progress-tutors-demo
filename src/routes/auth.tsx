@@ -6,13 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 export const Route = createFileRoute("/auth")({
-  ssr: false,
   head: () => ({
     meta: [
       { title: "Sign in — ProgressTutors" },
       {
         name: "description",
-        content: "Sign in to the shared ProgressTutors operational demo. Access is restricted to invited users.",
+        content:
+          "Sign in to the shared ProgressTutors operational demo. Access is restricted to invited users.",
       },
       { property: "og:title", content: "Sign in — ProgressTutors" },
       { property: "og:description", content: "Secure access to the shared ProgressTutors demo." },
@@ -84,7 +84,9 @@ function AuthPage() {
 
       <main className="mx-auto -mt-8 w-full max-w-md px-6 pb-16">
         <form onSubmit={submit} className="surface space-y-4 p-6">
-          <h2 className="text-lg font-extrabold">{mode === "signin" ? "Sign in" : "Create an account"}</h2>
+          <h2 className="text-lg font-extrabold">
+            {mode === "signin" ? "Sign in" : "Create an account"}
+          </h2>
           <label className="block text-sm font-semibold">
             Email
             <Input
