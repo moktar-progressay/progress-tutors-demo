@@ -2,221 +2,157 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Page } from "@/components/AppShell";
-import { Avatar, Empty, PageHeader, Pill, Section, StatCard, type Tone } from "@/components/kit";
+import { Empty, PageHeader, Pill, Section, StatCard } from "@/components/kit";
 import { Button } from "@/components/ui/button";
-import { PAYMENT_REQUESTS, money, tutor, type PRStatus } from "@/lib/demo-data";
-import { useDemo } from "@/lib/demo-store";
+import { Input } from "@/components/ui/input";
+import { fullName, money, num, prettyDate, useTable, useUpdateRow } from "@/lib/db";
 
 export const Route = createFileRoute("/_authenticated/admin/payment-requests")({
   head: () => ({
     meta: [
       { title: "Payment Requests — ProgressTutors" },
-      {
-        name: "description",
-        content: "Approve tutor Payment Requests built from verified lessons, sign-in times and lesson reviews.",
-      },
+      { name: "description", content: "Review, approve, query and mark paid the payment requests tutors submit." },
       { property: "og:title", content: "Payment Requests — ProgressTutors" },
-      { property: "og:description", content: "Review, approve, query or reject tutor pay in one place." },
+      { property: "og:description", content: "Approve and pay tutor payment requests." },
+      { name: "robots", content: "noindex" },
     ],
   }),
-  component: PaymentRequests,
+  component: AdminPaymentRequests,
 });
 
-const TABS = ["All", "Pending Review", "Approved", "Paid", "Rejected"] as const;
+const tone = (s: string) =>
+  s === "approved" ? "green" : s === "paid" ? "blue" : s === "queried" ? "amber" : s === "rejected" ? "pink" : "purple";
 
-const tone = (s: PRStatus): Tone =>
-  s === "Approved" ? "green" : s === "Paid" ? "blue" : s === "Rejected" ? "purple" : s === "On Hold" ? "amber" : "pink";
+function AdminPaymentRequests() {
+  const requests = useTable("payment_requests", "submitted_at");
+  const items = useTable("payment_request_items");
+  const tutors = useTable("tutors");
+  const sessions = useTable("sessions");
+  const classes = useTable("classes");
+  const update = useUpdateRow("payment_requests", ["tutor_earnings"]);
+  const updateEarning = useUpdateRow("tutor_earnings");
+  const earnings = useTable("tutor_earnings");
 
-function PaymentRequests() {
-  const { prStatus, setPrStatus } = useDemo();
-  const [tab, setTab] = useState<(typeof TABS)[number]>("All");
-  const [openId, setOpenId] = useState<string | null>("PR-1042");
+  const [q, setQ] = useState("");
+  const [expanded, setExpanded] = useState<string | null>(null);
 
-  const list = PAYMENT_REQUESTS.filter((p) => tab === "All" || prStatus[p.id] === tab);
-  const open = PAYMENT_REQUESTS.find((p) => p.id === openId);
-  const openStatus = open ? (prStatus[open.id] ?? open.status) : undefined;
+  const rows = (requests.data ?? []).filter((r) => {
+    const t = (tutors.data ?? []).find((x) => x.id === r.tutor_id);
+    return q === "" || `${fullName(t)} ${r.reference ?? ""}`.toLowerCase().includes(q.toLowerCase());
+  });
 
-  const total = (s: PRStatus) =>
-    PAYMENT_REQUESTS.filter((p) => prStatus[p.id] === s).reduce((a, p) => a + p.amount, 0);
+  const submitted = rows.filter((r) => r.status === "submitted");
+  const approved = rows.filter((r) => r.status === "approved");
+  const paid = rows.filter((r) => r.status === "paid");
+
+  async function decide(id: string, status: string) {
+    await update.mutateAsync({ id, values: { status, decided_at: new Date().toISOString() } });
+    const linked = (earnings.data ?? []).filter((e) => e.payment_request_id === id);
+    await Promise.all(
+      linked.map((e) =>
+        updateEarning.mutateAsync({
+          id: e.id,
+          values: { status: status === "paid" ? "paid" : status === "approved" ? "approved" : "eligible" },
+        }),
+      ),
+    );
+    toast.success(`Request marked ${status}`);
+  }
 
   return (
     <Page>
-      <PageHeader
-        title="Payment Requests"
-        subtitle="Tutor pay generated from completed, verified lessons"
-      />
+      <PageHeader title="Payment Requests" subtitle="Tutor pay is based on agreed session amounts, not timers" />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-        <StatCard label="Total Requested" value={money(PAYMENT_REQUESTS.reduce((a, p) => a + p.amount, 0))} tone="pink" />
-        <StatCard label="Pending Review" value={money(total("Pending Review"))} tone="amber" />
-        <StatCard label="Approved" value={money(total("Approved"))} tone="green" />
-        <StatCard label="Paid" value={money(total("Paid"))} tone="blue" />
-        <StatCard label="On Hold" value={money(total("On Hold"))} tone="purple" />
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatCard label="Waiting" value={String(submitted.length)} tone="amber" />
+        <StatCard label="Approved" value={String(approved.length)} tone="green" />
+        <StatCard label="Paid" value={String(paid.length)} tone="blue" />
+        <StatCard
+          label="Value waiting"
+          value={money(submitted.reduce((a, r) => a + num(r.total_amount), 0))}
+          tone="pink"
+        />
       </div>
 
-      <div className="surface p-2">
-        <div className="flex flex-wrap gap-1">
-          {TABS.map((t) => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => setTab(t)}
-              className={`rounded-full px-4 py-2 text-sm font-semibold ${
-                tab === t ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary"
-              }`}
-            >
-              {t}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="grid gap-6 xl:grid-cols-[1.3fr_1fr]">
-        <Section id="pr-table" title="Requests" subtitle={`${list.length} shown`}>
-          {list.length === 0 ? (
-            <Empty>No Payment Requests with this status.</Empty>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[640px] text-sm">
-                <thead>
-                  <tr className="text-left text-xs text-muted-foreground">
-                    {["Request ID", "Tutor", "Lessons", "Hours", "Amount", "Status", ""].map((h) => (
-                      <th key={h} className="pb-2 font-semibold">
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {list.map((p) => {
-                    const t = tutor(p.tutorId);
-                    const st = prStatus[p.id] ?? p.status;
-                    return (
-                      <tr key={p.id} className="border-t border-border">
-                        <td className="py-3 font-semibold">{p.id}</td>
-                        <td className="py-3">
-                          <div className="flex items-center gap-2">
-                            <Avatar initials={t?.initials ?? "?"} size="sm" />
-                            {t?.name}
-                          </div>
-                        </td>
-                        <td className="py-3">{p.lessons}</td>
-                        <td className="py-3">{p.hours}</td>
-                        <td className="py-3 font-bold">{money(p.amount)}</td>
-                        <td className="py-3">
-                          <Pill tone={tone(st)}>{st}</Pill>
-                        </td>
-                        <td className="py-3 text-right">
-                          <Button size="sm" variant="ghost" onClick={() => setOpenId(p.id)}>
-                            Open
-                          </Button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </Section>
-
-        <Section
-          id="pr-detail"
-          title={open ? `Payment Request ${open.id}` : "Request detail"}
-          subtitle={open ? `${tutor(open.tutorId)?.name} · ${open.lessons} verified lessons` : "Select a request"}
-        >
-          {!open || !openStatus ? (
-            <Empty>Open a Payment Request to review its lessons.</Empty>
-          ) : (
-            <div className="space-y-4">
-              <div className="grid grid-cols-3 gap-2">
-                <StatCard label="Lessons" value={String(open.lessons)} tone="blue" />
-                <StatCard label="Hours" value={String(open.hours)} tone="purple" />
-                <StatCard label="Amount" value={money(open.amount)} tone="green" />
-              </div>
-              <Pill tone={tone(openStatus)}>{openStatus}</Pill>
-
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[620px] text-xs">
-                  <thead>
-                    <tr className="text-left text-muted-foreground">
-                      {["Date", "Student / Class", "Scheduled", "Sign-in", "Review", "GoProgress", "Rate", "Amount"].map(
-                        (h) => (
-                          <th key={h} className="pb-2 font-semibold">
-                            {h}
-                          </th>
-                        ),
+      <Section id="pr-list" title="All requests">
+        <Input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Search by tutor or reference"
+          className="mb-3 h-10 max-w-sm rounded-xl"
+        />
+        {rows.length === 0 ? (
+          <Empty>No payment requests have been submitted yet.</Empty>
+        ) : (
+          <ul className="space-y-2">
+            {rows.map((r) => {
+              const t = (tutors.data ?? []).find((x) => x.id === r.tutor_id);
+              const lines = (items.data ?? []).filter((i) => i.payment_request_id === r.id);
+              const open = expanded === r.id;
+              return (
+                <li key={r.id} className="rounded-2xl border border-border px-4 py-3">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <button
+                      type="button"
+                      className="min-w-0 flex-1 text-left"
+                      onClick={() => setExpanded(open ? null : r.id)}
+                    >
+                      <p className="text-sm font-bold">
+                        {r.reference ?? "Request"} · {fullName(t)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {lines.length} lessons · {num(r.total_hours)} hours · submitted{" "}
+                        {prettyDate(r.submitted_at.slice(0, 10))}
+                      </p>
+                    </button>
+                    <span className="font-bold">{money(r.total_amount)}</span>
+                    <Pill tone={tone(r.status)}>{r.status}</Pill>
+                    {r.status === "submitted" ? (
+                      <>
+                        <Button size="sm" onClick={() => decide(r.id, "approved")}>
+                          Approve
+                        </Button>
+                        <Button size="sm" variant="secondary" onClick={() => decide(r.id, "queried")}>
+                          Query
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => decide(r.id, "rejected")}>
+                          Reject
+                        </Button>
+                      </>
+                    ) : null}
+                    {r.status === "approved" ? (
+                      <Button size="sm" onClick={() => decide(r.id, "paid")}>
+                        Mark paid
+                      </Button>
+                    ) : null}
+                  </div>
+                  {open ? (
+                    <ul className="mt-3 space-y-1 border-t border-border pt-3 text-sm">
+                      {lines.length === 0 ? (
+                        <li className="text-xs text-muted-foreground">No line detail recorded.</li>
+                      ) : (
+                        lines.map((l) => {
+                          const s = (sessions.data ?? []).find((x) => x.id === l.session_id);
+                          const c = (classes.data ?? []).find((x) => x.id === s?.class_id);
+                          return (
+                            <li key={l.id} className="flex flex-wrap gap-2">
+                              <span className="min-w-0 flex-1">
+                                {s ? prettyDate(s.session_date) : "—"} · {c?.name ?? l.description ?? "Session"}
+                              </span>
+                              <span>{num(l.hours)}h</span>
+                              <span className="font-semibold">{money(l.amount)}</span>
+                            </li>
+                          );
+                        })
                       )}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {open.lines.map((l, i) => (
-                      <tr key={`${l.lessonId}-${i}`} className="border-t border-border">
-                        <td className="py-2">{l.date}</td>
-                        <td className="py-2 font-semibold">{l.who}</td>
-                        <td className="py-2">{l.scheduled}</td>
-                        <td className="py-2">{l.signIn}</td>
-                        <td className="py-2">
-                          <Pill tone={l.review === "Complete" ? "green" : "amber"}>{l.review}</Pill>
-                        </td>
-                        <td className="py-2">
-                          <Pill tone={l.goprogress === "Synced" ? "blue" : "amber"}>{l.goprogress}</Pill>
-                        </td>
-                        <td className="py-2">{money(l.rate)}</td>
-                        <td className="py-2 font-bold">{money(l.amount)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  onClick={() => {
-                    setPrStatus(open.id, "Approved");
-                    toast.success(`${open.id} approved`);
-                  }}
-                >
-                  Approve
-                </Button>
-                <Button
-                  variant="secondary"
-                  onClick={() => {
-                    setPrStatus(open.id, "On Hold");
-                    toast.success(`${open.id} queried with tutor`);
-                  }}
-                >
-                  Query
-                </Button>
-                <Button variant="secondary" onClick={() => toast.success("Demo: adjust lines and amount")}>
-                  Adjust
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setPrStatus(open.id, "Rejected");
-                    toast.success(`${open.id} rejected`);
-                  }}
-                >
-                  Reject
-                </Button>
-                <Button variant="ghost" onClick={() => toast.success("Demo: message sent to tutor")}>
-                  Message Tutor
-                </Button>
-                <Button
-                  variant="ghost"
-                  onClick={() => {
-                    setPrStatus(open.id, "Paid");
-                    toast.success(`${open.id} marked as paid`);
-                  }}
-                >
-                  Mark Paid
-                </Button>
-              </div>
-            </div>
-          )}
-        </Section>
-      </div>
+                    </ul>
+                  ) : null}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </Section>
     </Page>
   );
 }

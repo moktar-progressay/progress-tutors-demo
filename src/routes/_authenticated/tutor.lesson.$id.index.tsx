@@ -1,103 +1,76 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { toast } from "sonner";
 import { Page } from "@/components/AppShell";
-import { Avatar, Empty, PageHeader, Pill, Section, StatCard } from "@/components/kit";
-import { Button } from "@/components/ui/button";
-import { DELIVERED_LESSONS, STUDENTS, TUTOR_LESSONS, money } from "@/lib/demo-data";
-import { useDemo } from "@/lib/demo-store";
+import { GoProgressLink, PageHeader, Pill, Section } from "@/components/kit";
+import { SessionRegister } from "@/components/session-register";
+import { hhmm, money, prettyDate, useTable } from "@/lib/db";
 
 export const Route = createFileRoute("/_authenticated/tutor/lesson/$id/")({
   head: () => ({
     meta: [
       { title: "Lesson — ProgressTutors" },
-      { name: "description", content: "Lesson detail with register, sign-in time and GoProgress attendance." },
+      { name: "description", content: "Sign in, take the register and submit your lesson review." },
       { property: "og:title", content: "Lesson — ProgressTutors" },
-      { property: "og:description", content: "Sign in, take the register and complete your lesson review." },
+      { property: "og:description", content: "Live lesson register for tutors." },
+      { name: "robots", content: "noindex" },
     ],
   }),
-  component: LessonDetail,
+  component: TutorLesson,
 });
 
-function LessonDetail() {
+function TutorLesson() {
   const { id } = Route.useParams();
-  const { signedIn, signIn } = useDemo();
-  const lesson = TUTOR_LESSONS.find((l) => l.id === id);
-  const delivered = DELIVERED_LESSONS.find((l) => l.id === id);
-  const active = signedIn[id];
+  const sessions = useTable("sessions");
+  const classes = useTable("classes");
+  const sites = useTable("sites");
+  const reviews = useTable("lesson_reviews");
 
-  const title = lesson?.title ?? delivered?.who ?? "Lesson";
-  const when = lesson ? `${lesson.dayLabel} ${lesson.start}–${lesson.end}` : (delivered?.scheduled ?? "");
-  const where = lesson?.location ?? delivered?.classLabel ?? "";
+  const s = (sessions.data ?? []).find((x) => x.id === id);
+  if (!s) {
+    return (
+      <Page>
+        <PageHeader title="Lesson not found" subtitle="It may not have been opened yet." />
+        <Link to="/tutor/lessons" className="text-sm font-bold text-primary">
+          Back to my lessons
+        </Link>
+      </Page>
+    );
+  }
 
-  const roster = STUDENTS.slice(0, lesson?.groupCount ?? 4);
+  const c = (classes.data ?? []).find((x) => x.id === s.class_id);
+  const site = (sites.data ?? []).find((x) => x.id === s.site_id);
+  const review = (reviews.data ?? []).find((r) => r.session_id === s.id);
 
   return (
     <Page>
       <PageHeader
         breadcrumb={
-          <span>
-            <Link to="/tutor/lessons" className="hover:text-primary">
-              My Lessons
-            </Link>{" "}
-            › <span className="text-foreground">{title}</span>
-          </span>
+          <Link to="/tutor/lessons" className="hover:text-primary">
+            My lessons
+          </Link>
         }
-        title={title}
-        subtitle={`${when} · ${where}`}
+        title={c?.name ?? "Lesson"}
+        subtitle={`${prettyDate(s.session_date)} · ${hhmm(s.start_time)}–${hhmm(s.end_time)} · ${
+          site?.name ?? "Venue to confirm"
+        }`}
         actions={
-          <>
-            {active ? (
-              <Pill tone="green">● Signed in at {active}</Pill>
-            ) : (
-              <Button
-                onClick={() => {
-                  signIn(id);
-                  toast.success("Signed in — tutor attendance recorded");
-                }}
-              >
-                Sign In
-              </Button>
-            )}
-            <Button variant="secondary" asChild>
-              <Link to="/tutor/lesson/$id/review" params={{ id }}>
-                Lesson Review
-              </Link>
-            </Button>
-          </>
+          <Link
+            to="/tutor/lesson/$id/review"
+            params={{ id: s.id }}
+            className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground"
+          >
+            {review ? "Edit review" : "Write review"}
+          </Link>
         }
       />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard label="Scheduled" value={when} tone="blue" />
-        <StatCard label="Sign-in" value={active ?? delivered?.signIn ?? "Not signed in"} tone="pink" />
-        <StatCard label="Rate" value={`${money(lesson?.rate ?? delivered?.rate ?? 25)}/hr`} tone="green" />
-        <StatCard label="GoProgress" value={delivered?.goprogress ?? "Ready"} tone="purple" />
+      <div className="flex flex-wrap items-center gap-2">
+        <Pill tone="purple">Agreed pay {money(s.agreed_amount ?? c?.session_rate)}</Pill>
+        <Pill tone={review ? "green" : "amber"}>{review ? "Review submitted" : "Review outstanding"}</Pill>
+        <GoProgressLink label="GoProgress course" />
       </div>
 
-      <Section id="lesson-register" title="Register" subtitle="Attendance syncs to GoProgress">
-        {lesson?.studentId || (!lesson && delivered) ? (
-          <ul className="space-y-2">
-            <li className="flex items-center gap-3 rounded-xl border border-border px-3 py-2">
-              <Avatar initials="AK" size="sm" tone="purple" />
-              <span className="flex-1 text-sm font-bold">Aisha Khan</span>
-              <Pill tone="green">Present</Pill>
-            </li>
-          </ul>
-        ) : roster.length ? (
-          <ul className="space-y-2">
-            {roster.map((s) => (
-              <li key={s.id} className="flex items-center gap-3 rounded-xl border border-border px-3 py-2">
-                <Avatar initials={s.initials} size="sm" tone="purple" />
-                <span className="flex-1 text-sm font-bold">{s.name}</span>
-                <Pill tone={s.attendance > 85 ? "green" : "amber"}>
-                  {s.attendance > 85 ? "Present" : "Late"}
-                </Pill>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <Empty>No register available for this lesson.</Empty>
-        )}
+      <Section id="lesson-register" title="Register" subtitle="Saved instantly to the shared database">
+        <SessionRegister session={s} />
       </Section>
     </Page>
   );

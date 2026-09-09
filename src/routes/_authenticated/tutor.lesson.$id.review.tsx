@@ -1,135 +1,93 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { Page } from "@/components/AppShell";
-import { PageHeader, Pill, Section } from "@/components/kit";
+import { PageHeader, Section } from "@/components/kit";
+import { TextAreaField } from "@/components/form-kit";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { DELIVERED_LESSONS, TUTOR_LESSONS } from "@/lib/demo-data";
-import { useDemo } from "@/lib/demo-store";
+import { hhmm, prettyDate, useTable, useUpdateRow, useUpsert } from "@/lib/db";
 
 export const Route = createFileRoute("/_authenticated/tutor/lesson/$id/review")({
   head: () => ({
     meta: [
       { title: "Lesson Review — ProgressTutors" },
-      {
-        name: "description",
-        content: "Submit a lesson review so the lesson becomes eligible for payment.",
-      },
+      { name: "description", content: "Record what was covered, progress made, next steps and any concerns." },
       { property: "og:title", content: "Lesson Review — ProgressTutors" },
-      { property: "og:description", content: "What went well, even better if, topics covered and homework set." },
+      { property: "og:description", content: "Submit a lesson review after teaching." },
+      { name: "robots", content: "noindex" },
     ],
   }),
   component: LessonReview,
 });
 
-const FIELDS = [
-  { key: "well", label: "What went well?", placeholder: "Aisha confidently factorised quadratics…" },
-  { key: "better", label: "Even better if?", placeholder: "More practice on completing the square…" },
-  { key: "topics", label: "Topics covered", placeholder: "Quadratic equations, factorising, graph sketching" },
-  { key: "homework", label: "Homework / next steps", placeholder: "Exam questions 4–9, due before next lesson" },
-  { key: "notes", label: "Additional notes", placeholder: "Parent asked about mock exam dates" },
-];
-
 function LessonReview() {
   const { id } = Route.useParams();
-  const { signedIn, endLesson, reviewDelivered, submitReview } = useDemo();
-  const [values, setValues] = useState<Record<string, string>>({});
-  const [done, setDone] = useState(false);
+  const navigate = useNavigate();
+  const sessions = useTable("sessions");
+  const classes = useTable("classes");
+  const reviews = useTable("lesson_reviews");
+  const create = useUpsert("lesson_reviews");
+  const update = useUpdateRow("lesson_reviews");
 
-  const lesson = TUTOR_LESSONS.find((l) => l.id === id);
-  const delivered = DELIVERED_LESSONS.find((l) => l.id === id);
-  const subject = lesson?.title ?? delivered?.classLabel ?? "Lesson";
-  const who = lesson ? (lesson.studentId ? "Aisha Khan" : `${lesson.groupCount} students`) : (delivered?.who ?? "");
-  const scheduled = lesson ? `${lesson.start}–${lesson.end}` : (delivered?.scheduled ?? "");
-  const signInTime = signedIn[id] ?? delivered?.signIn ?? "16:57";
+  const s = (sessions.data ?? []).find((x) => x.id === id);
+  const existing = (reviews.data ?? []).find((r) => r.session_id === id);
+  const c = (classes.data ?? []).find((x) => x.id === s?.class_id);
 
-  if (done) {
+  const [covered, setCovered] = useState(existing?.covered ?? "");
+  const [progress, setProgress] = useState(existing?.progress_note ?? "");
+  const [next, setNext] = useState(existing?.next_steps ?? "");
+  const [concerns, setConcerns] = useState(existing?.concerns ?? "");
+
+  if (!s) {
     return (
       <Page>
-        <div className="surface flex flex-col items-center gap-3 p-10 text-center">
-          <CheckCircle2 className="h-12 w-12 text-primary" />
-          <h1 className="text-2xl font-extrabold">Review submitted</h1>
-          <p className="text-sm text-muted-foreground">
-            This lesson is now eligible for payment and has been added to your draft Payment Request.
-          </p>
-          <div className="mt-2 flex flex-wrap justify-center gap-2">
-            <Button asChild>
-              <Link to="/tutor/payment-requests">Open Payment Requests</Link>
-            </Button>
-            <Button variant="secondary" asChild>
-              <Link to="/tutor/dashboard">Back to dashboard</Link>
-            </Button>
-          </div>
-        </div>
+        <PageHeader title="Lesson not found" />
+        <Link to="/tutor/lessons" className="text-sm font-bold text-primary">
+          Back to my lessons
+        </Link>
       </Page>
     );
+  }
+
+  async function save() {
+    const values = {
+      covered: covered || null,
+      progress_note: progress || null,
+      next_steps: next || null,
+      concerns: concerns || null,
+    };
+    try {
+      if (existing) await update.mutateAsync({ id: existing.id, values });
+      else await create.mutateAsync({ session_id: s!.id, tutor_id: s!.tutor_id, ...values });
+      toast.success("Review saved — this unlocks pay for the session");
+      navigate({ to: "/tutor/lesson/$id", params: { id: s!.id } });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not save the review");
+    }
   }
 
   return (
     <Page>
       <PageHeader
         breadcrumb={
-          <span>
-            <Link to="/tutor/lessons" className="hover:text-primary">
-              My Lessons
-            </Link>{" "}
-            › Lesson Review
-          </span>
+          <Link to="/tutor/lesson/$id" params={{ id: s.id }} className="hover:text-primary">
+            {c?.name ?? "Lesson"}
+          </Link>
         }
-        title="Lesson Review"
-        subtitle="Complete this review to make the lesson eligible for payment"
+        title="Lesson review"
+        subtitle={`${prettyDate(s.session_date)} · ${hhmm(s.start_time)}–${hhmm(s.end_time)}`}
       />
 
-      <Section id="review-context" title="Lesson details" subtitle="Pre-populated from the schedule">
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {[
-            ["Tutor", "Sarah Ahmed"],
-            ["Student / Class", who],
-            ["Subject", subject],
-            ["Date", lesson?.dayLabel ?? delivered?.date ?? "Today"],
-            ["Scheduled time", scheduled],
-            ["Actual sign-in time", signInTime],
-          ].map(([k, v]) => (
-            <label key={k} className="flex flex-col gap-1 text-xs font-semibold text-muted-foreground">
-              {k}
-              <Input readOnly value={v} className="h-10 rounded-xl bg-muted font-medium text-foreground" />
-            </label>
-          ))}
+      <Section id="review-form" title="What happened in the lesson?">
+        <div className="grid gap-3">
+          <TextAreaField label="Covered" value={covered} onChange={setCovered} placeholder="Topics and activities" />
+          <TextAreaField label="Progress" value={progress} onChange={setProgress} placeholder="How the group did" />
+          <TextAreaField label="Next steps" value={next} onChange={setNext} placeholder="Plan for next week" />
+          <TextAreaField label="Concerns" value={concerns} onChange={setConcerns} placeholder="Anything the office should know" />
         </div>
-        <div className="mt-3">
-          <Pill tone="green">Tutor attendance recorded</Pill>
-        </div>
-      </Section>
-
-      <Section id="review-form" title="Your review">
-        <div className="space-y-4">
-          {FIELDS.map((f) => (
-            <label key={f.key} className="block text-sm font-bold">
-              {f.label}
-              <Textarea
-                value={values[f.key] ?? ""}
-                onChange={(e) => setValues((v) => ({ ...v, [f.key]: e.target.value }))}
-                placeholder={f.placeholder}
-                className="mt-1 min-h-24 rounded-xl font-medium"
-              />
-            </label>
-          ))}
-          <Button
-            size="lg"
-            onClick={() => {
-              reviewDelivered(id);
-              submitReview(id);
-              endLesson(id);
-              setDone(true);
-              toast.success("Review submitted. This lesson is now eligible for payment.");
-            }}
-          >
-            Submit Lesson Review
-          </Button>
-        </div>
+        <Button className="mt-4" onClick={save} disabled={create.isPending || update.isPending}>
+          Save review
+        </Button>
       </Section>
     </Page>
   );

@@ -2,270 +2,295 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Page } from "@/components/AppShell";
-import { Avatar, Empty, PageHeader, Pill, Section, StatCard, type Tone } from "@/components/kit";
+import { Empty, PageHeader, Pill, Section, StatCard } from "@/components/kit";
+import { FormDialog, SelectField, TextAreaField, TextField } from "@/components/form-kit";
 import { Button } from "@/components/ui/button";
-import { CLIENTS, money, type ClientAccount } from "@/lib/demo-data";
+import { Input } from "@/components/ui/input";
+import { DEMO_DATE, fullName, money, num, useTable, useUpdateRow, useUpsert } from "@/lib/db";
 
 export const Route = createFileRoute("/_authenticated/admin/payments")({
   head: () => ({
     meta: [
-      { title: "Billing & Subscriptions — ProgressTutors" },
-      {
-        name: "description",
-        content: "Collect from parents: subscriptions, invoices, outstanding balances, failed payments and credits.",
-      },
-      { property: "og:title", content: "Billing & Subscriptions — ProgressTutors" },
-      { property: "og:description", content: "Client payments, plans, invoices, refunds and credits." },
+      { title: "Client Billing — ProgressTutors" },
+      { name: "description", content: "Record parent subscriptions and manual payments, and see who still owes." },
+      { property: "og:title", content: "Client Billing — ProgressTutors" },
+      { property: "og:description", content: "Subscriptions and manual payments for families." },
+      { name: "robots", content: "noindex" },
     ],
   }),
-  component: Payments,
+  component: Billing,
 });
 
-const TABS = ["Clients", "Subscriptions", "Invoices", "Payments", "Refunds"] as const;
-type Tab = (typeof TABS)[number];
+function Billing() {
+  const parents = useTable("parents", "first_name");
+  const students = useTable("students", "first_name");
+  const plans = useTable("pricing_plans", "sort_order");
+  const programmes = useTable("programmes");
+  const subs = useTable("client_subscriptions");
+  const payments = useTable("client_payments", "payment_date");
 
-const statusTone = (s: string): Tone =>
-  s === "Active" || s === "Paid" || s === "Succeeded"
-    ? "green"
-    : s === "Failed" || s === "Overdue"
-      ? "pink"
-      : s === "Paused"
-        ? "purple"
-        : "amber";
+  const addSub = useUpsert("client_subscriptions");
+  const updateSub = useUpdateRow("client_subscriptions");
+  const addPayment = useUpsert("client_payments", ["parents"]);
 
-function Payments() {
-  const [tab, setTab] = useState<Tab>("Clients");
-  const [open, setOpen] = useState<ClientAccount | null>(null);
+  const [q, setQ] = useState("");
+  const [subOpen, setSubOpen] = useState(false);
+  const [payOpen, setPayOpen] = useState(false);
+  const [sub, setSub] = useState({
+    parent_id: "",
+    student_id: "",
+    pricing_plan_id: "",
+    amount: "",
+    cadence: "monthly",
+    next_due_date: DEMO_DATE,
+    notes: "",
+  });
+  const [pay, setPay] = useState({
+    parent_id: "",
+    student_id: "",
+    amount: "",
+    payment_date: DEMO_DATE,
+    method: "bank_transfer",
+    reference: "",
+    note: "",
+  });
 
-  const act = (label: string) => {
-    toast.success(`Demo: ${label}${open ? ` — ${open.parent}` : ""}`);
-  };
+  const received = (payments.data ?? []).filter((p) => p.status === "received");
+  const total = received.reduce((a, p) => a + num(p.amount), 0);
+  const dueSoon = (subs.data ?? []).filter((s) => s.status === "active");
+  const expected = dueSoon.reduce((a, s) => a + num(s.amount), 0);
+
+  const parentName = (id: string | null) => fullName((parents.data ?? []).find((p) => p.id === id));
+  const studentName = (id: string | null) => fullName((students.data ?? []).find((s) => s.id === id));
+
+  const filteredPayments = (payments.data ?? []).filter((p) =>
+    q === "" ? true : `${parentName(p.parent_id)} ${studentName(p.student_id)} ${p.reference ?? ""}`.toLowerCase().includes(q.toLowerCase()),
+  );
 
   return (
     <Page>
-      <PageHeader title="Payments" subtitle="Billing & Subscriptions" />
+      <PageHeader
+        title="Client billing"
+        subtitle="Manual, operational record keeping — no card processing in this demo"
+        actions={
+          <>
+            <Button variant="secondary" onClick={() => setSubOpen(true)}>
+              Add plan
+            </Button>
+            <Button onClick={() => setPayOpen(true)}>Record payment</Button>
+          </>
+        }
+      />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-        <StatCard label="Total Collected" value={money(12540)} tone="green" />
-        <StatCard label="Outstanding" value={money(1845)} tone="pink" />
-        <StatCard label="Expected" value={money(8920)} tone="blue" />
-        <StatCard label="Active Subscriptions" value="24" tone="purple" />
-        <StatCard label="Failed Payments" value="2" tone="amber" />
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatCard label="Received" value={money(total)} tone="green" />
+        <StatCard label="Payments logged" value={String((payments.data ?? []).length)} tone="blue" />
+        <StatCard label="Active plans" value={String(dueSoon.length)} tone="purple" />
+        <StatCard label="Expected per cycle" value={money(expected)} tone="pink" />
       </div>
 
-      <div className="surface p-2">
-        <div className="flex flex-wrap gap-1">
-          {TABS.map((t) => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => setTab(t)}
-              className={`rounded-full px-4 py-2 text-sm font-semibold ${
-                tab === t ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary"
-              }`}
-            >
-              {t}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="grid gap-6 xl:grid-cols-[2fr_1fr]">
-        <Section id="pay-table" title={tab} subtitle="Demo billing data">
-          <div className="overflow-x-auto">
-            {tab === "Clients" || tab === "Subscriptions" ? (
-              <table className="w-full min-w-[760px] text-sm">
-                <thead>
-                  <tr className="text-left text-xs text-muted-foreground">
-                    {["Parent / client", "Children", "Plan", "Next payment", "Amount", "Status", ""].map((h) => (
-                      <th key={h} className="pb-2 font-semibold">
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {CLIENTS.map((c) => (
-                    <tr key={c.id} className="border-t border-border">
-                      <td className="py-3">
-                        <div className="flex items-center gap-2">
-                          <Avatar initials={c.initials} size="sm" />
-                          <span>
-                            <span className="block font-semibold">{c.parent}</span>
-                            <span className="block text-xs text-muted-foreground">{c.email}</span>
-                          </span>
-                        </div>
-                      </td>
-                      <td className="py-3">{c.children.join(", ")}</td>
-                      <td className="py-3">{c.plan}</td>
-                      <td className="py-3">{c.nextPayment}</td>
-                      <td className="py-3 font-bold">{money(c.amount)}</td>
-                      <td className="py-3">
-                        <Pill tone={statusTone(c.status)}>{c.status}</Pill>
-                      </td>
-                      <td className="py-3 text-right">
-                        <Button size="sm" variant="ghost" onClick={() => setOpen(c)}>
-                          Open
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            ) : null}
-
-            {tab === "Invoices" ? (
-              <table className="w-full min-w-[620px] text-sm">
-                <thead>
-                  <tr className="text-left text-xs text-muted-foreground">
-                    {["Invoice", "Client", "Date", "Amount", "Status"].map((h) => (
-                      <th key={h} className="pb-2 font-semibold">
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {CLIENTS.flatMap((c) => c.invoices.map((i) => ({ ...i, client: c.parent }))).map((i) => (
-                    <tr key={i.id} className="border-t border-border">
-                      <td className="py-3 font-semibold">{i.id}</td>
-                      <td className="py-3">{i.client}</td>
-                      <td className="py-3">{i.date}</td>
-                      <td className="py-3 font-bold">{money(i.amount)}</td>
-                      <td className="py-3">
-                        <Pill tone={statusTone(i.status)}>{i.status}</Pill>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            ) : null}
-
-            {tab === "Payments" ? (
-              <table className="w-full min-w-[620px] text-sm">
-                <thead>
-                  <tr className="text-left text-xs text-muted-foreground">
-                    {["Payment", "Client", "Date", "Method", "Amount", "Status"].map((h) => (
-                      <th key={h} className="pb-2 font-semibold">
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {CLIENTS.flatMap((c) => c.payments.map((p) => ({ ...p, client: c.parent }))).map((p) => (
-                    <tr key={p.id} className="border-t border-border">
-                      <td className="py-3 font-semibold">{p.id}</td>
-                      <td className="py-3">{p.client}</td>
-                      <td className="py-3">{p.date}</td>
-                      <td className="py-3">{p.method}</td>
-                      <td className="py-3 font-bold">{money(p.amount)}</td>
-                      <td className="py-3">
-                        <Pill tone={statusTone(p.status)}>{p.status}</Pill>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            ) : null}
-
-            {tab === "Refunds" ? <Empty>No refunds have been issued in this demo period.</Empty> : null}
-          </div>
-        </Section>
-
-        <Section id="client-drawer" title="Client detail" subtitle={open ? open.parent : "Select a client"}>
-          {!open ? (
-            <Empty>Open a client from the table to see their household billing.</Empty>
-          ) : (
-            <div className="space-y-4">
-              <div className="flex items-center gap-3">
-                <Avatar initials={open.initials} size="lg" />
-                <div>
-                  <p className="font-extrabold">{open.parent}</p>
-                  <p className="text-xs text-muted-foreground">{open.children.join(" · ")}</p>
+      <Section id="billing-plans" title="Family plans" subtitle="Amounts follow the agreed programme pricing">
+        {(subs.data ?? []).length === 0 ? (
+          <Empty>No plans set up yet.</Empty>
+        ) : (
+          <ul className="space-y-2">
+            {(subs.data ?? []).map((s) => (
+              <li key={s.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-border px-4 py-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-bold">
+                    {parentName(s.parent_id)} · {studentName(s.student_id)}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {s.plan_name ?? "Plan"} · {money(s.amount)} {s.cadence}
+                    {s.next_due_date ? ` · next due ${s.next_due_date}` : ""}
+                  </p>
                 </div>
-              </div>
+                <Pill tone={s.status === "active" ? "green" : "neutral"}>{s.status}</Pill>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() =>
+                    updateSub.mutate(
+                      { id: s.id, values: { status: s.status === "active" ? "paused" : "active" } },
+                      { onSuccess: () => toast.success("Plan updated") },
+                    )
+                  }
+                >
+                  {s.status === "active" ? "Pause" : "Resume"}
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Section>
 
-              <div className="grid grid-cols-2 gap-2">
-                <StatCard label="Household total" value={money(open.amount)} tone="pink" />
-                <StatCard label="Credits" value={money(open.credits)} tone="green" />
-              </div>
-
-              <div>
-                <p className="text-xs font-bold text-muted-foreground uppercase">Subscriptions per child</p>
-                <ul className="mt-2 space-y-2">
-                  {open.subscriptions.map((s) => (
-                    <li key={s.child} className="rounded-xl border border-border px-3 py-2">
-                      <p className="text-sm font-bold">{s.child}</p>
-                      <p className="text-xs text-muted-foreground">{s.plan}</p>
-                      <div className="mt-1 flex items-center justify-between">
-                        <span className="text-sm font-bold">{money(s.amount)}/mo</span>
-                        <Pill tone={statusTone(s.status)}>{s.status}</Pill>
-                      </div>
-                    </li>
+      <Section id="billing-payments" title="Payments received">
+        <Input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Search by family, child or reference"
+          className="mb-3 h-10 max-w-sm rounded-xl"
+        />
+        {filteredPayments.length === 0 ? (
+          <Empty>No payments recorded yet.</Empty>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[640px] text-sm">
+              <thead>
+                <tr className="text-left text-xs text-muted-foreground">
+                  {["Date", "Family", "Child", "Method", "Reference", "Amount", "Status"].map((h) => (
+                    <th key={h} className="pb-2 font-semibold">
+                      {h}
+                    </th>
                   ))}
-                </ul>
-              </div>
-
-              <div>
-                <p className="text-xs font-bold text-muted-foreground uppercase">Invoices</p>
-                <ul className="mt-2 space-y-1 text-sm">
-                  {open.invoices.length === 0 ? (
-                    <li className="text-muted-foreground">No invoices</li>
-                  ) : (
-                    open.invoices.map((i) => (
-                      <li key={i.id} className="flex justify-between">
-                        <span>
-                          {i.id} · {i.date}
-                        </span>
-                        <span className="font-semibold">
-                          {money(i.amount)} · {i.status}
-                        </span>
-                      </li>
-                    ))
-                  )}
-                </ul>
-              </div>
-
-              <div>
-                <p className="text-xs font-bold text-muted-foreground uppercase">Payments</p>
-                <ul className="mt-2 space-y-1 text-sm">
-                  {open.payments.length === 0 ? (
-                    <li className="text-muted-foreground">No payments</li>
-                  ) : (
-                    open.payments.map((p) => (
-                      <li key={p.id} className="flex justify-between">
-                        <span>
-                          {p.id} · {p.date}
-                        </span>
-                        <span className="font-semibold">
-                          {money(p.amount)} · {p.status}
-                        </span>
-                      </li>
-                    ))
-                  )}
-                </ul>
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                {[
-                  "Send reminder",
-                  "Create invoice",
-                  "Add credit",
-                  "Refund",
-                  "Pause subscription",
-                  "Cancel subscription",
-                  "Change plan",
-                ].map((a) => (
-                  <Button key={a} size="sm" variant="secondary" onClick={() => act(a)}>
-                    {a}
-                  </Button>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredPayments.map((p) => (
+                  <tr key={p.id} className="border-t border-border">
+                    <td className="py-3">{p.payment_date}</td>
+                    <td className="py-3 font-semibold">{parentName(p.parent_id)}</td>
+                    <td className="py-3">{studentName(p.student_id)}</td>
+                    <td className="py-3">{p.method ?? "—"}</td>
+                    <td className="py-3">{p.reference ?? "—"}</td>
+                    <td className="py-3 font-bold">{money(p.amount)}</td>
+                    <td className="py-3">
+                      <Pill tone={p.status === "received" ? "green" : "amber"}>{p.status}</Pill>
+                    </td>
+                  </tr>
                 ))}
-              </div>
-            </div>
-          )}
-        </Section>
-      </div>
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Section>
+
+      <FormDialog
+        open={subOpen}
+        onOpenChange={setSubOpen}
+        title="Add a family plan"
+        busy={addSub.isPending}
+        onSubmit={async () => {
+          const plan = (plans.data ?? []).find((p) => p.id === sub.pricing_plan_id);
+          await addSub.mutateAsync({
+            parent_id: sub.parent_id || null,
+            student_id: sub.student_id || null,
+            pricing_plan_id: sub.pricing_plan_id || null,
+            programme_id: plan?.programme_id ?? null,
+            plan_name: plan?.name ?? null,
+            amount: sub.amount ? Number(sub.amount) : num(plan?.amount),
+            cadence: sub.cadence,
+            next_due_date: sub.next_due_date || null,
+            notes: sub.notes || null,
+            status: "active",
+          });
+          toast.success("Plan added");
+          setSubOpen(false);
+        }}
+      >
+        <SelectField
+          label="Family"
+          value={sub.parent_id}
+          onChange={(v) => setSub({ ...sub, parent_id: v })}
+          options={[{ value: "", label: "Choose" }, ...(parents.data ?? []).map((p) => ({ value: p.id, label: fullName(p) }))]}
+        />
+        <SelectField
+          label="Child"
+          value={sub.student_id}
+          onChange={(v) => setSub({ ...sub, student_id: v })}
+          options={[{ value: "", label: "Choose" }, ...(students.data ?? []).map((s) => ({ value: s.id, label: fullName(s) }))]}
+        />
+        <SelectField
+          label="Plan"
+          value={sub.pricing_plan_id}
+          onChange={(v) => {
+            const plan = (plans.data ?? []).find((p) => p.id === v);
+            setSub({ ...sub, pricing_plan_id: v, amount: plan ? String(plan.amount) : sub.amount });
+          }}
+          options={[
+            { value: "", label: "Choose" },
+            ...(plans.data ?? []).map((p) => ({
+              value: p.id,
+              label: `${(programmes.data ?? []).find((g) => g.id === p.programme_id)?.name ?? ""} ${p.name} · ${money(
+                p.amount,
+              )} ${p.pricing_unit}`,
+            })),
+          ]}
+        />
+        <TextField label="Amount (£)" type="number" value={sub.amount} onChange={(v) => setSub({ ...sub, amount: v })} />
+        <SelectField
+          label="Billing cycle"
+          value={sub.cadence}
+          onChange={(v) => setSub({ ...sub, cadence: v })}
+          options={[
+            { value: "weekly", label: "Weekly" },
+            { value: "monthly", label: "Monthly" },
+            { value: "termly", label: "Termly" },
+            { value: "one_off", label: "One off" },
+          ]}
+        />
+        <TextField
+          label="Next due"
+          type="date"
+          value={sub.next_due_date}
+          onChange={(v) => setSub({ ...sub, next_due_date: v })}
+        />
+        <TextAreaField label="Notes" value={sub.notes} onChange={(v) => setSub({ ...sub, notes: v })} />
+      </FormDialog>
+
+      <FormDialog
+        open={payOpen}
+        onOpenChange={setPayOpen}
+        title="Record a payment"
+        busy={addPayment.isPending}
+        onSubmit={async () => {
+          await addPayment.mutateAsync({
+            parent_id: pay.parent_id || null,
+            student_id: pay.student_id || null,
+            amount: Number(pay.amount) || 0,
+            payment_date: pay.payment_date,
+            method: pay.method,
+            reference: pay.reference || null,
+            note: pay.note || null,
+            status: "received",
+          });
+          toast.success("Payment recorded");
+          setPayOpen(false);
+        }}
+      >
+        <SelectField
+          label="Family"
+          value={pay.parent_id}
+          onChange={(v) => setPay({ ...pay, parent_id: v })}
+          options={[{ value: "", label: "Choose" }, ...(parents.data ?? []).map((p) => ({ value: p.id, label: fullName(p) }))]}
+        />
+        <SelectField
+          label="Child"
+          value={pay.student_id}
+          onChange={(v) => setPay({ ...pay, student_id: v })}
+          options={[{ value: "", label: "Choose" }, ...(students.data ?? []).map((s) => ({ value: s.id, label: fullName(s) }))]}
+        />
+        <TextField label="Amount (£)" type="number" value={pay.amount} onChange={(v) => setPay({ ...pay, amount: v })} required />
+        <TextField
+          label="Date"
+          type="date"
+          value={pay.payment_date}
+          onChange={(v) => setPay({ ...pay, payment_date: v })}
+        />
+        <SelectField
+          label="Method"
+          value={pay.method}
+          onChange={(v) => setPay({ ...pay, method: v })}
+          options={[
+            { value: "bank_transfer", label: "Bank transfer" },
+            { value: "cash", label: "Cash" },
+            { value: "card", label: "Card machine" },
+            { value: "other", label: "Other" },
+          ]}
+        />
+        <TextField label="Reference" value={pay.reference} onChange={(v) => setPay({ ...pay, reference: v })} />
+        <TextAreaField label="Note" value={pay.note} onChange={(v) => setPay({ ...pay, note: v })} />
+      </FormDialog>
     </Page>
   );
 }

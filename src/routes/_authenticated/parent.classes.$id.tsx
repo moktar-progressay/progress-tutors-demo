@@ -1,20 +1,21 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { Page } from "@/components/AppShell";
-import { CapacityPill, Empty, Field, PageHeader, Pill, Section, StatCard } from "@/components/kit";
+import { Empty, GoProgressLink, PageHeader, Pill, Section, StatCard } from "@/components/kit";
+import { SelectField } from "@/components/form-kit";
 import { Button } from "@/components/ui/button";
-import { CHILDREN, klass, money, site, tutor } from "@/lib/demo-data";
-import { useDemo } from "@/lib/demo-store";
+import { useActingId } from "@/lib/acting";
+import { capacityTone, fullName, hhmm, money, prettyDate, useTable, useUpsert } from "@/lib/db";
 
 export const Route = createFileRoute("/_authenticated/parent/classes/$id")({
   head: () => ({
     meta: [
-      { title: "Class Details — ProgressTutors" },
-      { name: "description", content: "Class details, schedule, price and enrolment for your child." },
-      { property: "og:title", content: "Class Details — ProgressTutors" },
-      { property: "og:description", content: "Join a class and link it to GoProgress." },
+      { title: "Class details — ProgressTutors" },
+      { name: "description", content: "Class times, venue, coach, places left and how to request a place for your child." },
+      { property: "og:title", content: "Class details — ProgressTutors" },
+      { property: "og:description", content: "Class details and enrolment request." },
+      { name: "robots", content: "noindex" },
     ],
   }),
   component: ParentClassDetail,
@@ -22,119 +23,103 @@ export const Route = createFileRoute("/_authenticated/parent/classes/$id")({
 
 function ParentClassDetail() {
   const { id } = Route.useParams();
-  const { addEnrolment } = useDemo();
-  const c = klass(id);
-  const [child, setChild] = useState(CHILDREN[0]?.short ?? "Aisha");
-  const [payment, setPayment] = useState("Monthly subscription (demo card ••42)");
-  const [step, setStep] = useState<"details" | "confirm" | "done">("details");
+  const [parentId] = useActingId("parent");
+  const [childId, setChildId] = useState("");
 
+  const classes = useTable("classes");
+  const sites = useTable("sites");
+  const tutors = useTable("tutors");
+  const links = useTable("parent_students");
+  const students = useTable("students");
+  const enrolments = useTable("class_enrolments");
+  const sessions = useTable("sessions", "session_date");
+  const enrol = useUpsert("class_enrolments");
+
+  const c = (classes.data ?? []).find((x) => x.id === id);
   if (!c) {
     return (
       <Page>
-        <Empty>Class not found.</Empty>
+        <PageHeader title="Class not found" />
+        <Link to="/parent/classes" className="text-sm font-bold text-primary">
+          Back to classes
+        </Link>
       </Page>
     );
   }
 
-  if (step === "done") {
-    return (
-      <Page>
-        <div className="surface flex flex-col items-center gap-3 p-10 text-center">
-          <CheckCircle2 className="h-12 w-12 text-primary" />
-          <h1 className="text-2xl font-extrabold">Class added for {child} and linked to GoProgress.</h1>
-          <p className="text-sm text-muted-foreground">
-            {c.subject} · {c.day} {c.start}–{c.end} · {site(c.siteId)?.name}
-          </p>
-          <div className="mt-2 flex flex-wrap justify-center gap-2">
-            <Button asChild>
-              <Link to="/parent/dashboard">Back to dashboard</Link>
-            </Button>
-            <Button variant="secondary" asChild>
-              <Link to="/parent/classes">Find more classes</Link>
-            </Button>
-          </div>
-        </div>
-      </Page>
-    );
-  }
+  const site = (sites.data ?? []).find((s) => s.id === c.site_id);
+  const tutor = (tutors.data ?? []).find((t) => t.id === c.tutor_id);
+  const count = (enrolments.data ?? []).filter((e) => e.class_id === c.id && e.status === "active").length;
+  const childIds = (links.data ?? []).filter((l) => l.parent_id === parentId).map((l) => l.student_id);
+  const children = (students.data ?? []).filter((s) => childIds.includes(s.id));
+  const upcoming = (sessions.data ?? []).filter((s) => s.class_id === c.id);
+  const alreadyIn = (enrolments.data ?? []).some(
+    (e) => e.class_id === c.id && e.student_id === childId && e.status !== "left",
+  );
 
   return (
     <Page>
       <PageHeader
         breadcrumb={
           <Link to="/parent/classes" className="hover:text-primary">
-            Find Classes
+            Find a class
           </Link>
         }
-        title={c.subject}
-        subtitle={`${c.type} · ${site(c.siteId)?.name} · ${c.day} ${c.start}–${c.end}`}
+        title={c.name}
+        subtitle={`${c.weekday ?? ""} ${hhmm(c.start_time)}–${hhmm(c.end_time)} · ${site?.name ?? "Venue to confirm"}`}
       />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard label="Places" value={`${c.enrolled}/${c.capacity}`} tone="blue" />
-        <StatCard label="Price" value={`${money(c.price)}/session`} tone="green" />
-        <StatCard label="Tutor" value={tutor(c.tutorId)?.name ?? "To be confirmed"} tone="pink" />
-        <StatCard label="Level" value={c.level} tone="purple" />
+        <StatCard label="Places left" value={String(Math.max(c.capacity - count, 0))} tone={capacityTone(count, c.capacity)} />
+        <StatCard label="Price per session" value={money(c.price_per_session)} tone="green" />
+        <StatCard label="Coach / tutor" value={tutor ? fullName(tutor) : "To be confirmed"} tone="blue" />
+        <StatCard label="Format" value={c.delivery_mode.replace("_", " ")} tone="purple" />
       </div>
 
-      <Section id="pc-join" title="Join this class">
-        <div className="flex flex-wrap items-end gap-3">
-          <Field label="Which child" value={child} onChange={setChild} options={CHILDREN.map((x) => x.short)} />
-          <Field
-            label="Payment option"
-            value={payment}
-            onChange={setPayment}
-            options={[
-              "Monthly subscription (demo card ••42)",
-              "Pay per session (demo card ••42)",
-              "Termly upfront (demo bank transfer)",
-            ]}
-          />
-          <CapacityPill enrolled={c.enrolled} capacity={c.capacity} />
-        </div>
-
-        {step === "details" ? (
-          <Button className="mt-4" onClick={() => setStep("confirm")}>
-            Join Class
-          </Button>
+      <Section id="parent-join" title="Request a place">
+        {children.length === 0 ? (
+          <Empty>Choose your name on the parent dashboard first, so we know which children to offer.</Empty>
         ) : (
-          <div className="mt-4 rounded-2xl border border-border p-4">
-            <p className="text-sm font-bold">Confirm enrolment</p>
-            <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
-              <li>Child: {child}</li>
-              <li>
-                Class: {c.subject} · {c.day} {c.start}–{c.end}
-              </li>
-              <li>Location: {site(c.siteId)?.name}</li>
-              <li>Payment: {payment}</li>
-            </ul>
-            <div className="mt-3 flex gap-2">
-              <Button
-                onClick={() => {
-                  addEnrolment({ child, classId: c.id, className: c.subject });
-                  setStep("done");
-                  toast.success(`Class added for ${child} and linked to GoProgress.`);
-                }}
-              >
-                Confirm enrolment
-              </Button>
-              <Button variant="ghost" onClick={() => setStep("details")}>
-                Back
-              </Button>
-            </div>
+          <div className="flex flex-wrap items-end gap-3">
+            <SelectField
+              label="Child"
+              value={childId}
+              onChange={setChildId}
+              options={[{ value: "", label: "Choose" }, ...children.map((s) => ({ value: s.id, label: fullName(s) }))]}
+            />
+            <Button
+              disabled={!childId || alreadyIn || enrol.isPending}
+              onClick={async () => {
+                await enrol.mutateAsync({ class_id: c.id, student_id: childId, status: "pending" });
+                toast.success("Request sent — the office will confirm the place");
+              }}
+            >
+              {alreadyIn ? "Already requested" : "Request place"}
+            </Button>
           </div>
         )}
+        {c.goprogress_course_url ? (
+          <div className="mt-3">
+            <GoProgressLink label="Course in GoProgress" />
+          </div>
+        ) : null}
       </Section>
 
-      <Section id="pc-about" title="About this class">
-        <p className="text-sm text-muted-foreground">
-          Weekly {c.level} {c.subject} in {c.room}. Attendance and homework are shared with parents through
-          GoProgress.
-        </p>
-        <div className="mt-3 flex gap-2">
-          <Pill tone="blue">{c.recurrence}</Pill>
-          <Pill tone="green">{c.goprogress ? "GoProgress connected" : "GoProgress not linked"}</Pill>
-        </div>
+      <Section id="parent-class-dates" title="Upcoming dates">
+        {upcoming.length === 0 ? (
+          <Empty>Dates are published once the office opens the register.</Empty>
+        ) : (
+          <ul className="space-y-2">
+            {upcoming.slice(0, 8).map((s) => (
+              <li key={s.id} className="flex items-center gap-3 rounded-xl border border-border px-4 py-2 text-sm">
+                <span className="min-w-0 flex-1">{prettyDate(s.session_date)}</span>
+                <Pill tone="blue">
+                  {hhmm(s.start_time)}–{hhmm(s.end_time)}
+                </Pill>
+              </li>
+            ))}
+          </ul>
+        )}
       </Section>
     </Page>
   );

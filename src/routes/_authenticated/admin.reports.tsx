@@ -1,100 +1,113 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Page } from "@/components/AppShell";
-import { PageHeader, Pill, Section, StatCard } from "@/components/kit";
-import { SITES, TUTORS, money } from "@/lib/demo-data";
+import { Empty, PageHeader, Pill, Section, StatCard } from "@/components/kit";
+import { fullName, money, num, useTable } from "@/lib/db";
 
 export const Route = createFileRoute("/_authenticated/admin/reports")({
   head: () => ({
     meta: [
       { title: "Reports — ProgressTutors" },
-      {
-        name: "description",
-        content: "Attendance, capacity, revenue and tutor delivery trends across all tuition sites.",
-      },
+      { name: "description", content: "Attendance, income, tutor cost and enrolment figures calculated from live records." },
       { property: "og:title", content: "Reports — ProgressTutors" },
-      { property: "og:description", content: "Attendance, capacity and revenue trends for your tuition business." },
+      { property: "og:description", content: "Live operational reporting." },
+      { name: "robots", content: "noindex" },
     ],
   }),
   component: Reports,
 });
 
-const MONTHS = [
-  { m: "Apr", revenue: 7200, attendance: 88 },
-  { m: "May", revenue: 8100, attendance: 90 },
-  { m: "Jun", revenue: 9400, attendance: 91 },
-  { m: "Jul", revenue: 8800, attendance: 87 },
-  { m: "Aug", revenue: 7600, attendance: 85 },
-  { m: "Sep", revenue: 12540, attendance: 92 },
-];
-
 function Reports() {
-  const max = Math.max(...MONTHS.map((m) => m.revenue));
+  const sites = useTable("sites", "name");
+  const classes = useTable("classes", "name");
+  const enrolments = useTable("class_enrolments");
+  const sessions = useTable("sessions");
+  const attendance = useTable("student_attendance");
+  const payments = useTable("client_payments");
+  const earnings = useTable("tutor_earnings");
+  const tutors = useTable("tutors");
+
+  const marks = attendance.data ?? [];
+  const present = marks.filter((m) => m.status === "present" || m.status === "late").length;
+  const rate = marks.length === 0 ? 0 : Math.round((present / marks.length) * 100);
+  const income = (payments.data ?? [])
+    .filter((p) => p.status === "received")
+    .reduce((a, p) => a + num(p.amount), 0);
+  const cost = (earnings.data ?? []).reduce((a, e) => a + num(e.amount), 0);
+
   return (
     <Page>
-      <PageHeader title="Reports" subtitle="Attendance, capacity, revenue and tutor delivery" />
+      <PageHeader title="Reports" subtitle="Every figure is calculated from the shared database" />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard label="Revenue this month" value={money(12540)} tone="green" />
-        <StatCard label="Attendance" value="92%" tone="blue" />
-        <StatCard label="Capacity used" value="82%" tone="amber" />
-        <StatCard label="Lesson reviews" value="119" tone="purple" />
+        <StatCard label="Attendance rate" value={`${rate}%`} tone="green" />
+        <StatCard label="Sessions delivered" value={String((sessions.data ?? []).length)} tone="blue" />
+        <StatCard label="Income received" value={money(income)} tone="purple" />
+        <StatCard label="Tutor cost" value={money(cost)} tone="pink" />
       </div>
 
-      <Section id="rev-chart" title="Revenue trend" subtitle="Last 6 months">
-        <div className="flex h-56 items-end gap-3">
-          {MONTHS.map((m) => (
-            <div key={m.m} className="flex flex-1 flex-col items-center gap-2">
-              <span className="text-xs font-bold">{money(m.revenue)}</span>
-              <div
-                className="w-full rounded-t-xl bg-primary/85"
-                style={{ height: `${(m.revenue / max) * 100}%` }}
-              />
-              <span className="text-xs font-semibold text-muted-foreground">{m.m}</span>
-            </div>
-          ))}
-        </div>
+      <Section id="rep-sites" title="By site">
+        {(sites.data ?? []).length === 0 ? (
+          <Empty>No sites configured.</Empty>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[560px] text-sm">
+              <thead>
+                <tr className="text-left text-xs text-muted-foreground">
+                  {["Site", "Classes", "Enrolled", "Sessions", "Attendance"].map((h) => (
+                    <th key={h} className="pb-2 font-semibold">
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {(sites.data ?? []).map((s) => {
+                  const cls = (classes.data ?? []).filter((c) => c.site_id === s.id);
+                  const enrolled = (enrolments.data ?? []).filter(
+                    (e) => e.status === "active" && cls.some((c) => c.id === e.class_id),
+                  ).length;
+                  const sess = (sessions.data ?? []).filter((x) => x.site_id === s.id);
+                  const siteMarks = marks.filter((m) => sess.some((x) => x.id === m.session_id));
+                  const sitePresent = siteMarks.filter((m) => m.status === "present" || m.status === "late").length;
+                  return (
+                    <tr key={s.id} className="border-t border-border">
+                      <td className="py-3 font-semibold">{s.name}</td>
+                      <td className="py-3">{cls.length}</td>
+                      <td className="py-3">{enrolled}</td>
+                      <td className="py-3">{sess.length}</td>
+                      <td className="py-3">
+                        {siteMarks.length === 0 ? (
+                          <span className="text-muted-foreground">—</span>
+                        ) : (
+                          <Pill tone="green">{Math.round((sitePresent / siteMarks.length) * 100)}%</Pill>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </Section>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Section id="rep-sites" title="Capacity by site">
-          <ul className="space-y-3">
-            {SITES.map((s) => (
-              <li key={s.id}>
-                <div className="flex items-center justify-between text-sm font-semibold">
-                  <span>{s.name}</span>
-                  <span>{s.capacity}%</span>
-                </div>
-                <div className="mt-1 h-2 overflow-hidden rounded-full bg-muted">
-                  <div className="h-full rounded-full bg-primary" style={{ width: `${s.capacity}%` }} />
-                </div>
-              </li>
-            ))}
+      <Section id="rep-tutors" title="Tutor cost">
+        {(tutors.data ?? []).length === 0 ? (
+          <Empty>No tutors added yet.</Empty>
+        ) : (
+          <ul className="space-y-2">
+            {(tutors.data ?? []).map((t) => {
+              const mine = (earnings.data ?? []).filter((e) => e.tutor_id === t.id);
+              return (
+                <li key={t.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-border px-4 py-2">
+                  <span className="min-w-0 flex-1 text-sm font-semibold">{fullName(t)}</span>
+                  <span className="text-xs text-muted-foreground">{mine.length} sessions</span>
+                  <span className="font-bold">{money(mine.reduce((a, e) => a + num(e.amount), 0))}</span>
+                </li>
+              );
+            })}
           </ul>
-        </Section>
-
-        <Section id="rep-attendance" title="Attendance by month">
-          <ul className="space-y-3">
-            {MONTHS.map((m) => (
-              <li key={m.m} className="flex items-center gap-3">
-                <span className="w-10 text-sm font-semibold">{m.m}</span>
-                <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
-                  <div className="h-full rounded-full bg-primary" style={{ width: `${m.attendance}%` }} />
-                </div>
-                <span className="w-10 text-right text-sm font-bold">{m.attendance}%</span>
-              </li>
-            ))}
-          </ul>
-        </Section>
-      </div>
-
-      <Section id="rep-tutors" title="Tutor delivery">
-        <div className="flex flex-wrap gap-2">
-          {TUTORS.map((t) => (
-            <Pill key={t.id} tone="blue">
-              {t.name}: {t.lessons} lessons · {t.attendance}%
-            </Pill>
-          ))}
-        </div>
+        )}
       </Section>
     </Page>
   );

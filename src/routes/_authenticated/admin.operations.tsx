@@ -1,252 +1,176 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Page } from "@/components/AppShell";
-import { Avatar, CapacityPill, Field, PageHeader, Pill, Section } from "@/components/kit";
+import { Empty, PageHeader, Pill, Section, StatCard } from "@/components/kit";
+import { SelectField, TextField } from "@/components/form-kit";
+import { SessionRegister } from "@/components/session-register";
 import { Button } from "@/components/ui/button";
-import { CLASSES, DAYS, SITES, STUDENTS, TUTORS, capacityStatus, site, tutor } from "@/lib/demo-data";
+import {
+  capacityTone,
+  DEMO_DATE,
+  fullName,
+  hhmm,
+  prettyDate,
+  useTable,
+  useUpsert,
+  weekdayOf,
+} from "@/lib/db";
 
 export const Route = createFileRoute("/_authenticated/admin/operations")({
   head: () => ({
     meta: [
-      { title: "Operations Planner — ProgressTutors" },
-      {
-        name: "description",
-        content: "Weekly tuition timetable with rooms, tutors, capacity status and site-level operational alerts.",
-      },
-      { property: "og:title", content: "Operations Planner — ProgressTutors" },
-      { property: "og:description", content: "Plan classes, rooms and tutors across every tuition site." },
+      { title: "Operations — ProgressTutors" },
+      { name: "description", content: "Run the day: schedule blocks, sessions, tutor sign-ins and live registers." },
+      { property: "og:title", content: "Operations — ProgressTutors" },
+      { property: "og:description", content: "Daily operations board with live registers." },
+      { name: "robots", content: "noindex" },
     ],
   }),
   component: Operations,
 });
 
-const HOURS = ["10:00", "11:00", "12:00", "13:00", "16:30", "17:00", "18:00", "19:00", "20:00"];
-
-const toneFor = (enrolled: number, capacity: number) => {
-  const s = capacityStatus(enrolled, capacity);
-  return s === "available"
-    ? "border-l-tile-green-ink bg-tile-green"
-    : s === "nearly"
-      ? "border-l-tile-amber-ink bg-tile-amber"
-      : s === "full"
-        ? "border-l-tile-pink-ink bg-tile-pink"
-        : "border-l-tile-purple-ink bg-tile-purple";
-};
-
 function Operations() {
-  const [siteFilter, setSiteFilter] = useState("All sites");
-  const [dayFilter, setDayFilter] = useState("All days");
-  const [view, setView] = useState<"Classes" | "Rooms" | "Students">("Classes");
+  const [date, setDate] = useState(DEMO_DATE);
+  const [siteFilter, setSiteFilter] = useState("");
 
-  const classes = CLASSES.filter(
-    (c) =>
-      (siteFilter === "All sites" || site(c.siteId)?.name === siteFilter) &&
-      (dayFilter === "All days" || c.day === dayFilter),
+  const sites = useTable("sites", "name");
+  const blocks = useTable("recurring_schedule_blocks");
+  const classes = useTable("classes", "start_time");
+  const tutors = useTable("tutors");
+  const enrolments = useTable("class_enrolments");
+  const sessions = useTable("sessions");
+  const signins = useTable("tutor_signins");
+  const attendance = useTable("student_attendance");
+  const createSession = useUpsert("sessions");
+
+  const weekday = weekdayOf(date);
+  const siteList = sites.data ?? [];
+  const defaultSite = siteList.find((s) => s.name === "Lancaster Youth Hub")?.id ?? "";
+  const site = siteFilter || defaultSite;
+
+  const dayBlocks = useMemo(
+    () =>
+      (blocks.data ?? []).filter(
+        (b) => b.weekday === weekday && (site === "all" || !site || b.site_id === site),
+      ),
+    [blocks.data, weekday, site],
   );
 
-  const rows =
-    view === "Rooms"
-      ? Array.from(new Set(classes.map((c) => `${site(c.siteId)?.name} · ${c.room}`)))
-      : view === "Students"
-        ? Array.from(new Set(classes.map((c) => `${c.level} cohort`)))
-        : DAYS.filter((d) => classes.some((c) => c.day === d));
+  const daySessions = (sessions.data ?? []).filter((s) => s.session_date === date);
+  const signedIn = (signins.data ?? []).filter((s) => daySessions.some((d) => d.id === s.session_id)).length;
+  const marked = (attendance.data ?? []).filter((a) => daySessions.some((d) => d.id === a.session_id)).length;
 
-  const rowMatch = (row: string, c: (typeof CLASSES)[number]) =>
-    view === "Rooms"
-      ? `${site(c.siteId)?.name} · ${c.room}` === row
-      : view === "Students"
-        ? `${c.level} cohort` === row
-        : c.day === row;
-
-  const studentsToday = classes.reduce((a, c) => a + c.enrolled, 0);
-  const tutorsToday = new Set(classes.filter((c) => c.tutorId).map((c) => c.tutorId)).size;
-  const noTutor = classes.filter((c) => !c.tutorId);
+  async function startSession(classId: string) {
+    const c = (classes.data ?? []).find((x) => x.id === classId);
+    if (!c) return;
+    await createSession.mutateAsync({
+      class_id: c.id,
+      site_id: c.site_id,
+      schedule_block_id: c.schedule_block_id,
+      tutor_id: c.tutor_id,
+      session_date: date,
+      start_time: c.start_time,
+      end_time: c.end_time,
+      status: "in_progress",
+      agreed_amount: c.session_rate,
+    });
+    toast.success("Session opened — the register is live");
+  }
 
   return (
     <Page>
-      <PageHeader
-        title="Operations Planner"
-        subtitle="Visual timetable of classes, rooms, tutors and capacity"
-        actions={
-          <>
-            <Button variant="secondary" onClick={() => toast.success("Demo: Add Class form would open")}>
-              Add Class
-            </Button>
-            <Button asChild>
-              <Link to="/admin/classes">All Classes</Link>
-            </Button>
-          </>
-        }
-      />
+      <PageHeader title="Operations" subtitle={`${prettyDate(date)} · shared operational demo · live data`} />
 
       <div className="flex flex-wrap items-end gap-3">
-        <Field
+        <TextField label="Date" type="date" value={date} onChange={setDate} />
+        <SelectField
           label="Site"
-          value={siteFilter}
+          value={site}
           onChange={setSiteFilter}
-          options={["All sites", ...SITES.map((s) => s.name)]}
+          options={[{ value: "all", label: "All sites" }, ...siteList.map((s) => ({ value: s.id, label: s.name }))]}
         />
-        <Field label="Day" value={dayFilter} onChange={setDayFilter} options={["All days", ...DAYS]} />
-        <div className="flex flex-col gap-1 text-xs font-semibold text-muted-foreground">
-          View
-          <div className="flex rounded-xl bg-muted p-1">
-            {(["Classes", "Rooms", "Students"] as const).map((v) => (
-              <button
-                key={v}
-                type="button"
-                onClick={() => setView(v)}
-                className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${
-                  view === v ? "bg-card text-primary shadow-sm" : "text-muted-foreground"
-                }`}
-              >
-                {v}
-              </button>
-            ))}
-          </div>
-        </div>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[3fr_1fr]">
-        <Section id="timetable" title="Weekly timetable" subtitle={`${classes.length} classes shown`}>
-          <div className="overflow-x-auto no-scrollbar">
-            <div className="min-w-[900px]">
-              <div
-                className="grid gap-2 border-b border-border pb-2 text-xs font-bold text-muted-foreground"
-                style={{ gridTemplateColumns: `140px repeat(${HOURS.length}, minmax(120px, 1fr))` }}
-              >
-                <span />
-                {HOURS.map((h) => (
-                  <span key={h}>{h}</span>
-                ))}
-              </div>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatCard label="Blocks running" value={String(dayBlocks.length)} tone="pink" />
+        <StatCard label="Sessions open" value={String(daySessions.length)} tone="blue" />
+        <StatCard label="Tutor sign-ins" value={String(signedIn)} tone="green" />
+        <StatCard label="Attendance marks" value={String(marked)} tone="purple" />
+      </div>
 
-              {rows.length === 0 ? (
-                <p className="py-8 text-center text-sm text-muted-foreground">No classes match these filters.</p>
-              ) : null}
-
-              {rows.map((row) => (
-                <div
-                  key={row}
-                  className="grid items-stretch gap-2 border-b border-border py-3"
-                  style={{ gridTemplateColumns: `140px repeat(${HOURS.length}, minmax(120px, 1fr))` }}
-                >
-                  <span className="self-center text-sm font-bold">{row}</span>
-                  {HOURS.map((h) => {
-                    const c = classes.find((x) => rowMatch(row, x) && x.start === h);
-                    if (!c) return <span key={h} className="rounded-xl bg-muted/40" />;
-                    const t = tutor(c.tutorId);
-                    return (
-                      <Link
-                        key={h}
-                        to="/admin/classes/$id"
-                        params={{ id: c.id }}
-                        className={`rounded-xl border-l-4 p-2 text-left transition-transform hover:-translate-y-0.5 ${toneFor(c.enrolled, c.capacity)}`}
-                      >
-                        <p className="text-xs font-extrabold">{c.subject}</p>
-                        <p className="text-[10px] font-semibold opacity-75">
-                          {c.level} · {c.start}–{c.end}
-                        </p>
-                        <div className="mt-1.5 flex items-center gap-1.5">
-                          <Avatar initials={t?.initials ?? "?"} size="sm" tone={t ? "pink" : "amber"} />
-                          <span className="truncate text-[10px] font-bold">{t?.name ?? "Unassigned"}</span>
-                        </div>
-                        <p className="mt-1 text-[10px] font-semibold opacity-80">
-                          {c.enrolled}/{c.capacity} · {c.room}
-                        </p>
-                        <span className="mt-1 inline-block">
-                          <CapacityPill enrolled={c.enrolled} capacity={c.capacity} />
-                        </span>
-                      </Link>
-                    );
-                  })}
-                </div>
-              ))}
-            </div>
-          </div>
+      {dayBlocks.length === 0 ? (
+        <Section id="ops-empty" title="Nothing scheduled">
+          <Empty>No recurring blocks run on {weekday} at this site.</Empty>
         </Section>
+      ) : null}
 
-        <div className="space-y-6">
-          <Section id="ops-panel" title="Site operations" subtitle="Live snapshot">
-            <dl className="space-y-2 text-sm">
-              {[
-                ["Opening hours", siteFilter === "All sites" ? "Mon–Sun 09:00–20:00" : (SITES.find((s) => s.name === siteFilter)?.hours ?? "—")],
-                ["Classes today", String(classes.length)],
-                ["Students today", String(studentsToday)],
-                ["Tutors today", String(tutorsToday)],
-                ["Capacity", "82%"],
-              ].map(([k, v]) => (
-                <div key={k} className="flex items-center justify-between border-b border-border pb-2">
-                  <dt className="text-muted-foreground">{k}</dt>
-                  <dd className="font-bold">{v}</dd>
-                </div>
-              ))}
-            </dl>
-          </Section>
-
-          <Section id="ops-alerts" title="Alerts" subtitle="Needs attention">
-            <ul className="space-y-2 text-sm">
-              <li className="flex items-center justify-between rounded-xl bg-tile-pink px-3 py-2 text-tile-pink-ink">
-                Classes without tutor <span className="font-extrabold">{noTutor.length}</span>
-              </li>
-              <li className="flex items-center justify-between rounded-xl bg-tile-amber px-3 py-2 text-tile-amber-ink">
-                Students without class <span className="font-extrabold">4</span>
-              </li>
-              <li className="flex items-center justify-between rounded-xl bg-tile-blue px-3 py-2 text-tile-blue-ink">
-                Tutor gaps this week <span className="font-extrabold">2</span>
-              </li>
-              <li className="flex items-center justify-between rounded-xl bg-tile-purple px-3 py-2 text-tile-purple-ink">
-                Over capacity classes <span className="font-extrabold">1</span>
-              </li>
-            </ul>
-            {noTutor.map((c) => (
-              <div key={c.id} className="mt-3 rounded-xl border border-border px-3 py-2 text-sm">
-                <p className="font-bold">{c.subject}</p>
-                <p className="text-xs text-muted-foreground">
-                  {site(c.siteId)?.name} · {c.day} {c.start}
-                </p>
-                <Button
-                  size="sm"
-                  className="mt-2"
-                  onClick={() => toast.success(`Demo: tutor assigned to ${c.subject}`)}
-                >
-                  Assign Tutor
-                </Button>
+      {dayBlocks.map((b) => {
+        const blockSite = siteList.find((s) => s.id === b.site_id);
+        const blockClasses = (classes.data ?? []).filter((c) => c.schedule_block_id === b.id && c.active);
+        return (
+          <Section
+            key={b.id}
+            id={`ops-${b.id}`}
+            title={b.title}
+            subtitle={`${hhmm(b.start_time)}–${hhmm(b.end_time)} · ${blockSite?.name ?? "Venue to confirm"}${
+              b.status === "coming_soon" ? " · Coming soon, no start date confirmed" : ""
+            }`}
+          >
+            {blockClasses.length === 0 ? (
+              <Empty>
+                No classes created in this block yet — tutor not assigned, 0 enrolled.{" "}
+                <Link to="/admin/classes" className="font-bold text-primary">
+                  Create one
+                </Link>
+              </Empty>
+            ) : (
+              <div className="space-y-4">
+                {blockClasses.map((c) => {
+                  const session = daySessions.find((s) => s.class_id === c.id);
+                  const count = (enrolments.data ?? []).filter(
+                    (e) => e.class_id === c.id && e.status === "active",
+                  ).length;
+                  const tutor = (tutors.data ?? []).find((t) => t.id === c.tutor_id);
+                  return (
+                    <div key={c.id} className="rounded-2xl border border-border p-4">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Link
+                          to="/admin/classes/$id"
+                          params={{ id: c.id }}
+                          className="text-sm font-bold hover:text-primary"
+                        >
+                          {c.name}
+                        </Link>
+                        <span className="text-xs text-muted-foreground">
+                          {hhmm(c.start_time)}–{hhmm(c.end_time)} · {tutor ? fullName(tutor) : "Tutor not assigned"}
+                        </span>
+                        <Pill tone={capacityTone(count, c.capacity)}>
+                          {count}/{c.capacity}
+                        </Pill>
+                        {!session ? (
+                          <Button size="sm" className="ml-auto" onClick={() => startSession(c.id)}>
+                            Open register
+                          </Button>
+                        ) : (
+                          <Pill tone="green" className="ml-auto">
+                            Register open
+                          </Pill>
+                        )}
+                      </div>
+                      {session ? (
+                        <div className="mt-4">
+                          <SessionRegister session={session} />
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })}
               </div>
-            ))}
+            )}
           </Section>
-
-          <Section id="ops-actions" title="Quick actions">
-            <div className="flex flex-wrap gap-2">
-              {["Add Class", "Add Tutor", "Add Student", "Assign Tutor"].map((a) => (
-                <Button key={a} size="sm" variant="secondary" onClick={() => toast.success(`Demo: ${a}`)}>
-                  {a}
-                </Button>
-              ))}
-              <Button size="sm" variant="outline" asChild>
-                <a href="https://goprogress.example.com" target="_blank" rel="noreferrer">
-                  Open GoProgress
-                </a>
-              </Button>
-            </div>
-          </Section>
-
-          <Section id="ops-tutors" title="Tutors on shift">
-            <ul className="space-y-2">
-              {TUTORS.map((t) => (
-                <li key={t.id} className="flex items-center gap-3">
-                  <Avatar initials={t.initials} size="sm" />
-                  <span className="flex-1 text-sm font-semibold">{t.name}</span>
-                  <Pill tone="green">{t.subjects.join(" · ")}</Pill>
-                </li>
-              ))}
-            </ul>
-            <p className="mt-3 text-xs text-muted-foreground">
-              {STUDENTS.length} student profiles in this demo dataset.
-            </p>
-          </Section>
-        </div>
-      </div>
+        );
+      })}
     </Page>
   );
 }
