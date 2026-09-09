@@ -176,14 +176,26 @@ export function AppShell({ children }: { children: ReactNode }) {
             ))}
           </nav>
 
-          <div className="mt-4 flex items-center gap-3 rounded-2xl bg-secondary px-3 py-3">
-            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
-              {user.initials}
-            </span>
-            <span className="min-w-0">
-              <span className="block truncate text-sm font-bold">{user.name}</span>
-              <span className="block truncate text-[11px] text-muted-foreground">{user.sub}</span>
-            </span>
+          <div className="mt-4 rounded-2xl bg-secondary px-3 py-3">
+            <div className="flex items-center gap-3">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+                {initials}
+              </span>
+              <span className="min-w-0">
+                <span className="block truncate text-sm font-bold">{email || "Signed in"}</span>
+                <span className="block truncate text-[11px] text-muted-foreground">{ROLE_LABEL[role]}</span>
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={async () => {
+                await supabase.auth.signOut();
+                navigate({ to: "/auth" });
+              }}
+              className="mt-3 w-full rounded-xl bg-card px-3 py-2 text-xs font-bold text-foreground hover:bg-background"
+            >
+              Sign out
+            </button>
           </div>
         </aside>
 
