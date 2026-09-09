@@ -1,82 +1,75 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { Page } from "@/components/AppShell";
-import { PageHeader, Pill, Section, StatCard } from "@/components/kit";
-import { Button } from "@/components/ui/button";
-import { DELIVERED_LESSONS, money } from "@/lib/demo-data";
-import { useDemo } from "@/lib/demo-store";
+import { ActingPicker } from "@/components/acting-picker";
+import { Empty, PageHeader, Pill, Section, StatCard } from "@/components/kit";
+import { useActingId } from "@/lib/acting";
+import { fullName, money, num, prettyDate, useTable } from "@/lib/db";
 
 export const Route = createFileRoute("/_authenticated/tutor/earnings")({
   head: () => ({
     meta: [
-      { title: "Earnings — ProgressTutors" },
-      { name: "description", content: "Tutor earnings: delivered lessons, eligible pay, approved and paid amounts." },
-      { property: "og:title", content: "Earnings — ProgressTutors" },
-      { property: "og:description", content: "See what you have earned and what is ready to request." },
+      { title: "My Earnings — ProgressTutors" },
+      { name: "description", content: "Session by session earnings at the agreed rate, and what has been paid." },
+      { property: "og:title", content: "My Earnings — ProgressTutors" },
+      { property: "og:description", content: "Tutor earnings from delivered sessions." },
+      { name: "robots", content: "noindex" },
     ],
   }),
-  component: Earnings,
+  component: TutorEarnings,
 });
 
-function Earnings() {
-  const { eligibleLessons, awaitingReview, deliveredReviewed } = useDemo();
-  const ready = eligibleLessons.reduce((a, l) => a + l.rate * l.hours, 0);
+const tone = (s: string) => (s === "paid" ? "blue" : s === "approved" ? "green" : s === "claimed" ? "purple" : "amber");
+
+function TutorEarnings() {
+  const [tutorId, setTutorId] = useActingId("tutor");
+  const tutors = useTable("tutors", "first_name");
+  const earnings = useTable("tutor_earnings", "earning_date");
+  const classes = useTable("classes");
+
+  const mine = (earnings.data ?? []).filter((e) => e.tutor_id === tutorId);
+  const sum = (status: string) =>
+    mine.filter((e) => e.status === status).reduce((a, e) => a + num(e.amount), 0);
 
   return (
     <Page>
-      <PageHeader title="Earnings" subtitle="September · Sarah Ahmed" />
+      <PageHeader title="My earnings" subtitle="Based on the agreed amount for each session" />
+
+      <ActingPicker
+        label="I am"
+        value={tutorId}
+        onChange={setTutorId}
+        options={(tutors.data ?? []).map((t) => ({ value: t.id, label: fullName(t) }))}
+      />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard label="Earned this month" value={money(420)} tone="green" />
-        <StatCard label="Ready to request" value={money(ready)} tone="pink" />
-        <StatCard label="Awaiting Lesson Reviews" value={money(awaitingReview.length * 25)} tone="amber" />
-        <StatCard label="Approved" value={money(125)} tone="blue" />
+        <StatCard label="Ready to claim" value={money(sum("eligible"))} tone="amber" />
+        <StatCard label="In a request" value={money(sum("claimed"))} tone="purple" />
+        <StatCard label="Approved" value={money(sum("approved"))} tone="green" />
+        <StatCard label="Paid" value={money(sum("paid"))} tone="blue" />
       </div>
 
-      <Section id="earn-lessons" title="Delivered lessons" subtitle="Verified with sign-in and review status">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[680px] text-sm">
-            <thead>
-              <tr className="text-left text-xs text-muted-foreground">
-                {["Date", "Student / Class", "Scheduled", "Sign-in", "Review", "GoProgress", "Amount"].map((h) => (
-                  <th key={h} className="pb-2 font-semibold">
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {DELIVERED_LESSONS.map((l) => (
-                <tr key={l.id} className="border-t border-border">
-                  <td className="py-3">{l.date}</td>
-                  <td className="py-3">
-                    <span className="block font-semibold">{l.who}</span>
-                    <span className="block text-xs text-muted-foreground">{l.classLabel}</span>
-                  </td>
-                  <td className="py-3">{l.scheduled}</td>
-                  <td className="py-3">{l.signIn}</td>
-                  <td className="py-3">
-                    {deliveredReviewed[l.id] ? (
-                      <Pill tone="green">Complete</Pill>
-                    ) : (
-                      <Button size="sm" variant="secondary" asChild>
-                        <Link to="/tutor/lesson/$id/review" params={{ id: l.id }}>
-                          Write review
-                        </Link>
-                      </Button>
-                    )}
-                  </td>
-                  <td className="py-3">
-                    <Pill tone={l.goprogress === "Synced" ? "blue" : "amber"}>{l.goprogress}</Pill>
-                  </td>
-                  <td className="py-3 font-bold">{money(l.rate * l.hours)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <Button className="mt-4" asChild>
-          <Link to="/tutor/payment-requests">Go to Payment Requests</Link>
-        </Button>
+      <Section id="earnings-list" title="Session earnings">
+        {mine.length === 0 ? (
+          <Empty>Nothing yet. Earnings appear once you have signed in and submitted the lesson review.</Empty>
+        ) : (
+          <ul className="space-y-2">
+            {mine.map((e) => {
+              const c = (classes.data ?? []).find((x) => x.id === e.class_id);
+              return (
+                <li key={e.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-border px-4 py-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-bold">{c?.name ?? "Session"}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {prettyDate(e.earning_date)} · {num(e.hours)} hours at {money(e.agreed_rate)}
+                    </p>
+                  </div>
+                  <span className="font-bold">{money(e.amount)}</span>
+                  <Pill tone={tone(e.status)}>{e.status}</Pill>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </Section>
     </Page>
   );
