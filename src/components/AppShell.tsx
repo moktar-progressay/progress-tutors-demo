@@ -124,6 +124,7 @@ function RoleSwitcher() {
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { role } = useDemo();
+  const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const items = NAV[role];
   const email = useSignedInUser();
@@ -209,9 +210,16 @@ export function AppShell({ children }: { children: ReactNode }) {
               </span>
               <span className="text-sm font-extrabold">ProgressTutors</span>
             </Link>
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-secondary text-[11px] font-bold text-primary">
-              {user.initials}
-            </span>
+            <button
+              type="button"
+              onClick={async () => {
+                await supabase.auth.signOut();
+                navigate({ to: "/auth" });
+              }}
+              className="flex h-8 items-center justify-center rounded-full bg-secondary px-3 text-[11px] font-bold text-primary"
+            >
+              {initials} · Sign out
+            </button>
           </div>
 
           {children}
@@ -224,7 +232,9 @@ export function AppShell({ children }: { children: ReactNode }) {
                   Tuition management for schools, tutors, parents and students.
                 </p>
               </div>
-              <p className="text-xs opacity-85">Prototype only · No real data, payments or accounts</p>
+              <p className="text-xs opacity-85">
+                Shared operational demo · Sign-in required · Real records, no card payments
+              </p>
             </div>
           </footer>
         </main>
