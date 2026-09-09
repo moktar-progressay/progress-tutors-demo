@@ -687,7 +687,7 @@ export const DELIVERED_LESSONS: DeliveredLesson[] = [
 
 const prLines = (ids: string[]): PaymentRequestLine[] =>
   ids.map((id) => {
-    const l = DELIVERED_LESSONS.find((d) => d.id === id) ?? DELIVERED_LESSONS[0];
+    const l = (DELIVERED_LESSONS.find((d) => d.id === id) ?? DELIVERED_LESSONS[0]) as DeliveredLesson;
     return {
       lessonId: l.id,
       date: l.date,
