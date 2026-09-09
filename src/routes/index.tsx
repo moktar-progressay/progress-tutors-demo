@@ -24,7 +24,7 @@ export const Route = createFileRoute("/")({
 
 const CARDS: {
   role: Role;
-  to: LinkProps["to"];
+  to: NonNullable<LinkProps["to"]>;
   title: string;
   body: string;
   icon: typeof Home;

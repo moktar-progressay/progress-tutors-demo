@@ -6,7 +6,7 @@ import { Avatar, Empty, PageHeader, Pill, Section, StatCard, type Tone } from "@
 import { Button } from "@/components/ui/button";
 import { CLIENTS, money, type ClientAccount } from "@/lib/demo-data";
 
-export const Route = createFileRoute("/admin/payments")({
+export const Route = createFileRoute("/_authenticated/admin/payments")({
   head: () => ({
     meta: [
       { title: "Billing & Subscriptions — ProgressTutors" },

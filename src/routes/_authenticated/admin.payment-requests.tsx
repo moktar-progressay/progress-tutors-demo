@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { PAYMENT_REQUESTS, money, tutor, type PRStatus } from "@/lib/demo-data";
 import { useDemo } from "@/lib/demo-store";
 
-export const Route = createFileRoute("/admin/payment-requests")({
+export const Route = createFileRoute("/_authenticated/admin/payment-requests")({
   head: () => ({
     meta: [
       { title: "Payment Requests — ProgressTutors" },

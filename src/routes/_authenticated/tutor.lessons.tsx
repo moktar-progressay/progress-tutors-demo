@@ -4,7 +4,7 @@ import { PageHeader, Section } from "@/components/kit";
 import { TUTOR_LESSONS } from "@/lib/demo-data";
 import { LessonCard } from "./tutor.dashboard";
 
-export const Route = createFileRoute("/tutor/lessons")({
+export const Route = createFileRoute("/_authenticated/tutor/lessons")({
   head: () => ({
     meta: [
       { title: "My Lessons — ProgressTutors" },

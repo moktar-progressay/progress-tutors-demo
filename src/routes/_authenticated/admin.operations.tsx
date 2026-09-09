@@ -6,7 +6,7 @@ import { Avatar, CapacityPill, Field, PageHeader, Pill, Section } from "@/compon
 import { Button } from "@/components/ui/button";
 import { CLASSES, DAYS, SITES, STUDENTS, TUTORS, capacityStatus, site, tutor } from "@/lib/demo-data";
 
-export const Route = createFileRoute("/admin/operations")({
+export const Route = createFileRoute("/_authenticated/admin/operations")({
   head: () => ({
     meta: [
       { title: "Operations Planner — ProgressTutors" },

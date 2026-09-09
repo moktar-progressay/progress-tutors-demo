@@ -3,7 +3,7 @@ import { Page } from "@/components/AppShell";
 import { PageHeader, Pill, Section, StatCard } from "@/components/kit";
 import { SITES, TUTORS, money } from "@/lib/demo-data";
 
-export const Route = createFileRoute("/admin/reports")({
+export const Route = createFileRoute("/_authenticated/admin/reports")({
   head: () => ({
     meta: [
       { title: "Reports — ProgressTutors" },
