@@ -14,7 +14,7 @@ export const Route = createFileRoute("/_authenticated/tutor/lesson/$id/")({
       { name: "robots", content: "noindex" },
     ],
   }),
-  component: TutorLesson;
+  component: TutorLesson,
 });
 
 function TutorLesson() {
