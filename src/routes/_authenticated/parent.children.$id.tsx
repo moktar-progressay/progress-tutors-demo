@@ -4,7 +4,7 @@ import { Avatar, Empty, GoProgressLink, PageHeader, Pill, Section, StatCard } fr
 import { Button } from "@/components/ui/button";
 import { CHILDREN, childById, money } from "@/lib/demo-data";
 
-export const Route = createFileRoute("/parent/children/$id")({
+export const Route = createFileRoute("/_authenticated/parent/children/$id")({
   head: () => ({
     meta: [
       { title: "Child Profile — ProgressTutors" },

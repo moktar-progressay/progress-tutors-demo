@@ -4,7 +4,7 @@ import { GoProgressLink, PageHeader, Section, StatCard } from "@/components/kit"
 import { CHILDREN } from "@/lib/demo-data";
 import { useDemo } from "@/lib/demo-store";
 
-export const Route = createFileRoute("/student/progress")({
+export const Route = createFileRoute("/_authenticated/student/progress")({
   head: () => ({
     meta: [
       { title: "My Progress — ProgressTutors" },

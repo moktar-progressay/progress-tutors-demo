@@ -3,7 +3,7 @@ import { Page } from "@/components/AppShell";
 import { GoProgressLink, PageHeader, Section } from "@/components/kit";
 import { CHILDREN } from "@/lib/demo-data";
 
-export const Route = createFileRoute("/student/lessons")({
+export const Route = createFileRoute("/_authenticated/student/lessons")({
   head: () => ({
     meta: [
       { title: "My Lessons — ProgressTutors" },

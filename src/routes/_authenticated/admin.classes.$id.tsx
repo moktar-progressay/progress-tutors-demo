@@ -6,7 +6,7 @@ import { Avatar, CapacityPill, Empty, PageHeader, Pill, Section, StatCard } from
 import { Button } from "@/components/ui/button";
 import { CLASSES, STUDENTS, klass, money, site, tutor } from "@/lib/demo-data";
 
-export const Route = createFileRoute("/admin/classes/$id")({
+export const Route = createFileRoute("/_authenticated/admin/classes/$id")({
   head: () => ({
     meta: [
       { title: "Class Detail — ProgressTutors" },

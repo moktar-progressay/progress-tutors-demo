@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { CHILDREN } from "@/lib/demo-data";
 import { useDemo } from "@/lib/demo-store";
 
-export const Route = createFileRoute("/student/homework")({
+export const Route = createFileRoute("/_authenticated/student/homework")({
   head: () => ({
     meta: [
       { title: "My Homework — ProgressTutors" },

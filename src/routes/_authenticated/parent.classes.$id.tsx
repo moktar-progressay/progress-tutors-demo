@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { CHILDREN, klass, money, site, tutor } from "@/lib/demo-data";
 import { useDemo } from "@/lib/demo-store";
 
-export const Route = createFileRoute("/parent/classes/$id")({
+export const Route = createFileRoute("/_authenticated/parent/classes/$id")({
   head: () => ({
     meta: [
       { title: "Class Details — ProgressTutors" },

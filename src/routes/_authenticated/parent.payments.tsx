@@ -5,7 +5,7 @@ import { PageHeader, Pill, Section, StatCard } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { CLIENTS, money } from "@/lib/demo-data";
 
-export const Route = createFileRoute("/parent/payments")({
+export const Route = createFileRoute("/_authenticated/parent/payments")({
   head: () => ({
     meta: [
       { title: "My Payments — ProgressTutors" },

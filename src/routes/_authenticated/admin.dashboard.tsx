@@ -5,7 +5,7 @@ import { Avatar, CapacityPill, GoProgressLink, Hero, Pill, Section, StatCard } f
 import { Button } from "@/components/ui/button";
 import { SITES, TUTORS, money } from "@/lib/demo-data";
 
-export const Route = createFileRoute("/admin/dashboard")({
+export const Route = createFileRoute("/_authenticated/admin/dashboard")({
   head: () => ({
     meta: [
       { title: "Admin Dashboard — ProgressTutors" },

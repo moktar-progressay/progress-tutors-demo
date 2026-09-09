@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { DELIVERED_LESSONS, TUTOR_LESSONS } from "@/lib/demo-data";
 import { useDemo } from "@/lib/demo-store";
 
-export const Route = createFileRoute("/tutor/lesson/$id/review")({
+export const Route = createFileRoute("/_authenticated/tutor/lesson/$id/review")({
   head: () => ({
     meta: [
       { title: "Lesson Review — ProgressTutors" },
