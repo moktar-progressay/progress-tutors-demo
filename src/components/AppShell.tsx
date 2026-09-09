@@ -15,8 +15,9 @@ import {
   Users,
   Wallet,
 } from "lucide-react";
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
 import { useDemo } from "@/lib/demo-store";
 import { ORG, type Role } from "@/lib/demo-data";
 
