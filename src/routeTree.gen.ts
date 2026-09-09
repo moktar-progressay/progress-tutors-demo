@@ -10,18 +10,13 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as AdminClassesRouteImport } from './routes/admin.classes'
 import { Route as AdminDashboardRouteImport } from './routes/admin.dashboard'
 import { Route as AdminOperationsRouteImport } from './routes/admin.operations'
+import { Route as AdminClassesIndexRouteImport } from './routes/admin.classes.index'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AdminClassesRoute = AdminClassesRouteImport.update({
-  id: '/admin/classes',
-  path: '/admin/classes',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminDashboardRoute = AdminDashboardRouteImport.update({
@@ -34,44 +29,49 @@ const AdminOperationsRoute = AdminOperationsRouteImport.update({
   path: '/admin/operations',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminClassesIndexRoute = AdminClassesIndexRouteImport.update({
+  id: '/admin/classes/',
+  path: '/admin/classes/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/admin/classes': typeof AdminClassesRoute
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/operations': typeof AdminOperationsRoute
+  '/admin/classes/': typeof AdminClassesIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/admin/classes': typeof AdminClassesRoute
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/operations': typeof AdminOperationsRoute
+  '/admin/classes': typeof AdminClassesIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/admin/classes': typeof AdminClassesRoute
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/operations': typeof AdminOperationsRoute
+  '/admin/classes/': typeof AdminClassesIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/admin/classes' | '/admin/dashboard' | '/admin/operations'
+  fullPaths: '/' | '/admin/dashboard' | '/admin/operations' | '/admin/classes/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/admin/classes' | '/admin/dashboard' | '/admin/operations'
+  to: '/' | '/admin/dashboard' | '/admin/operations' | '/admin/classes'
   id:
     | '__root__'
     | '/'
-    | '/admin/classes'
     | '/admin/dashboard'
     | '/admin/operations'
+    | '/admin/classes/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  AdminClassesRoute: typeof AdminClassesRoute
   AdminDashboardRoute: typeof AdminDashboardRoute
   AdminOperationsRoute: typeof AdminOperationsRoute
+  AdminClassesIndexRoute: typeof AdminClassesIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -81,13 +81,6 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/admin/classes': {
-      id: '/admin/classes'
-      path: '/admin/classes'
-      fullPath: '/admin/classes'
-      preLoaderRoute: typeof AdminClassesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/dashboard': {
@@ -104,14 +97,21 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminOperationsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/classes/': {
+      id: '/admin/classes/'
+      path: '/admin/classes'
+      fullPath: '/admin/classes/'
+      preLoaderRoute: typeof AdminClassesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  AdminClassesRoute: AdminClassesRoute,
   AdminDashboardRoute: AdminDashboardRoute,
   AdminOperationsRoute: AdminOperationsRoute,
+  AdminClassesIndexRoute: AdminClassesIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
