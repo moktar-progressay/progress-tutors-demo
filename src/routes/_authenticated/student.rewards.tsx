@@ -1,75 +1,75 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { toast } from "sonner";
 import { Page } from "@/components/AppShell";
-import { PageHeader, Section, StatCard } from "@/components/kit";
-import { Button } from "@/components/ui/button";
-import { BADGES, CHILDREN } from "@/lib/demo-data";
-import { useDemo } from "@/lib/demo-store";
+import { ActingPicker } from "@/components/acting-picker";
+import { PageHeader, Pill, Section, StatCard } from "@/components/kit";
+import { useActingId } from "@/lib/acting";
+import { fullName, useTable } from "@/lib/db";
 
 export const Route = createFileRoute("/_authenticated/student/rewards")({
   head: () => ({
     meta: [
       { title: "Rewards — ProgressTutors" },
-      { name: "description", content: "Badges, streaks and rewards you can unlock with XP." },
+      { name: "description", content: "Points, levels and badges earned from attendance and finished homework." },
       { property: "og:title", content: "Rewards — ProgressTutors" },
-      { property: "og:description", content: "Earn badges and unlock rewards." },
+      { property: "og:description", content: "Student rewards, levels and badges." },
+      { name: "robots", content: "noindex" },
     ],
   }),
-  component: StudentRewards,
+  component: Rewards,
 });
 
-const REWARDS = [
-  { name: "Homework pass", cost: 500 },
-  { name: "Certificate of effort", cost: 1000 },
-  { name: "Prize draw entry", cost: 1500 },
-];
+function Rewards() {
+  const [studentId, setStudentId] = useActingId("student");
+  const students = useTable("students", "first_name");
+  const attendance = useTable("student_attendance");
+  const homework = useTable("homework_items");
 
-function StudentRewards() {
-  const me = CHILDREN[0]!;
-  const { xp, level } = useDemo();
+  const marks = (attendance.data ?? []).filter((a) => a.student_id === studentId);
+  const attended = marks.filter((m) => m.status === "present" || m.status === "late").length;
+  const onTime = marks.filter((m) => m.status === "present").length;
+  const done = (homework.data ?? []).filter((h) => h.student_id === studentId && h.status === "complete").length;
+  const xp = attended * 50 + done * 25;
+  const level = 1 + Math.floor(xp / 200);
+  const toNext = 200 - (xp % 200);
+
+  const badges = [
+    { name: "First lesson", earned: attended >= 1, hint: "Attend your first lesson" },
+    { name: "Five in a row", earned: onTime >= 5, hint: "Be on time five times" },
+    { name: "Homework hero", earned: done >= 3, hint: "Finish three homework tasks" },
+    { name: "Full term", earned: attended >= 10, hint: "Attend ten lessons" },
+    { name: "Perfect start", earned: marks.length > 0 && onTime === marks.length, hint: "Never miss a lesson" },
+  ];
 
   return (
     <Page>
-      <PageHeader title="Rewards" subtitle="Turn XP into rewards" />
+      <PageHeader title="Rewards" subtitle="Earned from real registers and finished homework" />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
-        <StatCard label="XP available" value={xp.toLocaleString()} tone="purple" />
-        <StatCard label="Level" value={String(level)} tone="pink" />
-        <StatCard label="Streak" value={`${me.streak} days`} tone="amber" />
+      <ActingPicker
+        label="I am"
+        value={studentId}
+        onChange={setStudentId}
+        options={(students.data ?? []).map((s) => ({ value: s.id, label: fullName(s) }))}
+      />
+
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatCard label="XP" value={String(xp)} tone="purple" />
+        <StatCard label="Level" value={String(level)} hint={`${toNext} XP to the next level`} tone="pink" />
+        <StatCard label="Lessons attended" value={String(attended)} tone="green" />
+        <StatCard label="Homework done" value={String(done)} tone="amber" />
       </div>
 
-      <Section id="sr-badges" title="Badges">
-        <div className="flex flex-wrap gap-3">
-          {BADGES.map((b) => (
-            <div
-              key={b.name}
-              className={`flex w-32 flex-col items-center gap-1 rounded-2xl border border-border p-3 text-center ${
-                b.earned ? "" : "opacity-40"
-              }`}
-            >
-              <span className="text-2xl">{b.icon}</span>
-              <span className="text-xs font-bold">{b.name}</span>
+      <Section id="student-badges" title="Badges">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {badges.map((b) => (
+            <div key={b.name} className="rounded-2xl border border-border p-4">
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-bold">{b.name}</p>
+                <Pill tone={b.earned ? "green" : "neutral"}>{b.earned ? "Earned" : "Locked"}</Pill>
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">{b.hint}</p>
             </div>
           ))}
         </div>
-      </Section>
-
-      <Section id="sr-shop" title="Reward shop">
-        <ul className="space-y-2">
-          {REWARDS.map((r) => (
-            <li key={r.name} className="flex flex-wrap items-center gap-3 rounded-2xl border border-border px-4 py-3">
-              <span className="min-w-0 flex-1 text-sm font-bold">{r.name}</span>
-              <span className="text-sm text-muted-foreground">{r.cost} XP</span>
-              <Button
-                size="sm"
-                disabled={xp < r.cost}
-                onClick={() => toast.success(`Demo: ${r.name} redeemed`)}
-              >
-                Redeem
-              </Button>
-            </li>
-          ))}
-        </ul>
       </Section>
     </Page>
   );
