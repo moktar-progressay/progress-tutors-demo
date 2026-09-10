@@ -24,7 +24,7 @@ export const Route = createFileRoute("/auth")({
 
 function AuthPage() {
   const navigate = useNavigate();
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const [mode, setMode] = useState<"signin" | "signup" | "forgot">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -39,7 +39,14 @@ function AuthPage() {
     e.preventDefault();
     setBusy(true);
     try {
-      if (mode === "signup") {
+      if (mode === "forgot") {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: `${window.location.origin}${import.meta.env.BASE_URL}`,
+        });
+        if (error) throw error;
+        toast.success("If an account exists for this email, a reset link has been sent.");
+        setMode("signin");
+      } else if (mode === "signup") {
         const { error } = await supabase.auth.signUp({
           email,
           password,
@@ -85,7 +92,7 @@ function AuthPage() {
       <main className="mx-auto -mt-8 w-full max-w-md px-6 pb-16">
         <form onSubmit={submit} className="surface space-y-4 p-6">
           <h2 className="text-lg font-extrabold">
-            {mode === "signin" ? "Sign in" : "Create an account"}
+            {mode === "signin" ? "Sign in" : mode === "signup" ? "Create an account" : "Reset your password"}
           </h2>
           <label className="block text-sm font-semibold">
             Email
@@ -98,27 +105,38 @@ function AuthPage() {
               autoComplete="email"
             />
           </label>
-          <label className="block text-sm font-semibold">
-            Password
-            <Input
-              type="password"
-              required
-              minLength={6}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="mt-1 h-11 rounded-xl"
-              autoComplete={mode === "signin" ? "current-password" : "new-password"}
-            />
-          </label>
+          {mode !== "forgot" ? (
+            <label className="block text-sm font-semibold">
+              Password
+              <Input
+                type="password"
+                required
+                minLength={8}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="mt-1 h-11 rounded-xl"
+                autoComplete={mode === "signin" ? "current-password" : "new-password"}
+              />
+            </label>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Enter your email and we will send you a secure link to choose a new password.
+            </p>
+          )}
           <Button type="submit" disabled={busy} className="w-full">
-            {busy ? "Please wait…" : mode === "signin" ? "Sign in" : "Sign up"}
+            {busy ? "Please wait…" : mode === "signin" ? "Sign in" : mode === "signup" ? "Sign up" : "Send reset link"}
           </Button>
+          {mode === "signin" ? (
+            <button type="button" className="w-full text-sm font-semibold text-primary" onClick={() => setMode("forgot")}>
+              Forgot password?
+            </button>
+          ) : null}
           <button
             type="button"
             className="w-full text-sm font-semibold text-primary"
             onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
           >
-            {mode === "signin" ? "No account yet? Sign up" : "Already have an account? Sign in"}
+            {mode === "signin" ? "No account yet? Sign up" : mode === "signup" ? "Already have an account? Sign in" : "Back to sign in"}
           </button>
         </form>
       </main>
