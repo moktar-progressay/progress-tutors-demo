@@ -8,7 +8,6 @@ import {
   Flame,
   GraduationCap,
   Home,
-  LayoutGrid,
   Receipt,
   Sparkles,
   Trophy,
@@ -34,20 +33,27 @@ const iconCls = "h-4.5 w-4.5";
 export const NAV: Record<Role, NavItem[]> = {
   admin: [
     { to: "/admin/dashboard", label: "Dashboard", icon: <Home className={iconCls} /> },
-    { to: "/admin/operations", label: "Operations", icon: <LayoutGrid className={iconCls} /> },
-    { to: "/admin/classes", label: "Classes", icon: <CalendarDays className={iconCls} /> },
+    { to: "/admin/classes", label: "Schedule", icon: <CalendarDays className={iconCls} /> },
     { to: "/admin/students", label: "Students", icon: <GraduationCap className={iconCls} /> },
     { to: "/admin/tutors", label: "Tutors", icon: <Users className={iconCls} /> },
     { to: "/admin/parents", label: "Parents", icon: <Users className={iconCls} /> },
     { to: "/admin/payments", label: "Payments", icon: <CreditCard className={iconCls} /> },
-    { to: "/admin/payment-requests", label: "Payment Requests", icon: <Receipt className={iconCls} /> },
+    {
+      to: "/admin/payment-requests",
+      label: "Payment Requests",
+      icon: <Receipt className={iconCls} />,
+    },
     { to: "/admin/reports", label: "Reports", icon: <BarChart3 className={iconCls} /> },
   ],
   tutor: [
     { to: "/tutor/dashboard", label: "Dashboard", icon: <Home className={iconCls} /> },
     { to: "/tutor/lessons", label: "My Lessons", icon: <CalendarDays className={iconCls} /> },
     { to: "/tutor/earnings", label: "Earnings", icon: <Wallet className={iconCls} /> },
-    { to: "/tutor/payment-requests", label: "Payment Requests", icon: <Receipt className={iconCls} /> },
+    {
+      to: "/tutor/payment-requests",
+      label: "Payment Requests",
+      icon: <Receipt className={iconCls} />,
+    },
   ],
   parent: [
     { to: "/parent/dashboard", label: "Dashboard", icon: <Home className={iconCls} /> },
@@ -140,7 +146,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="mx-auto flex max-w-[1500px] flex-wrap items-center justify-between gap-2 px-4 py-2">
           <p className="flex items-center gap-2 text-[11px] font-semibold sm:text-xs">
             <Sparkles className="h-3.5 w-3.5 shrink-0" />
-            Shared operational demo — data entered here is visible to authorised Progressay testers.
+            Private workspace. Your schedule is visible only to your signed-in account.
           </p>
           <div className="flex items-center gap-2">
             <span className="hidden text-[11px] font-semibold opacity-80 sm:inline">View as</span>
@@ -184,7 +190,9 @@ export function AppShell({ children }: { children: ReactNode }) {
               </span>
               <span className="min-w-0">
                 <span className="block truncate text-sm font-bold">{email || "Signed in"}</span>
-                <span className="block truncate text-[11px] text-muted-foreground">{ROLE_LABEL[role]}</span>
+                <span className="block truncate text-[11px] text-muted-foreground">
+                  {ROLE_LABEL[role]}
+                </span>
               </span>
             </div>
             <button
@@ -233,7 +241,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 </p>
               </div>
               <p className="text-xs opacity-85">
-                Shared operational demo · Sign-in required · Real records, no card payments
+                Private workspace · Sign-in required · Real records, no card payments
               </p>
             </div>
           </footer>
