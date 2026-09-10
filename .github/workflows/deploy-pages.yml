@@ -30,9 +30,9 @@ jobs:
         run: bun run build
         env:
           VITE_BASE_PATH: /${{ github.event.repository.name }}/
-          VITE_SUPABASE_PROJECT_ID: lmxvsqjgpvkmhyhobzku
-          VITE_SUPABASE_URL: https://lmxvsqjgpvkmhyhobzku.supabase.co
-          VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_tEzGPKdpmv65pQV-LPUUzg__a5iqJkg
+          VITE_SUPABASE_PROJECT_ID: xmfjmwcfzdewzxpchpty
+          VITE_SUPABASE_URL: https://xmfjmwcfzdewzxpchpty.supabase.co
+          VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable__hP7YliL791sizxGz5I9GQ_uRi5Avw_
       - name: Add SPA fallback
         run: cp dist/index.html dist/404.html
       - name: Upload Pages artifact

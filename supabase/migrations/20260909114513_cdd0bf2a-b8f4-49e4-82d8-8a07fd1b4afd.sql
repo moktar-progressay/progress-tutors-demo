@@ -1,3 +1,18 @@
+-- ===== secure application roles =====
+CREATE TABLE public.user_roles (
+  user_id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  role text NOT NULL CHECK (role IN ('admin', 'tutor')),
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+GRANT SELECT ON public.user_roles TO authenticated;
+GRANT ALL ON public.user_roles TO service_role;
+ALTER TABLE public.user_roles ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "users read own role"
+  ON public.user_roles
+  FOR SELECT
+  TO authenticated
+  USING ((SELECT auth.uid()) = user_id);
+
 -- ===== helper =====
 CREATE OR REPLACE FUNCTION public.set_updated_at()
 RETURNS TRIGGER LANGUAGE plpgsql SET search_path = public AS $$
@@ -17,7 +32,17 @@ CREATE TABLE public.sites (
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.sites TO authenticated;
 GRANT ALL ON public.sites TO service_role;
 ALTER TABLE public.sites ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "sites auth all" ON public.sites FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "sites auth all" ON public.sites FOR ALL TO authenticated USING (EXISTS (
+  SELECT 1
+  FROM public.user_roles
+  WHERE user_id = (SELECT auth.uid())
+    AND role = 'admin'
+)) WITH CHECK (EXISTS (
+  SELECT 1
+  FROM public.user_roles
+  WHERE user_id = (SELECT auth.uid())
+    AND role = 'admin'
+));
 CREATE TRIGGER sites_updated BEFORE UPDATE ON public.sites FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
 -- ===== programmes =====
@@ -34,7 +59,17 @@ CREATE TABLE public.programmes (
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.programmes TO authenticated;
 GRANT ALL ON public.programmes TO service_role;
 ALTER TABLE public.programmes ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "programmes auth all" ON public.programmes FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "programmes auth all" ON public.programmes FOR ALL TO authenticated USING (EXISTS (
+  SELECT 1
+  FROM public.user_roles
+  WHERE user_id = (SELECT auth.uid())
+    AND role = 'admin'
+)) WITH CHECK (EXISTS (
+  SELECT 1
+  FROM public.user_roles
+  WHERE user_id = (SELECT auth.uid())
+    AND role = 'admin'
+));
 CREATE TRIGGER programmes_updated BEFORE UPDATE ON public.programmes FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
 -- ===== pricing_plans =====
@@ -55,7 +90,17 @@ CREATE TABLE public.pricing_plans (
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.pricing_plans TO authenticated;
 GRANT ALL ON public.pricing_plans TO service_role;
 ALTER TABLE public.pricing_plans ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "pricing_plans auth all" ON public.pricing_plans FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "pricing_plans auth all" ON public.pricing_plans FOR ALL TO authenticated USING (EXISTS (
+  SELECT 1
+  FROM public.user_roles
+  WHERE user_id = (SELECT auth.uid())
+    AND role = 'admin'
+)) WITH CHECK (EXISTS (
+  SELECT 1
+  FROM public.user_roles
+  WHERE user_id = (SELECT auth.uid())
+    AND role = 'admin'
+));
 CREATE TRIGGER pricing_plans_updated BEFORE UPDATE ON public.pricing_plans FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
 -- ===== recurring_schedule_blocks =====
@@ -78,7 +123,17 @@ CREATE TABLE public.recurring_schedule_blocks (
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.recurring_schedule_blocks TO authenticated;
 GRANT ALL ON public.recurring_schedule_blocks TO service_role;
 ALTER TABLE public.recurring_schedule_blocks ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "blocks auth all" ON public.recurring_schedule_blocks FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "blocks auth all" ON public.recurring_schedule_blocks FOR ALL TO authenticated USING (EXISTS (
+  SELECT 1
+  FROM public.user_roles
+  WHERE user_id = (SELECT auth.uid())
+    AND role = 'admin'
+)) WITH CHECK (EXISTS (
+  SELECT 1
+  FROM public.user_roles
+  WHERE user_id = (SELECT auth.uid())
+    AND role = 'admin'
+));
 CREATE TRIGGER blocks_updated BEFORE UPDATE ON public.recurring_schedule_blocks FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
 -- ===== tutors =====
@@ -100,7 +155,17 @@ CREATE TABLE public.tutors (
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.tutors TO authenticated;
 GRANT ALL ON public.tutors TO service_role;
 ALTER TABLE public.tutors ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "tutors auth all" ON public.tutors FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "tutors auth all" ON public.tutors FOR ALL TO authenticated USING (EXISTS (
+  SELECT 1
+  FROM public.user_roles
+  WHERE user_id = (SELECT auth.uid())
+    AND role = 'admin'
+)) WITH CHECK (EXISTS (
+  SELECT 1
+  FROM public.user_roles
+  WHERE user_id = (SELECT auth.uid())
+    AND role = 'admin'
+));
 CREATE TRIGGER tutors_updated BEFORE UPDATE ON public.tutors FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
 -- ===== parents =====
@@ -119,7 +184,17 @@ CREATE TABLE public.parents (
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.parents TO authenticated;
 GRANT ALL ON public.parents TO service_role;
 ALTER TABLE public.parents ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "parents auth all" ON public.parents FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "parents auth all" ON public.parents FOR ALL TO authenticated USING (EXISTS (
+  SELECT 1
+  FROM public.user_roles
+  WHERE user_id = (SELECT auth.uid())
+    AND role = 'admin'
+)) WITH CHECK (EXISTS (
+  SELECT 1
+  FROM public.user_roles
+  WHERE user_id = (SELECT auth.uid())
+    AND role = 'admin'
+));
 CREATE TRIGGER parents_updated BEFORE UPDATE ON public.parents FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
 -- ===== students =====
@@ -147,7 +222,17 @@ CREATE TABLE public.students (
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.students TO authenticated;
 GRANT ALL ON public.students TO service_role;
 ALTER TABLE public.students ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "students auth all" ON public.students FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "students auth all" ON public.students FOR ALL TO authenticated USING (EXISTS (
+  SELECT 1
+  FROM public.user_roles
+  WHERE user_id = (SELECT auth.uid())
+    AND role = 'admin'
+)) WITH CHECK (EXISTS (
+  SELECT 1
+  FROM public.user_roles
+  WHERE user_id = (SELECT auth.uid())
+    AND role = 'admin'
+));
 CREATE TRIGGER students_updated BEFORE UPDATE ON public.students FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
 -- ===== parent_students =====
@@ -163,7 +248,17 @@ CREATE TABLE public.parent_students (
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.parent_students TO authenticated;
 GRANT ALL ON public.parent_students TO service_role;
 ALTER TABLE public.parent_students ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "parent_students auth all" ON public.parent_students FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "parent_students auth all" ON public.parent_students FOR ALL TO authenticated USING (EXISTS (
+  SELECT 1
+  FROM public.user_roles
+  WHERE user_id = (SELECT auth.uid())
+    AND role = 'admin'
+)) WITH CHECK (EXISTS (
+  SELECT 1
+  FROM public.user_roles
+  WHERE user_id = (SELECT auth.uid())
+    AND role = 'admin'
+));
 
 -- ===== classes =====
 CREATE TABLE public.classes (
@@ -193,7 +288,17 @@ CREATE TABLE public.classes (
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.classes TO authenticated;
 GRANT ALL ON public.classes TO service_role;
 ALTER TABLE public.classes ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "classes auth all" ON public.classes FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "classes auth all" ON public.classes FOR ALL TO authenticated USING (EXISTS (
+  SELECT 1
+  FROM public.user_roles
+  WHERE user_id = (SELECT auth.uid())
+    AND role = 'admin'
+)) WITH CHECK (EXISTS (
+  SELECT 1
+  FROM public.user_roles
+  WHERE user_id = (SELECT auth.uid())
+    AND role = 'admin'
+));
 CREATE TRIGGER classes_updated BEFORE UPDATE ON public.classes FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
 -- ===== class_enrolments =====
@@ -212,7 +317,17 @@ CREATE TABLE public.class_enrolments (
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.class_enrolments TO authenticated;
 GRANT ALL ON public.class_enrolments TO service_role;
 ALTER TABLE public.class_enrolments ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "class_enrolments auth all" ON public.class_enrolments FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "class_enrolments auth all" ON public.class_enrolments FOR ALL TO authenticated USING (EXISTS (
+  SELECT 1
+  FROM public.user_roles
+  WHERE user_id = (SELECT auth.uid())
+    AND role = 'admin'
+)) WITH CHECK (EXISTS (
+  SELECT 1
+  FROM public.user_roles
+  WHERE user_id = (SELECT auth.uid())
+    AND role = 'admin'
+));
 CREATE TRIGGER class_enrolments_updated BEFORE UPDATE ON public.class_enrolments FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
 -- ===== sessions =====
@@ -235,7 +350,17 @@ CREATE TABLE public.sessions (
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.sessions TO authenticated;
 GRANT ALL ON public.sessions TO service_role;
 ALTER TABLE public.sessions ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "sessions auth all" ON public.sessions FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "sessions auth all" ON public.sessions FOR ALL TO authenticated USING (EXISTS (
+  SELECT 1
+  FROM public.user_roles
+  WHERE user_id = (SELECT auth.uid())
+    AND role = 'admin'
+)) WITH CHECK (EXISTS (
+  SELECT 1
+  FROM public.user_roles
+  WHERE user_id = (SELECT auth.uid())
+    AND role = 'admin'
+));
 CREATE TRIGGER sessions_updated BEFORE UPDATE ON public.sessions FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
 -- ===== tutor_assignments =====
@@ -254,7 +379,17 @@ CREATE TABLE public.tutor_assignments (
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.tutor_assignments TO authenticated;
 GRANT ALL ON public.tutor_assignments TO service_role;
 ALTER TABLE public.tutor_assignments ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "tutor_assignments auth all" ON public.tutor_assignments FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "tutor_assignments auth all" ON public.tutor_assignments FOR ALL TO authenticated USING (EXISTS (
+  SELECT 1
+  FROM public.user_roles
+  WHERE user_id = (SELECT auth.uid())
+    AND role = 'admin'
+)) WITH CHECK (EXISTS (
+  SELECT 1
+  FROM public.user_roles
+  WHERE user_id = (SELECT auth.uid())
+    AND role = 'admin'
+));
 CREATE TRIGGER tutor_assignments_updated BEFORE UPDATE ON public.tutor_assignments FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
 -- ===== tutor_signins =====
@@ -271,7 +406,17 @@ CREATE TABLE public.tutor_signins (
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.tutor_signins TO authenticated;
 GRANT ALL ON public.tutor_signins TO service_role;
 ALTER TABLE public.tutor_signins ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "tutor_signins auth all" ON public.tutor_signins FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "tutor_signins auth all" ON public.tutor_signins FOR ALL TO authenticated USING (EXISTS (
+  SELECT 1
+  FROM public.user_roles
+  WHERE user_id = (SELECT auth.uid())
+    AND role = 'admin'
+)) WITH CHECK (EXISTS (
+  SELECT 1
+  FROM public.user_roles
+  WHERE user_id = (SELECT auth.uid())
+    AND role = 'admin'
+));
 
 -- ===== lesson_reviews =====
 CREATE TABLE public.lesson_reviews (
@@ -290,7 +435,17 @@ CREATE TABLE public.lesson_reviews (
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.lesson_reviews TO authenticated;
 GRANT ALL ON public.lesson_reviews TO service_role;
 ALTER TABLE public.lesson_reviews ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "lesson_reviews auth all" ON public.lesson_reviews FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "lesson_reviews auth all" ON public.lesson_reviews FOR ALL TO authenticated USING (EXISTS (
+  SELECT 1
+  FROM public.user_roles
+  WHERE user_id = (SELECT auth.uid())
+    AND role = 'admin'
+)) WITH CHECK (EXISTS (
+  SELECT 1
+  FROM public.user_roles
+  WHERE user_id = (SELECT auth.uid())
+    AND role = 'admin'
+));
 CREATE TRIGGER lesson_reviews_updated BEFORE UPDATE ON public.lesson_reviews FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
 -- ===== student_attendance =====
@@ -309,7 +464,17 @@ CREATE TABLE public.student_attendance (
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.student_attendance TO authenticated;
 GRANT ALL ON public.student_attendance TO service_role;
 ALTER TABLE public.student_attendance ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "student_attendance auth all" ON public.student_attendance FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "student_attendance auth all" ON public.student_attendance FOR ALL TO authenticated USING (EXISTS (
+  SELECT 1
+  FROM public.user_roles
+  WHERE user_id = (SELECT auth.uid())
+    AND role = 'admin'
+)) WITH CHECK (EXISTS (
+  SELECT 1
+  FROM public.user_roles
+  WHERE user_id = (SELECT auth.uid())
+    AND role = 'admin'
+));
 CREATE TRIGGER student_attendance_updated BEFORE UPDATE ON public.student_attendance FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
 -- ===== progress_records =====
@@ -329,7 +494,17 @@ CREATE TABLE public.progress_records (
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.progress_records TO authenticated;
 GRANT ALL ON public.progress_records TO service_role;
 ALTER TABLE public.progress_records ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "progress_records auth all" ON public.progress_records FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "progress_records auth all" ON public.progress_records FOR ALL TO authenticated USING (EXISTS (
+  SELECT 1
+  FROM public.user_roles
+  WHERE user_id = (SELECT auth.uid())
+    AND role = 'admin'
+)) WITH CHECK (EXISTS (
+  SELECT 1
+  FROM public.user_roles
+  WHERE user_id = (SELECT auth.uid())
+    AND role = 'admin'
+));
 CREATE TRIGGER progress_records_updated BEFORE UPDATE ON public.progress_records FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
 -- ===== homework_items =====
@@ -349,7 +524,17 @@ CREATE TABLE public.homework_items (
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.homework_items TO authenticated;
 GRANT ALL ON public.homework_items TO service_role;
 ALTER TABLE public.homework_items ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "homework_items auth all" ON public.homework_items FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "homework_items auth all" ON public.homework_items FOR ALL TO authenticated USING (EXISTS (
+  SELECT 1
+  FROM public.user_roles
+  WHERE user_id = (SELECT auth.uid())
+    AND role = 'admin'
+)) WITH CHECK (EXISTS (
+  SELECT 1
+  FROM public.user_roles
+  WHERE user_id = (SELECT auth.uid())
+    AND role = 'admin'
+));
 CREATE TRIGGER homework_items_updated BEFORE UPDATE ON public.homework_items FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
 -- ===== client_subscriptions =====
@@ -373,7 +558,17 @@ CREATE TABLE public.client_subscriptions (
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.client_subscriptions TO authenticated;
 GRANT ALL ON public.client_subscriptions TO service_role;
 ALTER TABLE public.client_subscriptions ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "client_subscriptions auth all" ON public.client_subscriptions FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "client_subscriptions auth all" ON public.client_subscriptions FOR ALL TO authenticated USING (EXISTS (
+  SELECT 1
+  FROM public.user_roles
+  WHERE user_id = (SELECT auth.uid())
+    AND role = 'admin'
+)) WITH CHECK (EXISTS (
+  SELECT 1
+  FROM public.user_roles
+  WHERE user_id = (SELECT auth.uid())
+    AND role = 'admin'
+));
 CREATE TRIGGER client_subscriptions_updated BEFORE UPDATE ON public.client_subscriptions FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
 -- ===== client_payments =====
@@ -394,7 +589,17 @@ CREATE TABLE public.client_payments (
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.client_payments TO authenticated;
 GRANT ALL ON public.client_payments TO service_role;
 ALTER TABLE public.client_payments ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "client_payments auth all" ON public.client_payments FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "client_payments auth all" ON public.client_payments FOR ALL TO authenticated USING (EXISTS (
+  SELECT 1
+  FROM public.user_roles
+  WHERE user_id = (SELECT auth.uid())
+    AND role = 'admin'
+)) WITH CHECK (EXISTS (
+  SELECT 1
+  FROM public.user_roles
+  WHERE user_id = (SELECT auth.uid())
+    AND role = 'admin'
+));
 CREATE TRIGGER client_payments_updated BEFORE UPDATE ON public.client_payments FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
 -- ===== payment_requests =====
@@ -414,7 +619,17 @@ CREATE TABLE public.payment_requests (
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.payment_requests TO authenticated;
 GRANT ALL ON public.payment_requests TO service_role;
 ALTER TABLE public.payment_requests ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "payment_requests auth all" ON public.payment_requests FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "payment_requests auth all" ON public.payment_requests FOR ALL TO authenticated USING (EXISTS (
+  SELECT 1
+  FROM public.user_roles
+  WHERE user_id = (SELECT auth.uid())
+    AND role = 'admin'
+)) WITH CHECK (EXISTS (
+  SELECT 1
+  FROM public.user_roles
+  WHERE user_id = (SELECT auth.uid())
+    AND role = 'admin'
+));
 CREATE TRIGGER payment_requests_updated BEFORE UPDATE ON public.payment_requests FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
 -- ===== tutor_earnings =====
@@ -437,7 +652,17 @@ CREATE TABLE public.tutor_earnings (
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.tutor_earnings TO authenticated;
 GRANT ALL ON public.tutor_earnings TO service_role;
 ALTER TABLE public.tutor_earnings ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "tutor_earnings auth all" ON public.tutor_earnings FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "tutor_earnings auth all" ON public.tutor_earnings FOR ALL TO authenticated USING (EXISTS (
+  SELECT 1
+  FROM public.user_roles
+  WHERE user_id = (SELECT auth.uid())
+    AND role = 'admin'
+)) WITH CHECK (EXISTS (
+  SELECT 1
+  FROM public.user_roles
+  WHERE user_id = (SELECT auth.uid())
+    AND role = 'admin'
+));
 CREATE TRIGGER tutor_earnings_updated BEFORE UPDATE ON public.tutor_earnings FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
 -- ===== payment_request_items =====
@@ -454,7 +679,17 @@ CREATE TABLE public.payment_request_items (
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.payment_request_items TO authenticated;
 GRANT ALL ON public.payment_request_items TO service_role;
 ALTER TABLE public.payment_request_items ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "payment_request_items auth all" ON public.payment_request_items FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "payment_request_items auth all" ON public.payment_request_items FOR ALL TO authenticated USING (EXISTS (
+  SELECT 1
+  FROM public.user_roles
+  WHERE user_id = (SELECT auth.uid())
+    AND role = 'admin'
+)) WITH CHECK (EXISTS (
+  SELECT 1
+  FROM public.user_roles
+  WHERE user_id = (SELECT auth.uid())
+    AND role = 'admin'
+));
 
 -- ===== SEED: sites, programmes, plans, schedule blocks =====
 INSERT INTO public.sites (name, city) VALUES
