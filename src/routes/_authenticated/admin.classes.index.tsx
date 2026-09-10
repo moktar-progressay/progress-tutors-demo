@@ -141,7 +141,7 @@ function ClassesPage() {
                   const count = enrolList.filter((e) => e.class_id === c.id).length;
                   const tutor = (tutors.data ?? []).find((t) => t.id === c.tutor_id);
                   return (
-                    <li key={c.id} className="flex flex-wrap items-center gap-3 rounded-2xl border border-border px-4 py-3">
+                    <li key={c.id} className="flex flex-wrap items-center gap-3 rounded-2xl border border-border px-4 py-3 transition-colors hover:bg-muted/50">
                       <div className="min-w-0 flex-1">
                         <Link to="/admin/classes/$id" params={{ id: c.id }} className="text-sm font-bold hover:text-primary">
                           {c.name}
@@ -155,6 +155,13 @@ function ClassesPage() {
                         {count}/{c.capacity} enrolled
                       </Pill>
                       {!c.tutor_id ? <Pill tone="amber">Tutor not assigned</Pill> : null}
+                      <Link
+                        to="/admin/classes/$id"
+                        params={{ id: c.id }}
+                        className="rounded-xl bg-secondary px-3 py-2 text-xs font-bold text-primary hover:bg-primary hover:text-primary-foreground"
+                      >
+                        View class
+                      </Link>
                     </li>
                   );
                 })}
