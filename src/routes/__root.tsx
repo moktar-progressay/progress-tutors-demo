@@ -5,6 +5,7 @@ import { useEffect, type ReactNode } from "react";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { DemoProvider } from "../lib/demo-store";
 import { AppShell } from "../components/AppShell";
+import { PasswordRecoveryGate } from "../components/PasswordRecoveryGate";
 import { Toaster } from "../components/ui/sonner";
 
 function NotFoundComponent() {
@@ -102,9 +103,11 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <DemoProvider>
-        <AppShell>
-          <Outlet />
-        </AppShell>
+        <PasswordRecoveryGate>
+          <AppShell>
+            <Outlet />
+          </AppShell>
+        </PasswordRecoveryGate>
         <Toaster position="top-center" />
       </DemoProvider>
     </QueryClientProvider>
