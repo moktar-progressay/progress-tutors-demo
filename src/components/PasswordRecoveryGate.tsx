@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
+import { PROGRESS_TUTORS_AUTH_URL } from "@/lib/app-url";
 
 function hasRecoveryToken() {
   if (typeof window === "undefined") return false;
@@ -42,7 +43,7 @@ function NewPasswordScreen() {
       if (error) throw error;
       await supabase.auth.signOut();
       toast.success("Password updated. You can now sign in.");
-      window.location.replace(`${window.location.origin}${import.meta.env.BASE_URL}#/auth`);
+      window.location.replace(PROGRESS_TUTORS_AUTH_URL);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Unable to update your password");
     } finally {

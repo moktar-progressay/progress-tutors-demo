@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PROGRESS_TUTORS_APP_URL, PROGRESS_TUTORS_AUTH_URL } from "@/lib/app-url";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
@@ -41,7 +42,7 @@ function AuthPage() {
     try {
       if (mode === "forgot") {
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: `${window.location.origin}${import.meta.env.BASE_URL}`,
+          redirectTo: PROGRESS_TUTORS_APP_URL,
         });
         if (error) throw error;
         toast.success("If an account exists for this email, a reset link has been sent.");
@@ -51,7 +52,7 @@ function AuthPage() {
           email,
           password,
           options: {
-            emailRedirectTo: `${window.location.origin}${import.meta.env.BASE_URL}#/auth`,
+            emailRedirectTo: PROGRESS_TUTORS_AUTH_URL,
           },
         });
         if (error) throw error;
