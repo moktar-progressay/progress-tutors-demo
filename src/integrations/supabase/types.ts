@@ -64,6 +64,7 @@ export type Database = {
           active: boolean;
           age_group: string | null;
           capacity: number;
+          card_colour: string | null;
           created_at: string;
           delivery_mode: string;
           end_time: string | null;
@@ -94,6 +95,7 @@ export type Database = {
           active?: boolean;
           age_group?: string | null;
           capacity?: number;
+          card_colour?: string | null;
           created_at?: string;
           delivery_mode?: string;
           end_time?: string | null;
@@ -124,6 +126,7 @@ export type Database = {
           active?: boolean;
           age_group?: string | null;
           capacity?: number;
+          card_colour?: string | null;
           created_at?: string;
           delivery_mode?: string;
           end_time?: string | null;
