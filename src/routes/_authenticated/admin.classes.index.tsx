@@ -589,7 +589,6 @@ function SchedulePage() {
 
   const renderCard = (lesson: ClassRow, compact = false) => {
     const tutor = tutorFor(lesson);
-    const site = siteFor(lesson);
     return (
       <button
         key={lesson.id}
@@ -603,41 +602,28 @@ function SchedulePage() {
           setDetail(lesson);
         }}
         className={cn(
-          "h-full w-full overflow-hidden rounded-md border border-l-4 border-white/30 p-2 text-left shadow-sm transition hover:brightness-95",
+          "flex h-full w-full flex-col overflow-hidden rounded-xl border border-l-4 border-white/30 p-1.5 text-left shadow-sm ring-1 ring-black/5 transition hover:brightness-95",
           colourFor(lesson),
           compact ? "text-[10px]" : "text-xs",
         )}
       >
         <p className="line-clamp-2 font-extrabold leading-tight">{lesson.name}</p>
-        <p className="mt-0.5 font-semibold opacity-90">
+        <p className="mt-0.5 whitespace-nowrap text-[9px] font-semibold leading-none opacity-85">
           {hhmm(lesson.start_time)}–{hhmm(lesson.end_time)}
         </p>
         {!compact ? (
-          <div className="mt-1 flex items-center justify-between gap-1">
-            <span className="flex min-w-0 items-center gap-1.5">
+          <div className="mt-auto flex min-w-0 items-end justify-between gap-1 pt-1">
+            <span className="flex min-w-0 items-center" title={fullName(tutor)}>
               <Avatar
                 initials={initialsOf(fullName(tutor))}
                 tone={avatarTone(fullName(tutor))}
                 size="sm"
               />
-              <span className="truncate">{tutor ? fullName(tutor) : "Tutor needed"}</span>
             </span>
-            <span className="shrink-0">
-              {countFor(lesson)}/{lesson.capacity}
+            <span className="shrink-0 whitespace-nowrap rounded-full bg-black/20 px-1.5 py-0.5 text-[9px] font-extrabold leading-none">
+              {countFor(lesson)}/{lesson.capacity} seats
             </span>
           </div>
-        ) : null}
-        {!compact ? (
-          <p className="mt-1 flex items-center gap-1 truncate opacity-75">
-            {lesson.delivery_mode === "online" ? (
-              <Video className="h-3 w-3" />
-            ) : (
-              <MapPin className="h-3 w-3" />
-            )}
-            {lesson.delivery_mode === "online"
-              ? "Online"
-              : (site?.name ?? lesson.venue_name ?? "Venue TBC")}
-          </p>
         ) : null}
       </button>
     );
