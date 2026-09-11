@@ -48,12 +48,12 @@ export function useTable<T extends keyof Tables>(table: T, order?: string) {
 
 export function useInvalidate() {
   const qc = useQueryClient();
-  return (...tables: (keyof Tables)[]) => {
+  return async (...tables: (keyof Tables)[]) => {
     if (tables.length === 0) {
-      void qc.invalidateQueries();
+      await qc.invalidateQueries();
       return;
     }
-    tables.forEach((t) => void qc.invalidateQueries({ queryKey: [t] }));
+    await Promise.all(tables.map((t) => qc.invalidateQueries({ queryKey: [t] })));
   };
 }
 
@@ -69,7 +69,7 @@ export function useUpsert<T extends keyof Tables>(table: T, invalidates: (keyof 
       if (error) throw error;
       return data as Row<T>[];
     },
-    onSuccess: () => invalidate(table, ...invalidates),
+    onSuccess: async () => invalidate(table, ...invalidates),
   });
 }
 
@@ -77,13 +77,16 @@ export function useUpdateRow<T extends keyof Tables>(table: T, invalidates: (key
   const invalidate = useInvalidate();
   return useMutation({
     mutationFn: async ({ id, values }: { id: string; values: Update<T> }) => {
-      const { error } = await sb
+      const { data, error } = await sb
         .from(table as string)
         .update(values as never)
-        .eq("id", id);
+        .eq("id", id)
+        .select()
+        .single();
       if (error) throw error;
+      return data as Row<T>;
     },
-    onSuccess: () => invalidate(table, ...invalidates),
+    onSuccess: async () => invalidate(table, ...invalidates),
   });
 }
 
@@ -91,17 +94,23 @@ export function useDeleteRow<T extends keyof Tables>(table: T, invalidates: (key
   const invalidate = useInvalidate();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await sb.from(table as string).delete().eq("id", id);
+      const { data, error } = await sb
+        .from(table as string)
+        .delete()
+        .eq("id", id)
+        .select("id");
       if (error) throw error;
+      if (!data?.length) throw new Error("Nothing was deleted. Check your access and try again.");
     },
-    onSuccess: () => invalidate(table, ...invalidates),
+    onSuccess: async () => invalidate(table, ...invalidates),
   });
 }
 
 // ---------- shared helpers ----------
 
-export const fullName = (r: { first_name: string; last_name?: string | null } | null | undefined) =>
-  r ? [r.first_name, r.last_name].filter(Boolean).join(" ") : "—";
+export const fullName = (
+  r: { first_name: string; last_name?: string | null } | null | undefined,
+) => (r ? [r.first_name, r.last_name].filter(Boolean).join(" ") : "—");
 
 export const initialsOf = (name: string) =>
   name
@@ -112,9 +121,11 @@ export const initialsOf = (name: string) =>
     .join("") || "?";
 
 export const money = (n: number | null | undefined) =>
-  new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP", maximumFractionDigits: 0 }).format(
-    Number(n ?? 0),
-  );
+  new Intl.NumberFormat("en-GB", {
+    style: "currency",
+    currency: "GBP",
+    maximumFractionDigits: 0,
+  }).format(Number(n ?? 0));
 
 export const num = (v: unknown) => Number(v ?? 0);
 
