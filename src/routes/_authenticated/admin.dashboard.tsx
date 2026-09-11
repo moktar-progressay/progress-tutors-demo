@@ -1,9 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { CalendarDays, ChevronRight, CreditCard, Users, Wallet } from "lucide-react";
+import { CalendarDays, ChevronRight, CreditCard, Filter, Plus, Users, Wallet } from "lucide-react";
+import { useState } from "react";
 import { Page } from "@/components/AppShell";
-import { Empty, PageHeader, Pill, Section, StatCard } from "@/components/kit";
+import { Avatar, avatarTone, Empty, PageHeader, Pill, Section, StatCard } from "@/components/kit";
+import { SelectField } from "@/components/form-kit";
 import { Button } from "@/components/ui/button";
-import { DEMO_DATE, fullName, hhmm, money, num, useTable, weekdayOf } from "@/lib/db";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DEMO_DATE, fullName, hhmm, initialsOf, money, num, useTable, weekdayOf } from "@/lib/db";
 
 export const Route = createFileRoute("/_authenticated/admin/dashboard")({
   head: () => ({
@@ -20,6 +23,9 @@ export const Route = createFileRoute("/_authenticated/admin/dashboard")({
 });
 
 function AdminDashboard() {
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [tutorFilter, setTutorFilter] = useState("all");
+  const [deliveryFilter, setDeliveryFilter] = useState("all");
   const lessons = useTable("classes", "start_time");
   const students = useTable("students");
   const parents = useTable("parents");
@@ -33,6 +39,11 @@ function AdminDashboard() {
   const todayLessons = (lessons.data ?? [])
     .filter((lesson) => lesson.active && lesson.weekday === today)
     .sort((a, b) => (a.start_time ?? "").localeCompare(b.start_time ?? ""));
+  const shownLessons = todayLessons.filter(
+    (lesson) =>
+      (tutorFilter === "all" || lesson.tutor_id === tutorFilter) &&
+      (deliveryFilter === "all" || lesson.delivery_mode === deliveryFilter),
+  );
   const activeEnrolments = (enrolments.data ?? []).filter((item) => item.status === "active");
   const collected = (payments.data ?? [])
     .filter((item) => ["received", "paid"].includes(item.status))
@@ -50,16 +61,23 @@ function AdminDashboard() {
         title="Dashboard"
         subtitle="Your tuition centre at a glance."
         actions={
-          <Button asChild>
-            <Link to="/admin/classes">Open schedule</Link>
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" onClick={() => setFiltersOpen(true)}>
+              <Filter className="h-4 w-4" /> Filter
+            </Button>
+            <Button asChild>
+              <Link to="/admin/classes" search={{ add: true }}>
+                <Plus className="h-4 w-4" /> Add lesson
+              </Link>
+            </Button>
+          </div>
         }
       />
 
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <StatCard
           label="Today's lessons"
-          value={String(todayLessons.length)}
+          value={String(shownLessons.length)}
           tone="pink"
           icon={<CalendarDays className="h-5 w-5" />}
         />
@@ -95,11 +113,11 @@ function AdminDashboard() {
             </Link>
           }
         >
-          {todayLessons.length === 0 ? (
+          {shownLessons.length === 0 ? (
             <Empty>No lessons scheduled today.</Empty>
           ) : (
             <ul className="divide-y divide-border">
-              {todayLessons.map((lesson) => {
+              {shownLessons.map((lesson) => {
                 const tutor = (tutors.data ?? []).find((item) => item.id === lesson.tutor_id);
                 const site = (sites.data ?? []).find((item) => item.id === lesson.site_id);
                 const count = activeEnrolments.filter((item) => item.class_id === lesson.id).length;
@@ -113,14 +131,21 @@ function AdminDashboard() {
                       <p className="text-sm font-extrabold text-primary">
                         {hhmm(lesson.start_time)}
                       </p>
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-bold">{lesson.name}</p>
-                        <p className="truncate text-xs text-muted-foreground">
-                          {tutor ? fullName(tutor) : "Tutor needed"} ·{" "}
-                          {site?.name ??
-                            lesson.venue_name ??
-                            (lesson.delivery_mode === "online" ? "Online" : "Venue TBC")}
-                        </p>
+                      <div className="flex min-w-0 items-center gap-2">
+                        <Avatar
+                          initials={initialsOf(fullName(tutor))}
+                          tone={avatarTone(fullName(tutor))}
+                          size="sm"
+                        />
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-bold">{lesson.name}</p>
+                          <p className="truncate text-xs text-muted-foreground">
+                            {tutor ? fullName(tutor) : "Tutor needed"} ·{" "}
+                            {site?.name ??
+                              lesson.venue_name ??
+                              (lesson.delivery_mode === "online" ? "Online" : "Venue TBC")}
+                          </p>
+                        </div>
                       </div>
                       <div className="flex items-center gap-2">
                         <Pill tone="blue">
@@ -155,6 +180,51 @@ function AdminDashboard() {
           </div>
         </Section>
       </div>
+
+      <Dialog open={filtersOpen} onOpenChange={setFiltersOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Filter dashboard lessons</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4">
+            <SelectField
+              label="Tutor"
+              value={tutorFilter}
+              onChange={setTutorFilter}
+              options={[
+                { value: "all", label: "All tutors" },
+                ...(tutors.data ?? []).map((tutor) => ({
+                  value: tutor.id,
+                  label: fullName(tutor),
+                })),
+              ]}
+            />
+            <SelectField
+              label="Delivery"
+              value={deliveryFilter}
+              onChange={setDeliveryFilter}
+              options={[
+                { value: "all", label: "Online and face-to-face" },
+                { value: "online", label: "Online" },
+                { value: "in_person", label: "Face-to-face" },
+                { value: "hybrid", label: "Hybrid" },
+              ]}
+            />
+            <div className="flex justify-between gap-2">
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setTutorFilter("all");
+                  setDeliveryFilter("all");
+                }}
+              >
+                Clear
+              </Button>
+              <Button onClick={() => setFiltersOpen(false)}>Show lessons</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Page>
   );
 }
