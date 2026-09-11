@@ -1,4 +1,4 @@
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, UserRound } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { useDemo } from "@/lib/demo-store";
@@ -14,6 +14,13 @@ const toneTile: Record<Tone, string> = {
   purple: "bg-tile-purple text-tile-purple-ink",
   neutral: "bg-muted text-muted-foreground",
 };
+
+const profileTones: Tone[] = ["pink", "blue", "green", "amber", "purple"];
+
+export function avatarTone(value: string): Tone {
+  const score = Array.from(value).reduce((total, character) => total + character.charCodeAt(0), 0);
+  return profileTones[score % profileTones.length] ?? "pink";
+}
 
 export function StatCard({
   label,
@@ -65,7 +72,13 @@ export function Pill({
 export function CapacityPill({ enrolled, capacity }: { enrolled: number; capacity: number }) {
   const status = capacityStatus(enrolled, capacity);
   const tone: Tone =
-    status === "available" ? "green" : status === "nearly" ? "amber" : status === "full" ? "pink" : "purple";
+    status === "available"
+      ? "green"
+      : status === "nearly"
+        ? "amber"
+        : status === "full"
+          ? "pink"
+          : "purple";
   return <Pill tone={tone}>{CAPACITY_LABEL[status]}</Pill>;
 }
 
@@ -73,22 +86,36 @@ export function Avatar({
   initials,
   size = "md",
   tone = "pink",
+  src,
 }: {
   initials: string;
   size?: "sm" | "md" | "lg";
   tone?: Tone;
+  src?: string | null;
 }) {
   return (
     <span
       className={cn(
-        "inline-flex shrink-0 items-center justify-center rounded-full font-bold",
+        "relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full font-bold ring-2 ring-card",
         toneTile[tone],
         size === "sm" && "h-7 w-7 text-[11px]",
         size === "md" && "h-9 w-9 text-xs",
         size === "lg" && "h-12 w-12 text-sm",
       )}
+      title={initials}
     >
-      {initials}
+      {src ? (
+        <img src={src} alt="" className="h-full w-full object-cover" />
+      ) : (
+        <>
+          <UserRound
+            className={cn(size === "sm" ? "h-4 w-4" : size === "lg" ? "h-7 w-7" : "h-5 w-5")}
+          />
+          <span className="absolute right-0 bottom-0 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-card px-0.5 text-[7px] leading-none text-foreground shadow-sm">
+            {initials}
+          </span>
+        </>
+      )}
     </span>
   );
 }
@@ -120,11 +147,16 @@ export function Section({
           aria-expanded={isOpen}
         >
           <ChevronDown
-            className={cn("h-4 w-4 text-muted-foreground transition-transform", !isOpen && "-rotate-90")}
+            className={cn(
+              "h-4 w-4 text-muted-foreground transition-transform",
+              !isOpen && "-rotate-90",
+            )}
           />
           <span>
             <span className="block text-base font-bold">{title}</span>
-            {subtitle ? <span className="block text-xs text-muted-foreground">{subtitle}</span> : null}
+            {subtitle ? (
+              <span className="block text-xs text-muted-foreground">{subtitle}</span>
+            ) : null}
           </span>
         </button>
         {action}
@@ -147,7 +179,9 @@ export function Hero({
     <div className="hero-curve px-5 pt-8 pb-12 sm:px-8 sm:pt-10 sm:pb-14">
       <div className="relative z-10">
         <h1 className="text-2xl font-extrabold sm:text-4xl">{title}</h1>
-        {subtitle ? <p className="mt-2 max-w-2xl text-sm opacity-90 sm:text-base">{subtitle}</p> : null}
+        {subtitle ? (
+          <p className="mt-2 max-w-2xl text-sm opacity-90 sm:text-base">{subtitle}</p>
+        ) : null}
         {children ? <div className="mt-5">{children}</div> : null}
       </div>
     </div>
@@ -208,7 +242,9 @@ export function Field({
 
 export function Empty({ children }: { children: ReactNode }) {
   return (
-    <p className="rounded-xl bg-muted px-4 py-6 text-center text-sm text-muted-foreground">{children}</p>
+    <p className="rounded-xl bg-muted px-4 py-6 text-center text-sm text-muted-foreground">
+      {children}
+    </p>
   );
 }
 
