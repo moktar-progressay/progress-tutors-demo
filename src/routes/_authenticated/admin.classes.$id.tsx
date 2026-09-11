@@ -68,9 +68,6 @@ function ClassProfile() {
   const addSession = useUpsert("sessions");
 
   const [tab, setTab] = useState<Tab>("Students");
-  const [siteFilter, setSiteFilter] = useState("all");
-  const [subjectFilter, setSubjectFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState("active");
   const [enrolOpen, setEnrolOpen] = useState(false);
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
   const [studentSearch, setStudentSearch] = useState("");
@@ -90,19 +87,7 @@ function ClassProfile() {
 
   const rows = useMemo(() => classes.data ?? [], [classes.data]);
   const c = rows.find((item) => item.id === id);
-  const subjects = useMemo(
-    () =>
-      Array.from(
-        new Set(rows.map((item) => item.subject).filter((v): v is string => Boolean(v))),
-      ).sort(),
-    [rows],
-  );
-  const visibleClasses = rows.filter(
-    (item) =>
-      (siteFilter === "all" || item.site_id === siteFilter) &&
-      (subjectFilter === "all" || item.subject === subjectFilter) &&
-      (statusFilter === "all" || (statusFilter === "active" ? item.active : !item.active)),
-  );
+  const visibleClasses = rows.filter((item) => item.active || item.id === id);
 
   if (classes.isLoading)
     return (
@@ -220,7 +205,7 @@ function ClassProfile() {
         actions={<Button onClick={openEdit}>Edit lesson</Button>}
       />
 
-      <div className="grid gap-3 rounded-2xl border border-border bg-card p-4 lg:grid-cols-[minmax(18rem,2fr)_1fr_1fr_1fr_auto]">
+      <div className="grid min-w-0 gap-3 rounded-2xl border border-border bg-card p-4 sm:grid-cols-[minmax(0,1fr)_auto]">
         <SelectField
           label="Choose lesson"
           value={c.id}
@@ -230,37 +215,9 @@ function ClassProfile() {
             : [c, ...visibleClasses]
           ).map((item) => ({ value: item.id, label: classLabel(item) }))}
         />
-        <SelectField
-          label="Site"
-          value={siteFilter}
-          onChange={setSiteFilter}
-          options={[
-            { value: "all", label: "All sites" },
-            ...(sites.data ?? []).map((item) => ({ value: item.id, label: item.name })),
-          ]}
-        />
-        <SelectField
-          label="Subject"
-          value={subjectFilter}
-          onChange={setSubjectFilter}
-          options={[
-            { value: "all", label: "All subjects" },
-            ...subjects.map((subject) => ({ value: subject, label: subject })),
-          ]}
-        />
-        <SelectField
-          label="Status"
-          value={statusFilter}
-          onChange={setStatusFilter}
-          options={[
-            { value: "all", label: "All" },
-            { value: "active", label: "Active" },
-            { value: "archived", label: "Archived" },
-          ]}
-        />
         <Button
           variant="secondary"
-          className="self-end"
+          className="w-full self-end sm:w-auto"
           onClick={() => navigate({ to: "/admin/classes" })}
         >
           Full schedule
@@ -270,9 +227,11 @@ function ClassProfile() {
       <section className="overflow-hidden rounded-3xl border border-border bg-card">
         <div className="p-5 sm:p-7">
           <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
+            <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-2xl font-extrabold sm:text-3xl">{c.name}</h1>
+                <h1 className="min-w-0 break-words text-2xl font-extrabold sm:text-3xl">
+                  {c.name}
+                </h1>
                 <Pill tone={c.active ? "green" : "neutral"}>
                   {c.active ? "Active" : "Archived"}
                 </Pill>
