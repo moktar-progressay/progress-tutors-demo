@@ -1,14 +1,11 @@
 import { Link, useNavigate, useRouterState, type LinkProps } from "@tanstack/react-router";
 import {
-  BarChart3,
-  BookOpen,
   CalendarDays,
   ClipboardCheck,
   CreditCard,
   Flame,
   GraduationCap,
   Home,
-  Receipt,
   Sparkles,
   Trophy,
   Users,
@@ -34,30 +31,19 @@ export const NAV: Record<Role, NavItem[]> = {
   admin: [
     { to: "/admin/dashboard", label: "Dashboard", icon: <Home className={iconCls} /> },
     { to: "/admin/classes", label: "Schedule", icon: <CalendarDays className={iconCls} /> },
-    { to: "/admin/students", label: "Students", icon: <GraduationCap className={iconCls} /> },
-    { to: "/admin/tutors", label: "Tutors", icon: <Users className={iconCls} /> },
-    { to: "/admin/parents", label: "Parents", icon: <Users className={iconCls} /> },
+    { to: "/admin/contacts", label: "Contacts", icon: <Users className={iconCls} /> },
     { to: "/admin/payments", label: "Payments", icon: <CreditCard className={iconCls} /> },
-    {
-      to: "/admin/payment-requests",
-      label: "Payment Requests",
-      icon: <Receipt className={iconCls} />,
-    },
-    { to: "/admin/reports", label: "Reports", icon: <BarChart3 className={iconCls} /> },
   ],
   tutor: [
     { to: "/tutor/dashboard", label: "Dashboard", icon: <Home className={iconCls} /> },
-    { to: "/tutor/lessons", label: "My Lessons", icon: <CalendarDays className={iconCls} /> },
+    { to: "/tutor/lessons", label: "My schedule", icon: <CalendarDays className={iconCls} /> },
+    { to: "/admin/students", label: "Students", icon: <GraduationCap className={iconCls} /> },
     { to: "/tutor/earnings", label: "Earnings", icon: <Wallet className={iconCls} /> },
-    {
-      to: "/tutor/payment-requests",
-      label: "Payment Requests",
-      icon: <Receipt className={iconCls} />,
-    },
   ],
   parent: [
     { to: "/parent/dashboard", label: "Dashboard", icon: <Home className={iconCls} /> },
-    { to: "/parent/classes", label: "Find Classes", icon: <BookOpen className={iconCls} /> },
+    { to: "/parent/classes", label: "Schedule", icon: <CalendarDays className={iconCls} /> },
+    { to: "/parent/dashboard", label: "Children", icon: <GraduationCap className={iconCls} /> },
     { to: "/parent/payments", label: "Payments", icon: <CreditCard className={iconCls} /> },
   ],
   student: [
@@ -141,12 +127,12 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Live-data banner + role switcher */}
+      {/* Private-workspace banner + demo role switcher */}
       <div className="sticky top-0 z-40 bg-primary text-primary-foreground">
         <div className="mx-auto flex max-w-[1500px] flex-wrap items-center justify-between gap-2 px-4 py-2">
           <p className="flex items-center gap-2 text-[11px] font-semibold sm:text-xs">
             <Sparkles className="h-3.5 w-3.5 shrink-0" />
-            Private workspace. Your schedule is visible only to your signed-in account.
+            Private workspace. You only see records available to your signed-in role.
           </p>
           <div className="flex items-center gap-2">
             <span className="hidden text-[11px] font-semibold opacity-80 sm:inline">View as</span>
