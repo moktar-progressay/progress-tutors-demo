@@ -22,6 +22,7 @@ import {
   Copy,
   Filter,
   MapPin,
+  Pencil,
   Search,
   UserRound,
   Video,
@@ -48,6 +49,7 @@ import {
   initialsOf,
   type ClassRow,
   useTable,
+  useUpdateRow,
   useUpsert,
   WEEKDAYS,
 } from "@/lib/db";
@@ -118,6 +120,7 @@ function SchedulePage() {
   const students = useTable("students", "first_name");
   const enrolments = useTable("class_enrolments");
   const createLesson = useUpsert("classes");
+  const updateLesson = useUpdateRow("classes");
   const addEnrolments = useUpsert("class_enrolments", ["classes"]);
 
   const [view, setView] = useState<CalendarView>("week");
@@ -129,6 +132,7 @@ function SchedulePage() {
   const [subjectFilter, setSubjectFilter] = useState("all");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [detail, setDetail] = useState<ClassRow | null>(null);
   const [showMore, setShowMore] = useState(false);
   const [studentSearch, setStudentSearch] = useState("");
@@ -205,6 +209,7 @@ function SchedulePage() {
   };
 
   function openNew(date = selectedDate) {
+    setEditingId(null);
     setForm({ ...BLANK, date });
     setSelectedStudentIds([]);
     setStudentSearch("");
@@ -213,6 +218,7 @@ function SchedulePage() {
   }
 
   function cloneLesson(lesson: ClassRow) {
+    setEditingId(null);
     setForm({
       ...BLANK,
       name: lesson.name,
@@ -240,9 +246,43 @@ function SchedulePage() {
     setFormOpen(true);
   }
 
+  function editLesson(lesson: ClassRow) {
+    setEditingId(lesson.id);
+    setForm({
+      ...BLANK,
+      name: lesson.name,
+      date: lesson.start_date ?? selectedDate,
+      start_time: hhmm(lesson.start_time),
+      end_time: hhmm(lesson.end_time),
+      recurrence: lesson.recurrence ?? "weekly",
+      end_date: lesson.end_date ?? "",
+      delivery_mode: lesson.delivery_mode,
+      site_id: lesson.site_id ?? "",
+      venue_name: lesson.venue_name ?? "",
+      room: lesson.room ?? "",
+      online_url: lesson.online_url ?? "",
+      tutor_id: lesson.tutor_id ?? "",
+      subject: lesson.subject ?? "",
+      level: lesson.level ?? "",
+      capacity: String(lesson.capacity),
+      session_rate: lesson.session_rate === null ? "" : String(lesson.session_rate),
+      price_per_session: lesson.price_per_session === null ? "" : String(lesson.price_per_session),
+      notes: lesson.notes ?? "",
+    });
+    setSelectedStudentIds(
+      (enrolments.data ?? [])
+        .filter((item) => item.class_id === lesson.id && item.status === "active")
+        .map((item) => item.student_id),
+    );
+    setStudentSearch("");
+    setShowMore(false);
+    setDetail(null);
+    setFormOpen(true);
+  }
+
   async function save() {
     try {
-      const created = await createLesson.mutateAsync({
+      const values = {
         name: form.name.trim(),
         schedule_block_id: null,
         site_id: form.site_id || null,
@@ -263,19 +303,29 @@ function SchedulePage() {
         session_rate: form.session_rate ? Number(form.session_rate) : null,
         price_per_session: form.price_per_session ? Number(form.price_per_session) : null,
         notes: form.notes.trim() || null,
-      });
-      const lessonId = created[0]?.id;
+      };
+      const created = editingId ? null : await createLesson.mutateAsync(values);
+      if (editingId) await updateLesson.mutateAsync({ id: editingId, values });
+      const lessonId = editingId ?? created?.[0]?.id;
       if (lessonId && selectedStudentIds.length > 0) {
-        await addEnrolments.mutateAsync(
-          selectedStudentIds.map((studentId) => ({
-            class_id: lessonId,
-            student_id: studentId,
-            status: "active",
-          })),
+        const alreadyEnrolled = new Set(
+          (enrolments.data ?? [])
+            .filter((item) => item.class_id === lessonId && item.status === "active")
+            .map((item) => item.student_id),
         );
+        const newStudentIds = selectedStudentIds.filter((id) => !alreadyEnrolled.has(id));
+        if (newStudentIds.length > 0)
+          await addEnrolments.mutateAsync(
+            newStudentIds.map((studentId) => ({
+              class_id: lessonId,
+              student_id: studentId,
+              status: "active",
+            })),
+          );
       }
-      toast.success("Lesson added to your calendar");
+      toast.success(editingId ? "Lesson updated" : "Lesson added to your calendar");
       setFormOpen(false);
+      setEditingId(null);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not create the lesson");
     }
@@ -656,6 +706,9 @@ function SchedulePage() {
                 </Pill>
               </div>
               <div className="flex flex-wrap justify-end gap-2">
+                <Button variant="secondary" onClick={() => editLesson(detail)}>
+                  <Pencil className="h-4 w-4" /> Edit
+                </Button>
                 <Button variant="secondary" onClick={() => cloneLesson(detail)}>
                   <Copy className="h-4 w-4" /> Clone lesson
                 </Button>
@@ -674,11 +727,15 @@ function SchedulePage() {
         open={formOpen}
         onOpenChange={setFormOpen}
         wide
-        title="Add lesson"
-        description="Add an event to your calendar. You are not creating another schedule."
+        title={editingId ? "Edit lesson" : "Add lesson"}
+        description={
+          editingId
+            ? "Update this lesson without leaving the calendar."
+            : "Add an event to your calendar. You are not creating another schedule."
+        }
         onSubmit={save}
-        busy={createLesson.isPending || addEnrolments.isPending}
-        submitLabel="Add lesson"
+        busy={createLesson.isPending || updateLesson.isPending || addEnrolments.isPending}
+        submitLabel={editingId ? "Save changes" : "Add lesson"}
       >
         <TextField
           label="Lesson name"
