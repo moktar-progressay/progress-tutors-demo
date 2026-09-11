@@ -169,6 +169,7 @@ function SchedulePage() {
     moved: boolean;
   } | null>(null);
   const dragHoldTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pageOverflowRef = useRef("");
   const suppressClickRef = useRef(false);
   const [showMore, setShowMore] = useState(false);
   const [studentSearch, setStudentSearch] = useState("");
@@ -374,6 +375,9 @@ function SchedulePage() {
       dragHoldTimerRef.current = setTimeout(() => {
         if (!dragRef.current || dragRef.current.pointerId !== event.pointerId) return;
         dragRef.current.armed = true;
+        suppressClickRef.current = true;
+        pageOverflowRef.current = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
         setDraggingId(lesson.id);
         navigator.vibrate?.(30);
       }, 500);
@@ -404,6 +408,7 @@ function SchedulePage() {
     dragHoldTimerRef.current = null;
     dragRef.current = null;
     setDraggingId(null);
+    document.body.style.overflow = pageOverflowRef.current;
     if (!drag || drag.pointerId !== event.pointerId || !drag.moved) return;
     suppressClickRef.current = true;
 
@@ -682,7 +687,7 @@ function SchedulePage() {
                     <div
                       key={lesson.id}
                       className={cn(
-                        "absolute touch-none px-1 transition-opacity",
+                        "absolute touch-auto select-none px-1 transition-opacity",
                         draggingId === lesson.id && "z-20 cursor-grabbing opacity-60",
                         draggingId !== lesson.id && "cursor-grab",
                       )}
@@ -702,6 +707,7 @@ function SchedulePage() {
                         dragHoldTimerRef.current = null;
                         dragRef.current = null;
                         setDraggingId(null);
+                        document.body.style.overflow = pageOverflowRef.current;
                       }}
                     >
                       {renderCard(lesson, days.length > 3)}
@@ -866,7 +872,7 @@ function SchedulePage() {
       </Button>
 
       <Dialog open={filtersOpen} onOpenChange={setFiltersOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="max-h-[calc(100dvh-1rem)] overflow-y-auto overscroll-contain pb-[calc(env(safe-area-inset-bottom)+1rem)] sm:max-h-[90vh] sm:max-w-md sm:pb-6">
           <DialogHeader>
             <DialogTitle>Filter lessons</DialogTitle>
             <DialogDescription>
@@ -941,7 +947,7 @@ function SchedulePage() {
           }
         }}
       >
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="max-h-[calc(100dvh-1rem)] overflow-y-auto overscroll-contain pb-[calc(env(safe-area-inset-bottom)+1rem)] sm:max-h-[90vh] sm:max-w-md sm:pb-6">
           {detail ? (
             <>
               <DialogHeader>
@@ -1074,7 +1080,7 @@ function SchedulePage() {
                   </div>
                 </div>
               )}
-              <div className="grid grid-cols-3 gap-2 border-t border-border pt-4">
+              <div className="sticky bottom-0 z-10 -mx-2 grid grid-cols-3 gap-2 border-t border-border bg-background px-2 py-3">
                 {quickEditing ? (
                   <>
                     <Button
