@@ -101,6 +101,9 @@ const COLOURS = [
 ];
 
 const HOURS = Array.from({ length: 13 }, (_, index) => index + 8);
+const CALENDAR_HOUR_HEIGHT = 100;
+const CALENDAR_MINUTE_SCALE = CALENDAR_HOUR_HEIGHT / 60;
+const CALENDAR_HEIGHT = HOURS.length * CALENDAR_HOUR_HEIGHT;
 
 function minutes(time: string | null) {
   if (!time) return 0;
@@ -379,7 +382,7 @@ function SchedulePage() {
         type="button"
         onClick={() => setDetail(lesson)}
         className={cn(
-          "w-full overflow-hidden rounded-lg border-l-4 p-2 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md",
+          "h-full w-full overflow-hidden rounded-lg border-l-4 p-2 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md",
           colourFor(lesson),
           compact ? "text-[10px]" : "text-xs",
         )}
@@ -453,12 +456,12 @@ function SchedulePage() {
           className="grid"
           style={{ gridTemplateColumns: `4rem repeat(${days.length}, minmax(0, 1fr))` }}
         >
-          <div className="relative h-[780px]">
+          <div className="relative" style={{ height: CALENDAR_HEIGHT }}>
             {HOURS.map((hour) => (
               <span
                 key={hour}
                 className="absolute right-2 -translate-y-2 text-[10px] text-muted-foreground"
-                style={{ top: `${(hour - 8) * 60}px` }}
+                style={{ top: `${(hour - 8) * CALENDAR_HOUR_HEIGHT}px` }}
               >
                 {hour}:00
               </span>
@@ -467,16 +470,21 @@ function SchedulePage() {
           {days.map((day) => (
             <div
               key={day.toISOString()}
-              className="relative h-[780px] border-l border-border bg-[repeating-linear-gradient(to_bottom,transparent_0,transparent_59px,var(--border)_60px)]"
+              className="relative border-l border-border"
+              style={{
+                height: CALENDAR_HEIGHT,
+                backgroundImage: `repeating-linear-gradient(to bottom, transparent 0, transparent ${CALENDAR_HOUR_HEIGHT - 1}px, var(--border) ${CALENDAR_HOUR_HEIGHT}px)`,
+              }}
               onDoubleClick={() => openNew(format(day, "yyyy-MM-dd"))}
             >
               {filtered
                 .filter((lesson) => lessonRunsOn(lesson, day))
                 .map((lesson, index, dayLessons) => {
-                  const top = Math.max(0, minutes(lesson.start_time) - 8 * 60);
+                  const top =
+                    Math.max(0, minutes(lesson.start_time) - 8 * 60) * CALENDAR_MINUTE_SCALE;
                   const height = Math.max(
                     44,
-                    minutes(lesson.end_time) - minutes(lesson.start_time),
+                    (minutes(lesson.end_time) - minutes(lesson.start_time)) * CALENDAR_MINUTE_SCALE,
                   );
                   const width = dayLessons.length > 1 ? 92 / dayLessons.length : 94;
                   return (
