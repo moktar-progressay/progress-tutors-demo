@@ -34,6 +34,7 @@ import { Avatar, avatarTone, Empty, PageHeader, Pill } from "@/components/kit";
 import { FormDialog, SelectField, TextAreaField, TextField } from "@/components/form-kit";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Slider } from "@/components/ui/slider";
 import {
   Dialog,
   DialogContent,
@@ -48,6 +49,8 @@ import {
   hhmm,
   initialsOf,
   type ClassRow,
+  type Site,
+  type TutorRow,
   useTable,
   useDeleteRow,
   useUpdateRow,
@@ -91,15 +94,20 @@ const BLANK = {
   session_rate: "",
   price_per_session: "",
   notes: "",
+  card_colour: "pink",
 };
 
-const COLOURS = [
-  "border-pink-800 bg-pink-600 text-white",
-  "border-blue-800 bg-blue-600 text-white",
-  "border-emerald-800 bg-emerald-600 text-white",
-  "border-amber-600 bg-amber-400 text-amber-950",
-  "border-violet-800 bg-violet-600 text-white",
-];
+const CARD_COLOURS = {
+  pink: "border-pink-800 bg-pink-600 text-white",
+  blue: "border-blue-800 bg-blue-600 text-white",
+  green: "border-emerald-800 bg-emerald-600 text-white",
+  amber: "border-amber-600 bg-amber-400 text-amber-950",
+  violet: "border-violet-800 bg-violet-600 text-white",
+  teal: "border-teal-800 bg-teal-600 text-white",
+} as const;
+
+type CardColour = keyof typeof CARD_COLOURS;
+const CARD_COLOUR_NAMES = Object.keys(CARD_COLOURS) as CardColour[];
 
 const HOURS = Array.from({ length: 13 }, (_, index) => index + 8);
 const CALENDAR_HOUR_HEIGHT = 100;
@@ -124,6 +132,23 @@ function subjectLabel(value: string | null | undefined) {
     .trim()
     .toLocaleLowerCase("en-GB")
     .replace(/(^|[\s/-])\p{L}/gu, (character) => character.toLocaleUpperCase("en-GB"));
+}
+
+function stableHash(value: string) {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
+  }
+  return hash;
+}
+
+function compareLessons(a: ClassRow, b: ClassRow) {
+  return (
+    minutes(a.start_time) - minutes(b.start_time) ||
+    minutes(a.end_time) - minutes(b.end_time) ||
+    a.name.localeCompare(b.name, "en-GB") ||
+    a.id.localeCompare(b.id)
+  );
 }
 
 function lessonRunsOn(lesson: ClassRow, date: Date) {
@@ -199,22 +224,24 @@ function SchedulePage() {
 
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
-    return (lessons.data ?? []).filter((lesson) => {
-      const tutor = (tutors.data ?? []).find((item) => item.id === lesson.tutor_id);
-      const haystack = [lesson.name, lesson.subject, lesson.level, fullName(tutor)]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-      return (
-        lesson.active &&
-        (!query || haystack.includes(query)) &&
-        (tutorId === "all" ||
-          (tutorId === "unassigned" ? !lesson.tutor_id : lesson.tutor_id === tutorId)) &&
-        (siteId === "all" || lesson.site_id === siteId) &&
-        (formatFilter === "all" || lesson.delivery_mode === formatFilter) &&
-        (subjectFilter === "all" || subjectLabel(lesson.subject) === subjectFilter)
-      );
-    });
+    return (lessons.data ?? [])
+      .filter((lesson) => {
+        const tutor = (tutors.data ?? []).find((item) => item.id === lesson.tutor_id);
+        const haystack = [lesson.name, lesson.subject, lesson.level, fullName(tutor)]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        return (
+          lesson.active &&
+          (!query || haystack.includes(query)) &&
+          (tutorId === "all" ||
+            (tutorId === "unassigned" ? !lesson.tutor_id : lesson.tutor_id === tutorId)) &&
+          (siteId === "all" || lesson.site_id === siteId) &&
+          (formatFilter === "all" || lesson.delivery_mode === formatFilter) &&
+          (subjectFilter === "all" || subjectLabel(lesson.subject) === subjectFilter)
+        );
+      })
+      .sort(compareLessons);
   }, [formatFilter, lessons.data, search, siteId, subjectFilter, tutorId, tutors.data]);
 
   const subjects = Array.from(
@@ -252,11 +279,11 @@ function SchedulePage() {
     return (students.data ?? []).filter((student) => ids.has(student.id));
   };
   const colourFor = (lesson: ClassRow) => {
-    const index = Math.max(
-      0,
-      (tutors.data ?? []).findIndex((item) => item.id === lesson.tutor_id),
-    );
-    return COLOURS[index % COLOURS.length];
+    if (lesson.card_colour && lesson.card_colour in CARD_COLOURS)
+      return CARD_COLOURS[lesson.card_colour as CardColour];
+    const index = stableHash(lesson.tutor_id ?? lesson.id) % CARD_COLOUR_NAMES.length;
+    const fallbackColour = CARD_COLOUR_NAMES[index % CARD_COLOUR_NAMES.length] ?? "pink";
+    return CARD_COLOURS[fallbackColour];
   };
 
   function openNew(date = selectedDate) {
@@ -290,6 +317,7 @@ function SchedulePage() {
       session_rate: lesson.session_rate === null ? "" : String(lesson.session_rate),
       price_per_session: lesson.price_per_session === null ? "" : String(lesson.price_per_session),
       notes: lesson.notes ?? "",
+      card_colour: lesson.card_colour ?? "pink",
     });
     setSelectedStudentIds([]);
     setShowMore(true);
@@ -319,6 +347,7 @@ function SchedulePage() {
       session_rate: lesson.session_rate === null ? "" : String(lesson.session_rate),
       price_per_session: lesson.price_per_session === null ? "" : String(lesson.price_per_session),
       notes: lesson.notes ?? "",
+      card_colour: lesson.card_colour ?? "pink",
     });
     setQuickEditing(true);
   }
@@ -347,6 +376,9 @@ function SchedulePage() {
           site_id: form.delivery_mode === "online" ? null : form.site_id || null,
           online_url: form.delivery_mode === "online" ? form.online_url.trim() || null : null,
           capacity: Number(form.capacity) || 0,
+          subject: subjectLabel(form.subject) || null,
+          venue_name: form.delivery_mode === "online" ? null : form.venue_name.trim() || null,
+          card_colour: form.card_colour,
         },
       });
       setDetail(updated);
@@ -469,6 +501,7 @@ function SchedulePage() {
       session_rate: lesson.session_rate === null ? "" : String(lesson.session_rate),
       price_per_session: lesson.price_per_session === null ? "" : String(lesson.price_per_session),
       notes: lesson.notes ?? "",
+      card_colour: lesson.card_colour ?? "pink",
     });
     setSelectedStudentIds(
       (enrolments.data ?? [])
@@ -504,6 +537,7 @@ function SchedulePage() {
         session_rate: form.session_rate ? Number(form.session_rate) : null,
         price_per_session: form.price_per_session ? Number(form.price_per_session) : null,
         notes: form.notes.trim() || null,
+        card_colour: form.card_colour,
       };
       const created = editingId ? null : await createLesson.mutateAsync(values);
       if (editingId) await updateLesson.mutateAsync({ id: editingId, values });
@@ -957,7 +991,7 @@ function SchedulePage() {
                 </DialogDescription>
               </DialogHeader>
               {quickEditing ? (
-                <div className="grid gap-3 sm:grid-cols-2">
+                <div className="grid gap-3">
                   <TextField
                     full
                     required
@@ -965,66 +999,67 @@ function SchedulePage() {
                     value={form.name}
                     onChange={(name) => setForm({ ...form, name })}
                   />
-                  <TextField
-                    label="Date"
-                    type="date"
-                    value={form.date}
-                    onChange={(date) => setForm({ ...form, date })}
+                  <div className="grid grid-cols-2 gap-3">
+                    <TextField
+                      label="Date"
+                      type="date"
+                      value={form.date}
+                      onChange={(date) => setForm({ ...form, date })}
+                    />
+                    <SelectField
+                      label="Delivery"
+                      value={form.delivery_mode}
+                      onChange={(delivery_mode) => setForm({ ...form, delivery_mode })}
+                      options={[
+                        { value: "in_person", label: "Face-to-face" },
+                        { value: "online", label: "Online" },
+                        { value: "hybrid", label: "Hybrid" },
+                      ]}
+                    />
+                  </div>
+                  <TimeRangePicker
+                    start={form.start_time}
+                    end={form.end_time}
+                    onChange={(start_time, end_time) => setForm({ ...form, start_time, end_time })}
                   />
-                  <SelectField
-                    label="Tutor"
+                  <TutorPicker
                     value={form.tutor_id}
                     onChange={(tutor_id) => setForm({ ...form, tutor_id })}
-                    options={[
-                      { value: "", label: "Tutor not assigned" },
-                      ...(tutors.data ?? []).map((item) => ({
-                        value: item.id,
-                        label: fullName(item),
-                      })),
-                    ]}
+                    tutors={tutors.data ?? []}
                   />
-                  <TextField
-                    label="Start time"
-                    type="time"
-                    value={form.start_time}
-                    onChange={(start_time) => setForm({ ...form, start_time })}
-                  />
-                  <TextField
-                    label="End time"
-                    type="time"
-                    value={form.end_time}
-                    onChange={(end_time) => setForm({ ...form, end_time })}
-                  />
-                  <SelectField
-                    label="Delivery"
-                    value={form.delivery_mode}
-                    onChange={(delivery_mode) => setForm({ ...form, delivery_mode })}
-                    options={[
-                      { value: "in_person", label: "Face-to-face" },
-                      { value: "online", label: "Online" },
-                      { value: "hybrid", label: "Hybrid" },
-                    ]}
+                  <SubjectPicker
+                    value={form.subject}
+                    onChange={(subject) => setForm({ ...form, subject })}
+                    options={Array.from(
+                      new Set([
+                        "English",
+                        "Maths",
+                        "Science",
+                        ...subjects,
+                        subjectLabel(form.subject),
+                      ]),
+                    ).filter(Boolean)}
                   />
                   {form.delivery_mode === "online" ? (
                     <TextField
+                      full
                       label="Meeting link"
                       value={form.online_url}
                       onChange={(online_url) => setForm({ ...form, online_url })}
                     />
                   ) : (
-                    <SelectField
-                      label="Venue"
+                    <LocationPicker
                       value={form.site_id}
                       onChange={(site_id) => setForm({ ...form, site_id })}
-                      options={[
-                        { value: "", label: "Venue to confirm" },
-                        ...(sites.data ?? []).map((item) => ({
-                          value: item.id,
-                          label: item.name,
-                        })),
-                      ]}
+                      customValue={form.venue_name}
+                      onCustomChange={(venue_name) => setForm({ ...form, venue_name })}
+                      sites={sites.data ?? []}
                     />
                   )}
+                  <CardColourPicker
+                    value={form.card_colour}
+                    onChange={(card_colour) => setForm({ ...form, card_colour })}
+                  />
                   <TextField
                     label="Capacity"
                     type="number"
@@ -1167,19 +1202,10 @@ function SchedulePage() {
             { value: "weekly", label: "Every week" },
           ]}
         />
-        <TextField
-          label="Start time"
-          type="time"
-          value={form.start_time}
-          onChange={(start_time) => setForm({ ...form, start_time })}
-          required
-        />
-        <TextField
-          label="End time"
-          type="time"
-          value={form.end_time}
-          onChange={(end_time) => setForm({ ...form, end_time })}
-          required
+        <TimeRangePicker
+          start={form.start_time}
+          end={form.end_time}
+          onChange={(start_time, end_time) => setForm({ ...form, start_time, end_time })}
         />
         <SelectField
           label="Delivery"
@@ -1191,14 +1217,10 @@ function SchedulePage() {
             { value: "hybrid", label: "Hybrid" },
           ]}
         />
-        <SelectField
-          label="Tutor"
+        <TutorPicker
           value={form.tutor_id}
           onChange={(tutor_id) => setForm({ ...form, tutor_id })}
-          options={[
-            { value: "", label: "Tutor not assigned" },
-            ...(tutors.data ?? []).map((item) => ({ value: item.id, label: fullName(item) })),
-          ]}
+          tutors={tutors.data ?? []}
         />
         <SubjectPicker
           value={form.subject}
@@ -1208,14 +1230,12 @@ function SchedulePage() {
           ).filter(Boolean)}
         />
         {form.delivery_mode !== "online" ? (
-          <SelectField
-            label="Venue"
+          <LocationPicker
             value={form.site_id}
             onChange={(site_id) => setForm({ ...form, site_id })}
-            options={[
-              { value: "", label: "Choose venue" },
-              ...(sites.data ?? []).map((item) => ({ value: item.id, label: item.name })),
-            ]}
+            customValue={form.venue_name}
+            onCustomChange={(venue_name) => setForm({ ...form, venue_name })}
+            sites={sites.data ?? []}
           />
         ) : (
           <TextField
@@ -1224,6 +1244,10 @@ function SchedulePage() {
             onChange={(online_url) => setForm({ ...form, online_url })}
           />
         )}
+        <CardColourPicker
+          value={form.card_colour}
+          onChange={(card_colour) => setForm({ ...form, card_colour })}
+        />
         <div className="sm:col-span-2">
           <Button type="button" variant="ghost" onClick={() => setShowMore(!showMore)}>
             {showMore ? "Show fewer options" : "See more options"}
@@ -1354,6 +1378,203 @@ function SchedulePage() {
   );
 }
 
+function TimeRangePicker({
+  start,
+  end,
+  onChange,
+}: {
+  start: string;
+  end: string;
+  onChange: (start: string, end: string) => void;
+}) {
+  return (
+    <div className="min-w-0 space-y-3 rounded-xl border border-border bg-muted/30 p-3 sm:col-span-2">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-xs font-semibold text-muted-foreground">Time</p>
+        <div className="flex items-center gap-2 text-sm font-extrabold">
+          <span className="rounded-lg bg-card px-2.5 py-1.5 shadow-sm">{hhmm(start)}</span>
+          <span className="text-muted-foreground">to</span>
+          <span className="rounded-lg bg-card px-2.5 py-1.5 shadow-sm">{hhmm(end)}</span>
+        </div>
+      </div>
+      <Slider
+        min={6 * 60}
+        max={22 * 60}
+        step={15}
+        minStepsBetweenThumbs={1}
+        value={[minutes(start), minutes(end)]}
+        onValueChange={([nextStart, nextEnd]) => {
+          if (nextStart === undefined || nextEnd === undefined) return;
+          onChange(clock(nextStart), clock(nextEnd));
+        }}
+      />
+      <div className="flex justify-between text-[10px] font-semibold text-muted-foreground">
+        <span>06:00</span>
+        <span>Drag start and end</span>
+        <span>22:00</span>
+      </div>
+    </div>
+  );
+}
+
+function TutorPicker({
+  value,
+  onChange,
+  tutors,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  tutors: TutorRow[];
+}) {
+  return (
+    <div className="min-w-0 space-y-2 sm:col-span-2">
+      <p className="text-xs font-semibold text-muted-foreground">Tutor</p>
+      <div className="overflow-x-auto pb-1">
+        <div className="flex w-max min-w-full gap-2">
+          <button
+            type="button"
+            onClick={() => onChange("")}
+            className={cn(
+              "shrink-0 rounded-full border bg-card px-3 py-2 text-xs font-bold",
+              !value ? "border-primary ring-2 ring-primary/20" : "border-border",
+            )}
+          >
+            Tutor needed
+          </button>
+          {tutors.map((tutor) => (
+            <button
+              key={tutor.id}
+              type="button"
+              aria-label={`Choose ${fullName(tutor)}`}
+              onClick={() => onChange(tutor.id)}
+              className={cn(
+                "flex shrink-0 items-center gap-2 rounded-full border bg-card py-1.5 pl-1.5 pr-3 text-xs font-bold",
+                value === tutor.id ? "border-primary ring-2 ring-primary/20" : "border-border",
+              )}
+            >
+              <Avatar
+                initials={initialsOf(fullName(tutor))}
+                tone={avatarTone(fullName(tutor))}
+                size="sm"
+              />
+              {tutor.first_name}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LocationPicker({
+  value,
+  onChange,
+  customValue,
+  onCustomChange,
+  sites,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  customValue: string;
+  onCustomChange: (value: string) => void;
+  sites: Site[];
+}) {
+  const [adding, setAdding] = useState(Boolean(customValue));
+  const colours = [
+    "bg-tile-blue text-tile-blue-ink",
+    "bg-tile-green text-tile-green-ink",
+    "bg-tile-amber text-tile-amber-ink",
+    "bg-tile-purple text-tile-purple-ink",
+    "bg-tile-pink text-tile-pink-ink",
+  ];
+  return (
+    <div className="min-w-0 space-y-2 sm:col-span-2">
+      <p className="text-xs font-semibold text-muted-foreground">Location</p>
+      <div className="overflow-x-auto pb-1">
+        <div className="flex w-max min-w-full gap-2">
+          {sites.map((site, index) => (
+            <button
+              key={site.id}
+              type="button"
+              onClick={() => {
+                onChange(site.id);
+                onCustomChange("");
+                setAdding(false);
+              }}
+              className={cn(
+                "flex shrink-0 items-center gap-1.5 rounded-full px-3 py-2 text-xs font-bold ring-offset-2",
+                colours[index % colours.length],
+                value === site.id && "ring-2 ring-primary",
+              )}
+            >
+              <MapPin className="h-3.5 w-3.5" /> {site.name}
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={() => {
+              onChange("");
+              setAdding(true);
+            }}
+            className={cn(
+              "shrink-0 rounded-full border border-dashed border-primary px-3 py-2 text-xs font-bold text-primary",
+              !value && customValue && "ring-2 ring-primary",
+            )}
+          >
+            + Other location
+          </button>
+        </div>
+      </div>
+      {adding ? (
+        <Input
+          value={customValue}
+          onChange={(event) => onCustomChange(event.target.value)}
+          placeholder="Type the location"
+          className="h-10 rounded-xl"
+          autoFocus={!customValue}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function CardColourPicker({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: CardColour) => void;
+}) {
+  const swatches: Record<CardColour, string> = {
+    pink: "bg-pink-600",
+    blue: "bg-blue-600",
+    green: "bg-emerald-600",
+    amber: "bg-amber-400",
+    violet: "bg-violet-600",
+    teal: "bg-teal-600",
+  };
+  return (
+    <div className="min-w-0 space-y-2 sm:col-span-2">
+      <p className="text-xs font-semibold text-muted-foreground">Card colour</p>
+      <div className="flex items-center gap-3">
+        {CARD_COLOUR_NAMES.map((colour) => (
+          <button
+            key={colour}
+            type="button"
+            aria-label={`${colour} lesson card`}
+            onClick={() => onChange(colour)}
+            className={cn(
+              "h-8 w-8 rounded-full border-2 border-background shadow-sm ring-offset-2",
+              swatches[colour],
+              value === colour && "ring-2 ring-foreground",
+            )}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function SubjectPicker({
   value,
   onChange,
@@ -1384,28 +1605,30 @@ function SubjectPicker({
   return (
     <div className="min-w-0 space-y-2 sm:col-span-2">
       <p className="text-xs font-semibold text-muted-foreground">Subject</p>
-      <div className="flex flex-wrap gap-2">
-        {options.map((option, index) => (
+      <div className="overflow-x-auto pb-1">
+        <div className="flex w-max min-w-full gap-2">
+          {options.map((option, index) => (
+            <button
+              key={option}
+              type="button"
+              onClick={() => onChange(option)}
+              className={cn(
+                "shrink-0 rounded-full px-3 py-2 text-xs font-bold ring-offset-2 transition",
+                colours[index % colours.length],
+                selected === option && "ring-2 ring-primary",
+              )}
+            >
+              {option}
+            </button>
+          ))}
           <button
-            key={option}
             type="button"
-            onClick={() => onChange(option)}
-            className={cn(
-              "rounded-full px-3 py-2 text-xs font-bold ring-offset-2 transition",
-              colours[index % colours.length],
-              selected === option && "ring-2 ring-primary",
-            )}
+            onClick={() => setAdding((current) => !current)}
+            className="shrink-0 rounded-full border border-dashed border-primary px-3 py-2 text-xs font-bold text-primary"
           >
-            {option}
+            + Add subject
           </button>
-        ))}
-        <button
-          type="button"
-          onClick={() => setAdding((current) => !current)}
-          className="rounded-full border border-dashed border-primary px-3 py-2 text-xs font-bold text-primary"
-        >
-          + Add subject
-        </button>
+        </div>
       </div>
       {adding ? (
         <div className="flex min-w-0 gap-2">
