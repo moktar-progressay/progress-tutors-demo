@@ -34,7 +34,11 @@ export function FormDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className={wide ? "max-h-[90vh] overflow-y-auto sm:max-w-3xl" : "max-h-[90vh] overflow-y-auto"}>
+      <DialogContent
+        className={
+          wide ? "max-h-[90vh] overflow-y-auto sm:max-w-3xl" : "max-h-[90vh] overflow-y-auto"
+        }
+      >
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           {description ? <DialogDescription>{description}</DialogDescription> : null}
@@ -79,7 +83,9 @@ export function TextField({
   full?: boolean;
 }) {
   return (
-    <label className={`flex flex-col gap-1 text-xs font-semibold text-muted-foreground ${full ? "sm:col-span-2" : ""}`}>
+    <label
+      className={`flex min-w-0 max-w-full flex-col gap-1 text-xs font-semibold text-muted-foreground ${full ? "sm:col-span-2" : ""}`}
+    >
       {label}
       <Input
         type={type}
@@ -87,7 +93,7 @@ export function TextField({
         required={required ?? false}
         placeholder={placeholder ?? ""}
         onChange={(e) => onChange(e.target.value)}
-        className="h-10 rounded-xl"
+        className="h-10 min-w-0 max-w-full rounded-xl"
       />
     </label>
   );
@@ -105,13 +111,13 @@ export function TextAreaField({
   placeholder?: string;
 }) {
   return (
-    <label className="flex flex-col gap-1 text-xs font-semibold text-muted-foreground sm:col-span-2">
+    <label className="flex min-w-0 max-w-full flex-col gap-1 text-xs font-semibold text-muted-foreground sm:col-span-2">
       {label}
       <Textarea
         value={value}
         placeholder={placeholder ?? ""}
         onChange={(e) => onChange(e.target.value)}
-        className="min-h-20 rounded-xl"
+        className="min-h-20 min-w-0 max-w-full rounded-xl"
       />
     </label>
   );
@@ -131,12 +137,14 @@ export function SelectField({
   full?: boolean;
 }) {
   return (
-    <label className={`flex flex-col gap-1 text-xs font-semibold text-muted-foreground ${full ? "sm:col-span-2" : ""}`}>
+    <label
+      className={`flex min-w-0 max-w-full flex-col gap-1 text-xs font-semibold text-muted-foreground ${full ? "sm:col-span-2" : ""}`}
+    >
       {label}
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="h-10 rounded-xl border border-border bg-card px-3 text-sm font-medium text-foreground focus:ring-2 focus:ring-ring focus:outline-none"
+        className="h-10 w-full min-w-0 max-w-full truncate rounded-xl border border-border bg-card px-3 text-sm font-medium text-foreground focus:ring-2 focus:ring-ring focus:outline-none"
       >
         {options.map((o) => (
           <option key={o.value} value={o.value}>
