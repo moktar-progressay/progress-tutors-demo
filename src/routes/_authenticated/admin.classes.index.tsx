@@ -592,44 +592,69 @@ function SchedulePage() {
   }
 
   function downloadTeachingReport() {
-    if (filtered.length === 0) {
+    const reportDates =
+      view === "day"
+        ? [anchor]
+        : view === "week"
+          ? weekDays
+          : view === "month"
+            ? eachDayOfInterval({ start: startOfMonth(anchor), end: endOfMonth(anchor) })
+            : [];
+    const visibleLessons =
+      view === "list"
+        ? filtered.map((lesson) => ({ lesson, date: null as Date | null }))
+        : reportDates.flatMap((date) =>
+            filtered
+              .filter((lesson) => lessonRunsOn(lesson, date))
+              .map((lesson) => ({ lesson, date })),
+          );
+
+    if (visibleLessons.length === 0) {
       toast.error("There are no lessons in this view to include in the report");
       return;
     }
 
-    const groups = new Map<string, ClassRow[]>();
-    [...filtered]
+    const groups = new Map<string, typeof visibleLessons>();
+    [...visibleLessons]
       .sort(
         (a, b) =>
-          fullName(tutorFor(a)).localeCompare(fullName(tutorFor(b)), "en-GB") ||
-          compareLessons(a, b),
+          fullName(tutorFor(a.lesson)).localeCompare(fullName(tutorFor(b.lesson)), "en-GB") ||
+          (a.date?.getTime() ?? 0) - (b.date?.getTime() ?? 0) ||
+          compareLessons(a.lesson, b.lesson),
       )
-      .forEach((lesson) => {
+      .forEach((occurrence) => {
+        const lesson = occurrence.lesson;
         const tutorName = tutorFor(lesson) ? fullName(tutorFor(lesson)) : "Tutor not assigned";
-        groups.set(tutorName, [...(groups.get(tutorName) ?? []), lesson]);
+        groups.set(tutorName, [...(groups.get(tutorName) ?? []), occurrence]);
       });
 
     const report: TeachingReportGroup[] = Array.from(groups, ([tutor, tutorLessons]) => ({
       tutor,
-      lessons: tutorLessons.map((lesson) => {
+      tutorInitials: initialsOf(tutor),
+      lessons: tutorLessons.map(({ lesson, date: occurrenceDate }) => {
         const enrolledStudents = studentsFor(lesson)
-          .map(fullName)
-          .sort((a, b) => a.localeCompare(b, "en-GB"));
+          .map((student) => ({
+            name: fullName(student),
+            initials: initialsOf(fullName(student)),
+          }))
+          .sort((a, b) => a.name.localeCompare(b.name, "en-GB"));
         const venue =
           lesson.delivery_mode === "online"
             ? lesson.online_url
               ? `Online - ${lesson.online_url}`
               : "Online"
             : (siteFor(lesson)?.name ?? lesson.venue_name ?? "Venue to be confirmed");
-        const date = lesson.start_date
+        const firstDate = lesson.start_date
           ? format(parseISO(lesson.start_date), "d MMM yyyy")
           : "Date to be confirmed";
-        const when =
-          lesson.recurrence === "once"
-            ? `${date}, ${hhmm(lesson.start_time)}-${hhmm(lesson.end_time)}`
-            : `Every ${lesson.weekday}, ${hhmm(lesson.start_time)}-${hhmm(lesson.end_time)} from ${date}`;
+        const when = occurrenceDate
+          ? `${format(occurrenceDate, "EEE d MMM yyyy")}, ${hhmm(lesson.start_time)}-${hhmm(lesson.end_time)}`
+          : lesson.recurrence === "once"
+            ? `${firstDate}, ${hhmm(lesson.start_time)}-${hhmm(lesson.end_time)}`
+            : `Every ${lesson.weekday}, ${hhmm(lesson.start_time)}-${hhmm(lesson.end_time)} from ${firstDate}`;
         return {
           name: lesson.name,
+          subject: subjectLabel(lesson.subject) || "Subject not set",
           when,
           where: venue,
           delivery:
@@ -638,17 +663,35 @@ function SchedulePage() {
               : lesson.delivery_mode === "hybrid"
                 ? "Hybrid"
                 : "Online",
-          capacity: `${enrolledStudents.length}/${lesson.capacity} seats filled`,
-          students: enrolledStudents.length ? enrolledStudents.join(", ") : "No students assigned",
+          capacity: lesson.capacity,
+          enrolled: enrolledStudents.length,
+          students: enrolledStudents,
+          colour: (lesson.card_colour as CardColour | null) ?? "pink",
         };
       }),
     }));
 
-    const pdf = createTeachingReportPdf(report);
+    const filterLabels = [
+      tutorId !== "all"
+        ? tutorId === "unassigned"
+          ? "Unassigned tutors"
+          : fullName((tutors.data ?? []).find((tutor) => tutor.id === tutorId))
+        : null,
+      siteId !== "all" ? (sites.data ?? []).find((site) => site.id === siteId)?.name : null,
+      formatFilter !== "all"
+        ? formatFilter === "in_person"
+          ? "Face-to-face"
+          : subjectLabel(formatFilter)
+        : null,
+      subjectFilter !== "all" ? subjectFilter : null,
+      search.trim() ? `Search: ${search.trim()}` : null,
+    ].filter(Boolean) as string[];
+    const scope = `${dateTitle}${filterLabels.length ? ` | ${filterLabels.join(" | ")}` : ""}`;
+    const pdf = createTeachingReportPdf(report, scope);
     const url = URL.createObjectURL(pdf);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `ProgressTutors-teaching-report-${format(new Date(), "yyyy-MM-dd")}.pdf`;
+    link.download = `ProgressTutors-teaching-report-${selectedDate}.pdf`;
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -1842,23 +1885,18 @@ function SubjectPicker({
 
 type TeachingReportGroup = {
   tutor: string;
+  tutorInitials: string;
   lessons: {
     name: string;
+    subject: string;
     when: string;
     where: string;
     delivery: string;
-    capacity: string;
-    students: string;
+    capacity: number;
+    enrolled: number;
+    students: { name: string; initials: string }[];
+    colour: CardColour;
   }[];
-};
-
-type PdfLine = {
-  text: string;
-  size: number;
-  bold?: boolean;
-  indent?: number;
-  colour?: [number, number, number];
-  spaceAfter?: number;
 };
 
 function pdfText(value: string) {
@@ -1872,29 +1910,12 @@ function pdfText(value: string) {
     .replace(/([\\()])/g, "\\$1");
 }
 
-function wrapReportText(value: string, maxLength: number) {
-  const words = pdfText(value).split(/\s+/).filter(Boolean);
-  const lines: string[] = [];
-  let current = "";
-
-  for (const originalWord of words) {
-    const chunks = originalWord.match(new RegExp(`.{1,${maxLength}}`, "g")) ?? [originalWord];
-    for (const word of chunks) {
-      const candidate = current ? `${current} ${word}` : word;
-      if (candidate.length > maxLength && current) {
-        lines.push(current);
-        current = word;
-      } else {
-        current = candidate;
-      }
-    }
-  }
-  if (current) lines.push(current);
-  return lines.length ? lines : [""];
+function truncatePdfText(value: string, maxLength: number) {
+  const clean = pdfText(value);
+  return clean.length > maxLength ? `${clean.slice(0, Math.max(1, maxLength - 3))}...` : clean;
 }
 
-function createTeachingReportPdf(groups: TeachingReportGroup[]) {
-  const lines: PdfLine[] = [];
+function createTeachingReportPdf(groups: TeachingReportGroup[], scope: string) {
   const lessonCount = groups.reduce((total, group) => total + group.lessons.length, 0);
   const tutorCount = groups.filter((group) => group.tutor !== "Tutor not assigned").length;
   const generated = new Date().toLocaleString("en-GB", {
@@ -1905,65 +1926,170 @@ function createTeachingReportPdf(groups: TeachingReportGroup[]) {
     minute: "2-digit",
   });
 
-  lines.push(
-    { text: `Prepared ${generated}`, size: 9, colour: [0.38, 0.4, 0.46], spaceAfter: 8 },
-    {
-      text: `${lessonCount} lesson${lessonCount === 1 ? "" : "s"} across ${tutorCount} assigned tutor${tutorCount === 1 ? "" : "s"}`,
-      size: 11,
-      bold: true,
-      spaceAfter: 12,
-    },
-  );
-
-  groups.forEach((group) => {
-    lines.push({
-      text: group.tutor,
-      size: 15,
-      bold: true,
-      colour: [0.91, 0.18, 0.43],
-      spaceAfter: 5,
-    });
-    group.lessons.forEach((lesson) => {
-      lines.push(
-        { text: lesson.name, size: 11, bold: true, indent: 8, spaceAfter: 2 },
-        { text: `When: ${lesson.when}`, size: 9, indent: 8 },
-        { text: `Where: ${lesson.where}`, size: 9, indent: 8 },
-        { text: `Delivery: ${lesson.delivery} | ${lesson.capacity}`, size: 9, indent: 8 },
-        { text: `Students: ${lesson.students}`, size: 9, indent: 8, spaceAfter: 9 },
-      );
-    });
-  });
-
   const pages: string[][] = [[]];
   let pageIndex = 0;
-  let y = 758;
+  let y = 724;
+
+  const palette: Record<CardColour, [number, number, number]> = {
+    pink: [0.91, 0.18, 0.43],
+    blue: [0.15, 0.39, 0.92],
+    green: [0.04, 0.64, 0.43],
+    amber: [0.96, 0.62, 0.04],
+    violet: [0.49, 0.23, 0.93],
+    teal: [0.02, 0.58, 0.58],
+  };
+
+  const command = (value: string) => pages[pageIndex]?.push(value);
+  const textAt = (
+    value: string,
+    x: number,
+    textY: number,
+    size: number,
+    options?: { bold?: boolean; colour?: [number, number, number] },
+  ) => {
+    const [red, green, blue] = options?.colour ?? [0.08, 0.09, 0.12];
+    command(
+      `BT /${options?.bold ? "F2" : "F1"} ${size} Tf ${red} ${green} ${blue} rg ${x} ${textY} Td (${pdfText(value)}) Tj ET`,
+    );
+  };
+  const roundedRect = (
+    x: number,
+    rectY: number,
+    width: number,
+    height: number,
+    radius: number,
+    fill: [number, number, number],
+    stroke?: [number, number, number],
+  ) => {
+    const right = x + width;
+    const top = rectY + height;
+    const curve = radius * 0.5523;
+    const path = [
+      `${x + radius} ${rectY} m`,
+      `${right - radius} ${rectY} l`,
+      `${right - radius + curve} ${rectY} ${right} ${rectY + radius - curve} ${right} ${rectY + radius} c`,
+      `${right} ${top - radius} l`,
+      `${right} ${top - radius + curve} ${right - radius + curve} ${top} ${right - radius} ${top} c`,
+      `${x + radius} ${top} l`,
+      `${x + radius - curve} ${top} ${x} ${top - radius + curve} ${x} ${top - radius} c`,
+      `${x} ${rectY + radius} l`,
+      `${x} ${rectY + radius - curve} ${x + radius - curve} ${rectY} ${x + radius} ${rectY} c h`,
+    ].join(" ");
+    command(
+      `${fill.join(" ")} rg ${stroke ? `${stroke.join(" ")} RG 0.8 w ` : ""}${path} ${stroke ? "B" : "f"}`,
+    );
+  };
+  const circle = (x: number, centreY: number, radius: number, fill: [number, number, number]) => {
+    const curve = radius * 0.5523;
+    command(
+      `${fill.join(" ")} rg ${x + radius} ${centreY} m ${x + radius} ${centreY + curve} ${x + curve} ${centreY + radius} ${x} ${centreY + radius} c ${x - curve} ${centreY + radius} ${x - radius} ${centreY + curve} ${x - radius} ${centreY} c ${x - radius} ${centreY - curve} ${x - curve} ${centreY - radius} ${x} ${centreY - radius} c ${x + curve} ${centreY - radius} ${x + radius} ${centreY - curve} ${x + radius} ${centreY} c f`,
+    );
+  };
 
   const startPage = () => {
-    const page = pages[pageIndex] ?? [];
-    page.push("0.91 0.18 0.43 rg 0 790 595 52 re f");
-    page.push("BT /F2 20 Tf 1 1 1 rg 48 807 Td (ProgressTutors teaching report) Tj ET");
-    y = 758;
+    command("0.97 0.98 1 rg 0 0 595 842 re f");
+    command("0.91 0.18 0.43 rg 0 766 595 76 re f");
+    textAt("ProgressTutors", 42, 811, 20, { bold: true, colour: [1, 1, 1] });
+    textAt("Teaching schedule", 42, 787, 12, { bold: true, colour: [1, 1, 1] });
+    roundedRect(42, 735, 511, 21, 10, [1, 1, 1]);
+    textAt(truncatePdfText(scope, 82), 52, 742, 9, {
+      bold: true,
+      colour: [0.35, 0.12, 0.23],
+    });
+    textAt(
+      `${lessonCount} lesson${lessonCount === 1 ? "" : "s"} | ${tutorCount} tutor${tutorCount === 1 ? "" : "s"} | Prepared ${generated}`,
+      42,
+      716,
+      8,
+      { colour: [0.38, 0.4, 0.46] },
+    );
+    y = 694;
   };
+
+  const ensureSpace = (height: number) => {
+    if (y - height >= 54) return false;
+    pageIndex += 1;
+    pages.push([]);
+    startPage();
+    return true;
+  };
+
+  const tutorHeader = (group: TeachingReportGroup) => {
+    ensureSpace(42);
+    roundedRect(42, y - 34, 511, 34, 13, [1, 0.93, 0.96]);
+    circle(62, y - 17, 11, [0.91, 0.18, 0.43]);
+    textAt(truncatePdfText(group.tutorInitials, 3), 54, y - 21, 8, {
+      bold: true,
+      colour: [1, 1, 1],
+    });
+    textAt(truncatePdfText(group.tutor, 52), 82, y - 21, 13, {
+      bold: true,
+      colour: [0.35, 0.12, 0.23],
+    });
+    y -= 44;
+  };
+
   startPage();
 
-  lines.forEach((line) => {
-    const indent = line.indent ?? 0;
-    const maxLength = Math.max(28, Math.floor((490 - indent) / (line.size * 0.52)));
-    const wrapped = wrapReportText(line.text, maxLength);
-    wrapped.forEach((textLine) => {
-      const height = line.size + 4;
-      if (y - height < 54) {
-        pageIndex += 1;
-        pages.push([]);
-        startPage();
+  groups.forEach((group) => {
+    tutorHeader(group);
+    group.lessons.forEach((lesson) => {
+      const studentRows = Math.max(1, Math.ceil(lesson.students.length / 2));
+      const cardHeight = 114 + studentRows * 22;
+      if (ensureSpace(cardHeight + 10)) tutorHeader(group);
+      const cardBottom = y - cardHeight;
+      const colour = palette[lesson.colour] ?? palette.pink;
+      roundedRect(42, cardBottom, 511, cardHeight, 14, [1, 1, 1], [0.86, 0.88, 0.92]);
+      roundedRect(42, cardBottom, 7, cardHeight, 3, colour);
+      textAt(truncatePdfText(lesson.name, 58), 62, y - 23, 12, { bold: true });
+
+      const subjectWidth = Math.min(145, 18 + lesson.subject.length * 5.2);
+      roundedRect(62, y - 50, subjectWidth, 19, 9, [0.93, 0.95, 1]);
+      textAt(truncatePdfText(lesson.subject, 24), 71, y - 44, 8, {
+        bold: true,
+        colour,
+      });
+      textAt(truncatePdfText(lesson.when, 52), 62, y - 69, 9, { bold: true });
+      textAt(`${lesson.delivery} | ${truncatePdfText(lesson.where, 49)}`, 62, y - 86, 8, {
+        colour: [0.38, 0.4, 0.46],
+      });
+
+      const filled = lesson.capacity > 0 ? Math.min(1, lesson.enrolled / lesson.capacity) : 0;
+      textAt(`${lesson.enrolled}/${lesson.capacity} seats`, 431, y - 44, 9, {
+        bold: true,
+        colour,
+      });
+      roundedRect(431, y - 60, 96, 6, 3, [0.9, 0.91, 0.94]);
+      if (filled > 0) roundedRect(431, y - 60, Math.max(6, 96 * filled), 6, 3, colour);
+
+      textAt("Students", 62, y - 108, 8, {
+        bold: true,
+        colour: [0.38, 0.4, 0.46],
+      });
+      if (lesson.students.length === 0) {
+        textAt("No students assigned", 62, y - 127, 9, { colour: [0.5, 0.52, 0.58] });
+      } else {
+        lesson.students.forEach((student, index) => {
+          const column = index % 2;
+          const row = Math.floor(index / 2);
+          const itemX = 69 + column * 238;
+          const itemY = y - 126 - row * 22;
+          const avatarColours: [number, number, number][] = [
+            [0.91, 0.18, 0.43],
+            [0.15, 0.39, 0.92],
+            [0.04, 0.64, 0.43],
+            [0.49, 0.23, 0.93],
+          ];
+          circle(itemX, itemY + 3, 8, avatarColours[stableHash(student.name) % 4] ?? colour);
+          textAt(truncatePdfText(student.initials, 3), itemX - 5, itemY, 6, {
+            bold: true,
+            colour: [1, 1, 1],
+          });
+          textAt(truncatePdfText(student.name, 29), itemX + 14, itemY, 8, { bold: true });
+        });
       }
-      const [red, green, blue] = line.colour ?? [0.08, 0.09, 0.12];
-      pages[pageIndex]?.push(
-        `BT /${line.bold ? "F2" : "F1"} ${line.size} Tf ${red} ${green} ${blue} rg ${48 + indent} ${y} Td (${textLine}) Tj ET`,
-      );
-      y -= height;
+      y -= cardHeight + 10;
     });
-    y -= line.spaceAfter ?? 0;
   });
 
   pages.forEach((page, index) => {
