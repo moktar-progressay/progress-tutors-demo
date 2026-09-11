@@ -1,14 +1,7 @@
 import { toast } from "sonner";
 import { Empty, Pill } from "@/components/kit";
 import { Button } from "@/components/ui/button";
-import {
-  fullName,
-  num,
-  useTable,
-  useUpdateRow,
-  useUpsert,
-  type SessionRow,
-} from "@/lib/db";
+import { fullName, num, useTable, useUpdateRow, useUpsert, type SessionRow } from "@/lib/db";
 
 const STATUSES = ["present", "late", "absent", "excused"] as const;
 export type AttendanceStatus = (typeof STATUSES)[number];
@@ -51,12 +44,13 @@ export function SessionRegister({ session }: { session: SessionRow }) {
       (a) => a.session_id === session.id && a.student_id === studentId,
     );
     if (existing) await updateAttendance.mutateAsync({ id: existing.id, values: { status } });
-    else await markAttendance.mutateAsync({ session_id: session.id, student_id: studentId, status });
+    else
+      await markAttendance.mutateAsync({ session_id: session.id, student_id: studentId, status });
   }
 
   async function doSignIn() {
     if (!session.tutor_id) {
-      toast.error("Assign a tutor to this session first");
+      toast.error("Assign a tutor to this lesson first");
       return;
     }
     await signIn.mutateAsync({ session_id: session.id, tutor_id: session.tutor_id });
@@ -76,7 +70,7 @@ export function SessionRegister({ session }: { session: SessionRow }) {
       amount: rate,
       status: "eligible",
     });
-    toast.success("Earning created from the agreed session amount");
+    toast.success("Earning created from the agreed lesson amount");
   }
 
   return (
@@ -111,7 +105,10 @@ export function SessionRegister({ session }: { session: SessionRow }) {
                 (a) => a.session_id === session.id && a.student_id === s!.id,
               );
               return (
-                <li key={s!.id} className="flex flex-wrap items-center gap-2 rounded-xl border border-border px-4 py-2">
+                <li
+                  key={s!.id}
+                  className="flex flex-wrap items-center gap-2 rounded-xl border border-border px-4 py-2"
+                >
                   <span className="min-w-0 flex-1 text-sm font-semibold">{fullName(s!)}</span>
                   {STATUSES.map((st) => (
                     <button
@@ -119,7 +116,9 @@ export function SessionRegister({ session }: { session: SessionRow }) {
                       type="button"
                       onClick={() => setStatus(s!.id, st)}
                       className={`rounded-full px-3 py-1 text-xs font-bold capitalize ${
-                        record?.status === st ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+                        record?.status === st
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-muted text-muted-foreground"
                       }`}
                     >
                       {st}
@@ -135,15 +134,21 @@ export function SessionRegister({ session }: { session: SessionRow }) {
 
       <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-border px-4 py-3">
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-bold">Pay for this session</p>
+          <p className="text-sm font-bold">Pay for this lesson</p>
           <p className="text-xs text-muted-foreground">
-            Needs a tutor sign-in and a submitted lesson review. Uses the agreed session amount, not a timer.
+            Needs a tutor sign-in and a submitted lesson review. Uses the agreed lesson amount, not
+            a timer.
           </p>
         </div>
         {earning ? (
           <Pill tone="green">Earning created</Pill>
         ) : (
-          <Button size="sm" variant="secondary" disabled={!mySignIn || !review} onClick={makeEligible}>
+          <Button
+            size="sm"
+            variant="secondary"
+            disabled={!mySignIn || !review}
+            onClick={makeEligible}
+          >
             Create earning
           </Button>
         )}
