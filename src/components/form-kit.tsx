@@ -51,11 +51,16 @@ export function FormDialog({
           }}
         >
           {children}
-          <DialogFooter className="sm:col-span-2">
-            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
+          <DialogFooter className="flex-row gap-2 sm:col-span-2">
+            <Button
+              type="button"
+              variant="ghost"
+              className="min-w-0 flex-1 sm:flex-none"
+              onClick={() => onOpenChange(false)}
+            >
               Cancel
             </Button>
-            <Button type="submit" disabled={busy}>
+            <Button type="submit" className="min-w-0 flex-1 sm:flex-none" disabled={busy}>
               {busy ? "Saving…" : submitLabel}
             </Button>
           </DialogFooter>
