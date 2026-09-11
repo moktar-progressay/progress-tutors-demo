@@ -20,6 +20,7 @@ import {
   ChevronRight,
   Clock3,
   Copy,
+  Download,
   Filter,
   MapPin,
   Pencil,
@@ -580,6 +581,71 @@ function SchedulePage() {
     setSelectedDate(format(next, "yyyy-MM-dd"));
   }
 
+  function downloadTeachingReport() {
+    if (filtered.length === 0) {
+      toast.error("There are no lessons in this view to include in the report");
+      return;
+    }
+
+    const groups = new Map<string, ClassRow[]>();
+    [...filtered]
+      .sort(
+        (a, b) =>
+          fullName(tutorFor(a)).localeCompare(fullName(tutorFor(b)), "en-GB") ||
+          compareLessons(a, b),
+      )
+      .forEach((lesson) => {
+        const tutorName = tutorFor(lesson) ? fullName(tutorFor(lesson)) : "Tutor not assigned";
+        groups.set(tutorName, [...(groups.get(tutorName) ?? []), lesson]);
+      });
+
+    const report: TeachingReportGroup[] = Array.from(groups, ([tutor, tutorLessons]) => ({
+      tutor,
+      lessons: tutorLessons.map((lesson) => {
+        const enrolledStudents = studentsFor(lesson)
+          .map(fullName)
+          .sort((a, b) => a.localeCompare(b, "en-GB"));
+        const venue =
+          lesson.delivery_mode === "online"
+            ? lesson.online_url
+              ? `Online - ${lesson.online_url}`
+              : "Online"
+            : (siteFor(lesson)?.name ?? lesson.venue_name ?? "Venue to be confirmed");
+        const date = lesson.start_date
+          ? format(parseISO(lesson.start_date), "d MMM yyyy")
+          : "Date to be confirmed";
+        const when =
+          lesson.recurrence === "once"
+            ? `${date}, ${hhmm(lesson.start_time)}-${hhmm(lesson.end_time)}`
+            : `Every ${lesson.weekday}, ${hhmm(lesson.start_time)}-${hhmm(lesson.end_time)} from ${date}`;
+        return {
+          name: lesson.name,
+          when,
+          where: venue,
+          delivery:
+            lesson.delivery_mode === "in_person"
+              ? "Face-to-face"
+              : lesson.delivery_mode === "hybrid"
+                ? "Hybrid"
+                : "Online",
+          capacity: `${enrolledStudents.length}/${lesson.capacity} seats filled`,
+          students: enrolledStudents.length ? enrolledStudents.join(", ") : "No students assigned",
+        };
+      }),
+    }));
+
+    const pdf = createTeachingReportPdf(report);
+    const url = URL.createObjectURL(pdf);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `ProgressTutors-teaching-report-${format(new Date(), "yyyy-MM-dd")}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
+    toast.success("Teaching report downloaded");
+  }
+
   const dateTitle =
     view === "day"
       ? format(anchor, "EEE d MMM yyyy")
@@ -792,6 +858,9 @@ function SchedulePage() {
           </div>
           <Button size="sm" variant="secondary" onClick={() => setFiltersOpen(true)}>
             <Filter className="h-4 w-4" /> Filters{activeFilterCount ? ` ${activeFilterCount}` : ""}
+          </Button>
+          <Button size="sm" variant="secondary" onClick={downloadTeachingReport}>
+            <Download className="h-4 w-4" /> Report
           </Button>
         </div>
         <div className="relative">
@@ -1665,4 +1734,169 @@ function SubjectPicker({
       ) : null}
     </div>
   );
+}
+
+type TeachingReportGroup = {
+  tutor: string;
+  lessons: {
+    name: string;
+    when: string;
+    where: string;
+    delivery: string;
+    capacity: string;
+    students: string;
+  }[];
+};
+
+type PdfLine = {
+  text: string;
+  size: number;
+  bold?: boolean;
+  indent?: number;
+  colour?: [number, number, number];
+  spaceAfter?: number;
+};
+
+function pdfText(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[–—]/g, "-")
+    .replace(/[‘’]/g, "'")
+    .replace(/[“”]/g, '"')
+    .replace(/[^\x20-\x7E]/g, "?")
+    .replace(/([\\()])/g, "\\$1");
+}
+
+function wrapReportText(value: string, maxLength: number) {
+  const words = pdfText(value).split(/\s+/).filter(Boolean);
+  const lines: string[] = [];
+  let current = "";
+
+  for (const originalWord of words) {
+    const chunks = originalWord.match(new RegExp(`.{1,${maxLength}}`, "g")) ?? [originalWord];
+    for (const word of chunks) {
+      const candidate = current ? `${current} ${word}` : word;
+      if (candidate.length > maxLength && current) {
+        lines.push(current);
+        current = word;
+      } else {
+        current = candidate;
+      }
+    }
+  }
+  if (current) lines.push(current);
+  return lines.length ? lines : [""];
+}
+
+function createTeachingReportPdf(groups: TeachingReportGroup[]) {
+  const lines: PdfLine[] = [];
+  const lessonCount = groups.reduce((total, group) => total + group.lessons.length, 0);
+  const tutorCount = groups.filter((group) => group.tutor !== "Tutor not assigned").length;
+  const generated = new Date().toLocaleString("en-GB", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  lines.push(
+    { text: `Prepared ${generated}`, size: 9, colour: [0.38, 0.4, 0.46], spaceAfter: 8 },
+    {
+      text: `${lessonCount} lesson${lessonCount === 1 ? "" : "s"} across ${tutorCount} assigned tutor${tutorCount === 1 ? "" : "s"}`,
+      size: 11,
+      bold: true,
+      spaceAfter: 12,
+    },
+  );
+
+  groups.forEach((group) => {
+    lines.push({
+      text: group.tutor,
+      size: 15,
+      bold: true,
+      colour: [0.91, 0.18, 0.43],
+      spaceAfter: 5,
+    });
+    group.lessons.forEach((lesson) => {
+      lines.push(
+        { text: lesson.name, size: 11, bold: true, indent: 8, spaceAfter: 2 },
+        { text: `When: ${lesson.when}`, size: 9, indent: 8 },
+        { text: `Where: ${lesson.where}`, size: 9, indent: 8 },
+        { text: `Delivery: ${lesson.delivery} | ${lesson.capacity}`, size: 9, indent: 8 },
+        { text: `Students: ${lesson.students}`, size: 9, indent: 8, spaceAfter: 9 },
+      );
+    });
+  });
+
+  const pages: string[][] = [[]];
+  let pageIndex = 0;
+  let y = 758;
+
+  const startPage = () => {
+    const page = pages[pageIndex] ?? [];
+    page.push("0.91 0.18 0.43 rg 0 790 595 52 re f");
+    page.push("BT /F2 20 Tf 1 1 1 rg 48 807 Td (ProgressTutors teaching report) Tj ET");
+    y = 758;
+  };
+  startPage();
+
+  lines.forEach((line) => {
+    const indent = line.indent ?? 0;
+    const maxLength = Math.max(28, Math.floor((490 - indent) / (line.size * 0.52)));
+    const wrapped = wrapReportText(line.text, maxLength);
+    wrapped.forEach((textLine) => {
+      const height = line.size + 4;
+      if (y - height < 54) {
+        pageIndex += 1;
+        pages.push([]);
+        startPage();
+      }
+      const [red, green, blue] = line.colour ?? [0.08, 0.09, 0.12];
+      pages[pageIndex]?.push(
+        `BT /${line.bold ? "F2" : "F1"} ${line.size} Tf ${red} ${green} ${blue} rg ${48 + indent} ${y} Td (${textLine}) Tj ET`,
+      );
+      y -= height;
+    });
+    y -= line.spaceAfter ?? 0;
+  });
+
+  pages.forEach((page, index) => {
+    page.push("0.78 0.79 0.82 RG 48 38 m 547 38 l S");
+    page.push(`BT /F1 8 Tf 0.38 0.4 0.46 rg 48 24 Td (Private team timetable) Tj ET`);
+    page.push(`BT /F1 8 Tf 0.38 0.4 0.46 rg 510 24 Td (Page ${index + 1}/${pages.length}) Tj ET`);
+  });
+
+  const objects: string[] = [];
+  const pageReferences = pages.map((_, index) => `${5 + index * 2} 0 R`).join(" ");
+  objects[0] = "<< /Type /Catalog /Pages 2 0 R >>";
+  objects[1] = `<< /Type /Pages /Kids [${pageReferences}] /Count ${pages.length} >>`;
+  objects[2] = "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>";
+  objects[3] =
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>";
+
+  pages.forEach((commands, index) => {
+    const pageId = 5 + index * 2;
+    const contentId = pageId + 1;
+    const stream = commands.join("\n");
+    objects[pageId - 1] =
+      `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ${contentId} 0 R >>`;
+    objects[contentId - 1] = `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`;
+  });
+
+  const encoder = new TextEncoder();
+  let output = "%PDF-1.4\n";
+  const offsets = [0];
+  objects.forEach((object, index) => {
+    offsets[index + 1] = encoder.encode(output).length;
+    output += `${index + 1} 0 obj\n${object}\nendobj\n`;
+  });
+  const xrefOffset = encoder.encode(output).length;
+  output += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  offsets.slice(1).forEach((offset) => {
+    output += `${String(offset).padStart(10, "0")} 00000 n \n`;
+  });
+  output += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
+  return new Blob([output], { type: "application/pdf" });
 }
