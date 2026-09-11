@@ -589,6 +589,8 @@ function SchedulePage() {
 
   const renderCard = (lesson: ClassRow, compact = false) => {
     const tutor = tutorFor(lesson);
+    const enrolled = countFor(lesson);
+    const filled = lesson.capacity > 0 ? Math.min(100, (enrolled / lesson.capacity) * 100) : 0;
     return (
       <button
         key={lesson.id}
@@ -612,17 +614,25 @@ function SchedulePage() {
           {hhmm(lesson.start_time)}–{hhmm(lesson.end_time)}
         </p>
         {!compact ? (
-          <div className="mt-auto flex min-w-0 items-end justify-between gap-1 pt-1">
-            <span className="flex min-w-0 items-center" title={fullName(tutor)}>
-              <Avatar
-                initials={initialsOf(fullName(tutor))}
-                tone={avatarTone(fullName(tutor))}
-                size="sm"
+          <div className="mt-auto min-w-0 pt-1">
+            <div className="mb-1 h-1 overflow-hidden rounded-full bg-black/20">
+              <div
+                className="h-full rounded-full bg-white/90 transition-[width]"
+                style={{ width: `${filled}%` }}
               />
-            </span>
-            <span className="shrink-0 whitespace-nowrap rounded-full bg-black/20 px-1.5 py-0.5 text-[9px] font-extrabold leading-none">
-              {countFor(lesson)}/{lesson.capacity} seats
-            </span>
+            </div>
+            <div className="flex min-w-0 items-end justify-between gap-1">
+              <span className="flex min-w-0 items-center" title={fullName(tutor)}>
+                <Avatar
+                  initials={initialsOf(fullName(tutor))}
+                  tone={avatarTone(fullName(tutor))}
+                  size="sm"
+                />
+              </span>
+              <span className="shrink-0 whitespace-nowrap rounded-full bg-black/20 px-1.5 py-0.5 text-[9px] font-extrabold leading-none">
+                {enrolled}/{lesson.capacity} seats
+              </span>
+            </div>
           </div>
         ) : null}
       </button>
@@ -1080,6 +1090,23 @@ function SchedulePage() {
                   <Pill tone={capacityTone(countFor(detail), detail.capacity)}>
                     {countFor(detail)}/{detail.capacity} students
                   </Pill>
+                  <div className="space-y-1.5" aria-label="Seat capacity">
+                    <div className="h-2.5 overflow-hidden rounded-full bg-muted">
+                      <div
+                        className="h-full rounded-full bg-primary transition-[width]"
+                        style={{
+                          width: `${
+                            detail.capacity > 0
+                              ? Math.min(100, (countFor(detail) / detail.capacity) * 100)
+                              : 0
+                          }%`,
+                        }}
+                      />
+                    </div>
+                    <p className="text-xs font-semibold text-muted-foreground">
+                      {Math.max(0, detail.capacity - countFor(detail))} seats remaining
+                    </p>
+                  </div>
                   <div className="flex items-center gap-3 border-t border-border pt-3">
                     <div className="flex -space-x-2">
                       {studentsFor(detail)
