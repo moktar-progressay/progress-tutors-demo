@@ -23,10 +23,11 @@ import {
   Filter,
   MapPin,
   Pencil,
+  Plus,
   Search,
   Video,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Page } from "@/components/AppShell";
 import { Avatar, avatarTone, Empty, PageHeader, Pill } from "@/components/kit";
@@ -93,11 +94,11 @@ const BLANK = {
 };
 
 const COLOURS = [
-  "border-pink-500 bg-pink-50 text-pink-950",
-  "border-blue-500 bg-blue-50 text-blue-950",
-  "border-emerald-500 bg-emerald-50 text-emerald-950",
-  "border-amber-500 bg-amber-50 text-amber-950",
-  "border-violet-500 bg-violet-50 text-violet-950",
+  "border-pink-800 bg-pink-600 text-white",
+  "border-blue-800 bg-blue-600 text-white",
+  "border-emerald-800 bg-emerald-600 text-white",
+  "border-amber-600 bg-amber-400 text-amber-950",
+  "border-violet-800 bg-violet-600 text-white",
 ];
 
 const HOURS = Array.from({ length: 13 }, (_, index) => index + 8);
@@ -109,6 +110,13 @@ function minutes(time: string | null) {
   if (!time) return 0;
   const [hour, minute] = time.split(":").map(Number);
   return (hour ?? 0) * 60 + (minute ?? 0);
+}
+
+function clock(totalMinutes: number) {
+  const safe = Math.max(0, Math.min(23 * 60 + 59, Math.round(totalMinutes)));
+  const hour = Math.floor(safe / 60);
+  const minute = safe % 60;
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
 }
 
 function subjectLabel(value: string | null | undefined) {
@@ -150,6 +158,18 @@ function SchedulePage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [detail, setDetail] = useState<ClassRow | null>(null);
   const [quickEditing, setQuickEditing] = useState(false);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const dragRef = useRef<{
+    lesson: ClassRow;
+    pointerId: number;
+    pointerType: string;
+    startX: number;
+    startY: number;
+    armed: boolean;
+    moved: boolean;
+  } | null>(null);
+  const dragHoldTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const suppressClickRef = useRef(false);
   const [showMore, setShowMore] = useState(false);
   const [studentSearch, setStudentSearch] = useState("");
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
@@ -337,6 +357,91 @@ function SchedulePage() {
     }
   }
 
+  function beginDrag(event: React.PointerEvent<HTMLDivElement>, lesson: ClassRow) {
+    if (event.button !== 0) return;
+    if (dragHoldTimerRef.current) clearTimeout(dragHoldTimerRef.current);
+    dragRef.current = {
+      lesson,
+      pointerId: event.pointerId,
+      pointerType: event.pointerType,
+      startX: event.clientX,
+      startY: event.clientY,
+      armed: event.pointerType !== "touch",
+      moved: false,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+    if (event.pointerType === "touch") {
+      dragHoldTimerRef.current = setTimeout(() => {
+        if (!dragRef.current || dragRef.current.pointerId !== event.pointerId) return;
+        dragRef.current.armed = true;
+        setDraggingId(lesson.id);
+        navigator.vibrate?.(30);
+      }, 500);
+    }
+  }
+
+  function continueDrag(event: React.PointerEvent<HTMLDivElement>) {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    const distance = Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY);
+    if (!drag.armed) {
+      if (distance > 10) {
+        if (dragHoldTimerRef.current) clearTimeout(dragHoldTimerRef.current);
+        dragHoldTimerRef.current = null;
+        dragRef.current = null;
+      }
+      return;
+    }
+    if (distance < 8) return;
+    drag.moved = true;
+    setDraggingId(drag.lesson.id);
+    event.preventDefault();
+  }
+
+  async function finishDrag(event: React.PointerEvent<HTMLDivElement>) {
+    const drag = dragRef.current;
+    if (dragHoldTimerRef.current) clearTimeout(dragHoldTimerRef.current);
+    dragHoldTimerRef.current = null;
+    dragRef.current = null;
+    setDraggingId(null);
+    if (!drag || drag.pointerId !== event.pointerId || !drag.moved) return;
+    suppressClickRef.current = true;
+
+    const target = document
+      .elementsFromPoint(event.clientX, event.clientY)
+      .find(
+        (element): element is HTMLElement =>
+          element instanceof HTMLElement && element.hasAttribute("data-calendar-date"),
+      );
+    const targetDate = target?.dataset["calendarDate"];
+    if (!target || !targetDate) return;
+
+    const rect = target.getBoundingClientRect();
+    const duration = Math.max(15, minutes(drag.lesson.end_time) - minutes(drag.lesson.start_time));
+    const rawStart = 8 * 60 + (event.clientY - rect.top) / CALENDAR_MINUTE_SCALE;
+    const snappedStart = Math.round(rawStart / 15) * 15;
+    const start = Math.max(8 * 60, Math.min(21 * 60 - duration, snappedStart));
+    const end = start + duration;
+
+    try {
+      await updateLesson.mutateAsync({
+        id: drag.lesson.id,
+        values: {
+          start_date: targetDate,
+          weekday: format(parseISO(targetDate), "EEEE"),
+          start_time: clock(start),
+          end_time: clock(end),
+        },
+      });
+      setSelectedDate(targetDate);
+      toast.success(
+        `${drag.lesson.recurrence === "weekly" ? "Weekly lesson" : "Lesson"} moved to ${clock(start)}`,
+      );
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not move the lesson");
+    }
+  }
+
   function editLesson(lesson: ClassRow) {
     setEditingId(lesson.id);
     setForm({
@@ -450,15 +555,22 @@ function SchedulePage() {
       <button
         key={lesson.id}
         type="button"
-        onClick={() => setDetail(lesson)}
+        onClick={(event) => {
+          if (suppressClickRef.current) {
+            suppressClickRef.current = false;
+            event.preventDefault();
+            return;
+          }
+          setDetail(lesson);
+        }}
         className={cn(
-          "h-full w-full overflow-hidden rounded-lg border-l-4 p-2 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md",
+          "h-full w-full overflow-hidden rounded-md border border-l-4 border-white/30 p-2 text-left shadow-sm transition hover:brightness-95",
           colourFor(lesson),
           compact ? "text-[10px]" : "text-xs",
         )}
       >
-        <p className="font-extrabold">{lesson.name}</p>
-        <p className="mt-0.5 opacity-75">
+        <p className="line-clamp-2 font-extrabold leading-tight">{lesson.name}</p>
+        <p className="mt-0.5 font-semibold opacity-90">
           {hhmm(lesson.start_time)}–{hhmm(lesson.end_time)}
         </p>
         {!compact ? (
@@ -541,6 +653,7 @@ function SchedulePage() {
             <div
               key={day.toISOString()}
               className="relative border-l border-border"
+              data-calendar-date={format(day, "yyyy-MM-dd")}
               style={{
                 height: CALENDAR_HEIGHT,
                 backgroundImage: `repeating-linear-gradient(to bottom, transparent 0, transparent ${CALENDAR_HOUR_HEIGHT - 1}px, var(--border) ${CALENDAR_HOUR_HEIGHT}px)`,
@@ -549,19 +662,47 @@ function SchedulePage() {
             >
               {filtered
                 .filter((lesson) => lessonRunsOn(lesson, day))
-                .map((lesson, index, dayLessons) => {
+                .map((lesson, _index, dayLessons) => {
                   const top =
                     Math.max(0, minutes(lesson.start_time) - 8 * 60) * CALENDAR_MINUTE_SCALE;
                   const height = Math.max(
                     44,
                     (minutes(lesson.end_time) - minutes(lesson.start_time)) * CALENDAR_MINUTE_SCALE,
                   );
-                  const width = dayLessons.length > 1 ? 92 / dayLessons.length : 94;
+                  const overlappingLessons = dayLessons.filter(
+                    (candidate) =>
+                      minutes(candidate.start_time) < minutes(lesson.end_time) &&
+                      minutes(candidate.end_time) > minutes(lesson.start_time),
+                  );
+                  const overlapIndex = overlappingLessons.findIndex(
+                    (candidate) => candidate.id === lesson.id,
+                  );
+                  const width = overlappingLessons.length > 1 ? 94 / overlappingLessons.length : 94;
                   return (
                     <div
                       key={lesson.id}
-                      className="absolute px-1"
-                      style={{ top, height, left: `${3 + index * width}%`, width: `${width}%` }}
+                      className={cn(
+                        "absolute touch-none px-1 transition-opacity",
+                        draggingId === lesson.id && "z-20 cursor-grabbing opacity-60",
+                        draggingId !== lesson.id && "cursor-grab",
+                      )}
+                      style={{
+                        top,
+                        height,
+                        left: `${3 + Math.max(0, overlapIndex) * width}%`,
+                        width: `${width}%`,
+                      }}
+                      title="Drag to reschedule. On mobile, press and hold first."
+                      onContextMenu={(event) => event.preventDefault()}
+                      onPointerDown={(event) => beginDrag(event, lesson)}
+                      onPointerMove={continueDrag}
+                      onPointerUp={finishDrag}
+                      onPointerCancel={() => {
+                        if (dragHoldTimerRef.current) clearTimeout(dragHoldTimerRef.current);
+                        dragHoldTimerRef.current = null;
+                        dragRef.current = null;
+                        setDraggingId(null);
+                      }}
                     >
                       {renderCard(lesson, days.length > 3)}
                     </div>
@@ -579,7 +720,11 @@ function SchedulePage() {
       <PageHeader
         title="Schedule"
         subtitle="One calendar for every online and face-to-face lesson."
-        actions={<Button onClick={() => openNew()}>Add lesson</Button>}
+        actions={
+          <Button className="hidden sm:inline-flex" onClick={() => openNew()}>
+            Add lesson
+          </Button>
+        }
       />
 
       <section className="space-y-3 rounded-2xl border border-border bg-card p-3 sm:p-4">
@@ -710,6 +855,15 @@ function SchedulePage() {
           </section>
         )
       ) : null}
+
+      <Button
+        size="icon"
+        onClick={() => openNew()}
+        aria-label="Add lesson"
+        className="fixed right-4 bottom-24 z-30 h-14 w-14 rounded-2xl shadow-xl sm:hidden"
+      >
+        <Plus className="h-6 w-6" />
+      </Button>
 
       <Dialog open={filtersOpen} onOpenChange={setFiltersOpen}>
         <DialogContent className="sm:max-w-md">
