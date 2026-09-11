@@ -1,11 +1,10 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { ArrowLeft, Search } from "lucide-react";
+import { ArrowLeft, Check, Filter, Pencil, Plus, Search } from "lucide-react";
 import { toast } from "sonner";
 import { Page } from "@/components/AppShell";
 import { Avatar, avatarTone, Empty, GoProgressLink, PageHeader, Pill } from "@/components/kit";
 import { FormDialog, SelectField, TextAreaField, TextField } from "@/components/form-kit";
-import { SessionRegister } from "@/components/session-register";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -37,16 +36,7 @@ export const Route = createFileRoute("/_authenticated/admin/classes/$id")({
   component: ClassProfile,
 });
 
-const TABS = [
-  "Overview",
-  "Students",
-  "Registers",
-  "Attendance",
-  "Lesson Reviews",
-  "Payments",
-  "GoProgress",
-  "Notes",
-] as const;
+const TABS = ["Overview", "Students", "Lesson Reviews", "Payments", "GoProgress", "Notes"] as const;
 type Tab = (typeof TABS)[number];
 
 function ClassProfile() {
@@ -68,16 +58,15 @@ function ClassProfile() {
   const deleteClass = useDeleteRow("classes");
   const addEnrolment = useUpsert("class_enrolments");
   const updateEnrolment = useUpdateRow("class_enrolments");
-  const addSession = useUpsert("sessions");
 
   const [tab, setTab] = useState<Tab>("Students");
+  const [lessonPickerOpen, setLessonPickerOpen] = useState(false);
+  const [lessonSearch, setLessonSearch] = useState("");
   const [enrolOpen, setEnrolOpen] = useState(false);
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
   const [studentSearch, setStudentSearch] = useState("");
   const [studentSchool, setStudentSchool] = useState("all");
   const [studentYear, setStudentYear] = useState("all");
-  const [sessionOpen, setSessionOpen] = useState(false);
-  const [sessionDate, setSessionDate] = useState(DEMO_DATE);
   const [editOpen, setEditOpen] = useState(false);
   const [edit, setEdit] = useState({
     name: "",
@@ -120,12 +109,6 @@ function ClassProfile() {
   const classSessions = (sessions.data ?? []).filter((item) => item.class_id === c.id);
   const sessionIds = new Set(classSessions.map((item) => item.id));
   const classAttendance = (attendance.data ?? []).filter((item) => sessionIds.has(item.session_id));
-  const present = classAttendance.filter(
-    (item) => item.status === "present" || item.status === "late",
-  ).length;
-  const attendanceRate = classAttendance.length
-    ? Math.round((present / classAttendance.length) * 100)
-    : null;
   const classReviews = (reviews.data ?? []).filter((item) => sessionIds.has(item.session_id));
   const classSubscriptions = (subscriptions.data ?? []).filter((item) => item.class_id === c.id);
   const subscriptionIds = new Set(classSubscriptions.map((item) => item.id));
@@ -173,20 +156,25 @@ function ClassProfile() {
     const classSite = (sites.data ?? []).find((value) => value.id === item.site_id);
     return `${item.name} · ${classSite?.name ?? "Venue TBC"} · ${item.weekday ?? "Day TBC"} ${hhmm(item.start_time)}–${hhmm(item.end_time)}`;
   };
+  const filteredLessons = visibleClasses.filter((lesson) => {
+    const query = lessonSearch.trim().toLowerCase();
+    return !query || classLabel(lesson).toLowerCase().includes(query);
+  });
   const parentFor = (studentIdValue: string) => {
     const links = (parentStudents.data ?? []).filter((item) => item.student_id === studentIdValue);
     const link = links.find((item) => item.is_primary) ?? links[0];
     return (parents.data ?? []).find((item) => item.id === link?.parent_id);
   };
-  const rateFor = (studentIdValue: string) => {
+  const attendanceFor = (studentIdValue: string) => {
     const records = classAttendance.filter((item) => item.student_id === studentIdValue);
-    return records.length
-      ? Math.round(
-          (records.filter((item) => item.status === "present" || item.status === "late").length /
-            records.length) *
-            100,
-        )
-      : null;
+    const attended = records.filter(
+      (item) => item.status === "present" || item.status === "late",
+    ).length;
+    return {
+      attended,
+      total: records.length,
+      rate: records.length ? Math.round((attended / records.length) * 100) : null,
+    };
   };
   const openEdit = () => {
     setEdit({
@@ -207,47 +195,41 @@ function ClassProfile() {
 
   return (
     <Page className="space-y-5">
-      <PageHeader
-        breadcrumb={
-          <Link
-            to="/admin/classes"
-            className="inline-flex items-center gap-1 font-bold hover:text-primary"
+      <section className="rounded-2xl border border-border bg-card p-3 shadow-sm sm:p-4">
+        <div className="flex min-w-0 items-center gap-2">
+          <Button asChild size="icon" variant="ghost" aria-label="Back to schedule">
+            <Link to="/admin/classes">
+              <ArrowLeft className="h-5 w-5" />
+            </Link>
+          </Button>
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+              Lesson
+            </p>
+            <h1 className="truncate text-base font-extrabold sm:text-xl">{c.name}</h1>
+          </div>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => {
+              setLessonSearch("");
+              setLessonPickerOpen(true);
+            }}
           >
-            <ArrowLeft className="h-3.5 w-3.5" /> Schedule
-          </Link>
-        }
-        title="Lesson"
-        subtitle="Manage one lesson and switch without losing your place."
-        actions={<Button onClick={openEdit}>Edit lesson</Button>}
-      />
-
-      <div className="grid min-w-0 gap-3 rounded-2xl border border-border bg-card p-4 sm:grid-cols-[minmax(0,1fr)_auto]">
-        <SelectField
-          label="Choose lesson"
-          value={c.id}
-          onChange={(classId) => navigate({ to: "/admin/classes/$id", params: { id: classId } })}
-          options={(visibleClasses.some((item) => item.id === c.id)
-            ? visibleClasses
-            : [c, ...visibleClasses]
-          ).map((item) => ({ value: item.id, label: classLabel(item) }))}
-        />
-        <Button
-          variant="secondary"
-          className="w-full self-end sm:w-auto"
-          onClick={() => navigate({ to: "/admin/classes" })}
-        >
-          Full schedule
-        </Button>
-      </div>
+            <Filter className="h-4 w-4" />
+            <span className="hidden sm:inline">Change lesson</span>
+          </Button>
+          <Button size="icon" onClick={openEdit} aria-label="Edit lesson">
+            <Pencil className="h-4 w-4" />
+          </Button>
+        </div>
+      </section>
 
       <section className="overflow-hidden rounded-3xl border border-border bg-card">
         <div className="p-5 sm:p-7">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="min-w-0 break-words text-2xl font-extrabold sm:text-3xl">
-                  {c.name}
-                </h1>
                 <Pill tone={c.active ? "green" : "neutral"}>
                   {c.active ? "Active" : "Archived"}
                 </Pill>
@@ -276,7 +258,7 @@ function ClassProfile() {
           <div className="mt-6 grid grid-cols-2 divide-x divide-y divide-border border-t border-border sm:grid-cols-4 sm:divide-y-0">
             {[
               ["Students", `${activeRoster.length}/${c.capacity}`],
-              ["Attendance", attendanceRate === null ? "No data" : `${attendanceRate}%`],
+              ["Spaces", String(Math.max(c.capacity - activeRoster.length, 0))],
               ["Lessons held", String(classSessions.length)],
               ["Per lesson", money(c.price_per_session)],
             ].map(([label, value]) => (
@@ -322,8 +304,8 @@ function ClassProfile() {
                 <p className="text-sm text-muted-foreground">
                   {hhmm(nextSession.start_time)}–{hhmm(nextSession.end_time)}
                 </p>
-                <Button className="mt-4 w-full" onClick={() => setTab("Registers")}>
-                  Start register
+                <Button className="mt-4 w-full" onClick={() => setTab("Students")}>
+                  View students
                 </Button>
               </>
             ) : (
@@ -352,7 +334,7 @@ function ClassProfile() {
                 setEnrolOpen(true);
               }}
             >
-              Add students
+              <Plus className="h-4 w-4" /> Add students
             </Button>
           </div>
           {roster.length === 0 ? (
@@ -360,142 +342,146 @@ function ClassProfile() {
               <Empty>No students enrolled yet.</Empty>
             </div>
           ) : (
-            <div className="mt-4 overflow-x-auto">
-              <table className="w-full min-w-[680px] text-left text-sm">
-                <thead className="border-b border-border text-xs text-muted-foreground">
-                  <tr>
-                    <th className="px-3 py-3">Student</th>
-                    <th className="px-3 py-3">Year</th>
-                    <th className="px-3 py-3">Parent</th>
-                    <th className="px-3 py-3">Attendance</th>
-                    <th className="px-3 py-3">Status</th>
-                    <th className="px-3 py-3 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {roster.map((item) => {
-                    const student = (students.data ?? []).find(
-                      (value) => value.id === item.student_id,
-                    );
-                    const rate = rateFor(item.student_id);
-                    return (
-                      <tr key={item.id}>
-                        <td className="px-3 py-3">
-                          <span className="flex items-center gap-2">
-                            <Avatar
-                              initials={initialsOf(fullName(student))}
-                              tone={avatarTone(fullName(student))}
-                              size="sm"
-                            />
-                            <Link
-                              to="/admin/students/$id"
-                              params={{ id: item.student_id }}
-                              className="font-bold hover:text-primary"
-                            >
-                              {fullName(student)}
-                            </Link>
-                          </span>
-                        </td>
-                        <td className="px-3 py-3 text-muted-foreground">
-                          {student?.year_group ?? "—"}
-                        </td>
-                        <td className="px-3 py-3 text-muted-foreground">
-                          {fullName(parentFor(item.student_id))}
-                        </td>
-                        <td className="px-3 py-3 font-semibold">
-                          {rate === null ? "No data" : `${rate}%`}
-                        </td>
-                        <td className="px-3 py-3">
-                          <Pill tone={item.status === "active" ? "green" : "neutral"}>
-                            {item.status}
-                          </Pill>
-                        </td>
-                        <td className="px-3 py-3 text-right">
-                          {item.status === "active" ? (
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() =>
-                                updateEnrolment.mutate(
-                                  { id: item.id, values: { status: "left" } },
-                                  { onSuccess: () => toast.success("Student removed from lesson") },
-                                )
-                              }
-                            >
-                              Remove
-                            </Button>
-                          ) : null}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
-      ) : null}
-
-      {tab === "Registers" ? (
-        <section className="rounded-2xl border border-border bg-card p-4 sm:p-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-bold">Lesson registers</h2>
-              <p className="text-xs text-muted-foreground">Registers and tutor sign-ins</p>
-            </div>
-            <Button onClick={() => setSessionOpen(true)}>Add lesson date</Button>
-          </div>
-          {classSessions.length === 0 ? (
             <div className="mt-4">
-              <Empty>No lesson registers yet.</Empty>
-            </div>
-          ) : (
-            <div className="mt-4 space-y-4">
-              {classSessions.map((item) => (
-                <div key={item.id} className="rounded-2xl border border-border p-4">
-                  <div className="mb-3 flex flex-wrap items-center gap-2">
-                    <p className="text-sm font-bold">{prettyDate(item.session_date)}</p>
-                    <Pill tone={item.status === "completed" ? "green" : "blue"}>{item.status}</Pill>
-                    <span className="text-xs text-muted-foreground">
-                      {hhmm(item.start_time)}–{hhmm(item.end_time)}
-                    </span>
-                  </div>
-                  <SessionRegister session={item} />
-                </div>
-              ))}
+              <div className="space-y-3 md:hidden">
+                {roster.map((item) => {
+                  const student = (students.data ?? []).find(
+                    (value) => value.id === item.student_id,
+                  );
+                  const studentAttendance = attendanceFor(item.student_id);
+                  return (
+                    <article key={item.id} className="rounded-2xl border border-border p-3">
+                      <div className="flex items-start gap-3">
+                        <Avatar
+                          initials={initialsOf(fullName(student))}
+                          tone={avatarTone(fullName(student))}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <Link
+                            to="/admin/students/$id"
+                            params={{ id: item.student_id }}
+                            className="block truncate text-sm font-bold hover:text-primary"
+                          >
+                            {fullName(student)}
+                          </Link>
+                          <p className="truncate text-xs text-muted-foreground">
+                            {[student?.year_group, fullName(parentFor(item.student_id))]
+                              .filter((value) => value && value !== "—")
+                              .join(" · ") || "No additional details"}
+                          </p>
+                        </div>
+                        <Pill tone={item.status === "active" ? "green" : "neutral"}>
+                          {item.status}
+                        </Pill>
+                      </div>
+                      <div className="mt-3 flex items-center justify-between gap-3 border-t border-border pt-3">
+                        <div>
+                          <p className="text-[11px] font-semibold text-muted-foreground">
+                            Attendance
+                          </p>
+                          <p className="text-sm font-bold">
+                            {studentAttendance.rate === null
+                              ? "Not recorded yet"
+                              : `${studentAttendance.attended}/${studentAttendance.total} lessons (${studentAttendance.rate}%)`}
+                          </p>
+                        </div>
+                        {item.status === "active" ? (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() =>
+                              updateEnrolment.mutate(
+                                { id: item.id, values: { status: "left" } },
+                                { onSuccess: () => toast.success("Student removed from lesson") },
+                              )
+                            }
+                          >
+                            Remove
+                          </Button>
+                        ) : null}
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+              <div className="hidden overflow-x-auto md:block">
+                <table className="w-full min-w-[680px] text-left text-sm">
+                  <thead className="border-b border-border text-xs text-muted-foreground">
+                    <tr>
+                      <th className="px-3 py-3">Student</th>
+                      <th className="px-3 py-3">Year</th>
+                      <th className="px-3 py-3">Parent</th>
+                      <th className="px-3 py-3">Attendance</th>
+                      <th className="px-3 py-3">Status</th>
+                      <th className="px-3 py-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {roster.map((item) => {
+                      const student = (students.data ?? []).find(
+                        (value) => value.id === item.student_id,
+                      );
+                      const studentAttendance = attendanceFor(item.student_id);
+                      return (
+                        <tr key={item.id}>
+                          <td className="px-3 py-3">
+                            <span className="flex items-center gap-2">
+                              <Avatar
+                                initials={initialsOf(fullName(student))}
+                                tone={avatarTone(fullName(student))}
+                                size="sm"
+                              />
+                              <Link
+                                to="/admin/students/$id"
+                                params={{ id: item.student_id }}
+                                className="font-bold hover:text-primary"
+                              >
+                                {fullName(student)}
+                              </Link>
+                            </span>
+                          </td>
+                          <td className="px-3 py-3 text-muted-foreground">
+                            {student?.year_group ?? "—"}
+                          </td>
+                          <td className="px-3 py-3 text-muted-foreground">
+                            {fullName(parentFor(item.student_id))}
+                          </td>
+                          <td className="px-3 py-3 font-semibold">
+                            {studentAttendance.rate === null
+                              ? "Not recorded yet"
+                              : `${studentAttendance.attended}/${studentAttendance.total} attended (${studentAttendance.rate}%)`}
+                          </td>
+                          <td className="px-3 py-3">
+                            <Pill tone={item.status === "active" ? "green" : "neutral"}>
+                              {item.status}
+                            </Pill>
+                          </td>
+                          <td className="px-3 py-3 text-right">
+                            {item.status === "active" ? (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() =>
+                                  updateEnrolment.mutate(
+                                    { id: item.id, values: { status: "left" } },
+                                    {
+                                      onSuccess: () => toast.success("Student removed from lesson"),
+                                    },
+                                  )
+                                }
+                              >
+                                Remove
+                              </Button>
+                            ) : null}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
-        </section>
-      ) : null}
-
-      {tab === "Attendance" ? (
-        <section className="rounded-2xl border border-border bg-card p-5">
-          <h2 className="text-lg font-bold">Attendance</h2>
-          <p className="text-xs text-muted-foreground">{classAttendance.length} records</p>
-          <div className="mt-4 divide-y divide-border">
-            {activeRoster.map((item) => {
-              const student = (students.data ?? []).find((value) => value.id === item.student_id);
-              const rate = rateFor(item.student_id);
-              return (
-                <div key={item.id} className="flex items-center justify-between gap-3 py-3">
-                  <span className="font-semibold">{fullName(student)}</span>
-                  <Pill
-                    tone={
-                      rate === null
-                        ? "neutral"
-                        : rate >= 90
-                          ? "green"
-                          : rate >= 75
-                            ? "amber"
-                            : "pink"
-                    }
-                  >
-                    {rate === null ? "No data" : `${rate}%`}
-                  </Pill>
-                </div>
-              );
-            })}
-          </div>
         </section>
       ) : null}
 
@@ -610,6 +596,48 @@ function ClassProfile() {
           }}
         />
       ) : null}
+
+      <Dialog open={lessonPickerOpen} onOpenChange={setLessonPickerOpen}>
+        <DialogContent className="flex max-h-[82vh] flex-col p-0 sm:max-w-xl">
+          <DialogHeader className="px-5 pt-5 text-left">
+            <DialogTitle>Change lesson</DialogTitle>
+            <DialogDescription>Search and choose another lesson.</DialogDescription>
+          </DialogHeader>
+          <div className="relative px-5">
+            <Search className="absolute left-8 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              autoFocus
+              value={lessonSearch}
+              onChange={(event) => setLessonSearch(event.target.value)}
+              placeholder="Search lesson, venue, day or time"
+              className="h-11 rounded-xl pl-10"
+            />
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-5">
+            <div className="mt-3 divide-y divide-border rounded-xl border border-border">
+              {filteredLessons.map((lesson) => (
+                <button
+                  key={lesson.id}
+                  type="button"
+                  onClick={() => {
+                    setLessonPickerOpen(false);
+                    navigate({ to: "/admin/classes/$id", params: { id: lesson.id } });
+                  }}
+                  className="flex w-full items-center gap-3 px-3 py-3 text-left hover:bg-muted"
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-bold">{lesson.name}</span>
+                    <span className="block truncate text-xs text-muted-foreground">
+                      {classLabel(lesson)}
+                    </span>
+                  </span>
+                  {lesson.id === c.id ? <Check className="h-4 w-4 text-primary" /> : null}
+                </button>
+              ))}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={enrolOpen} onOpenChange={setEnrolOpen}>
         <DialogContent className="flex max-h-[88vh] flex-col p-0 sm:max-w-2xl">
@@ -765,30 +793,6 @@ function ClassProfile() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      <FormDialog
-        open={sessionOpen}
-        onOpenChange={setSessionOpen}
-        title="Add a lesson date"
-        busy={addSession.isPending}
-        onSubmit={async () => {
-          await addSession.mutateAsync({
-            class_id: c.id,
-            site_id: c.site_id,
-            schedule_block_id: c.schedule_block_id,
-            tutor_id: c.tutor_id,
-            session_date: sessionDate,
-            start_time: c.start_time,
-            end_time: c.end_time,
-            status: "scheduled",
-            agreed_amount: c.session_rate,
-          });
-          toast.success("Lesson date added");
-          setSessionOpen(false);
-          setTab("Registers");
-        }}
-      >
-        <TextField full label="Date" type="date" value={sessionDate} onChange={setSessionDate} />
-      </FormDialog>
       <FormDialog
         open={editOpen}
         onOpenChange={setEditOpen}
