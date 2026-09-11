@@ -127,24 +127,52 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen max-w-full overflow-x-clip bg-background">
-      {/* Private-workspace banner + demo role switcher */}
-      <div className="sticky top-0 z-40 bg-primary text-primary-foreground">
-        <div className="mx-auto flex max-w-[1500px] flex-wrap items-center justify-between gap-2 px-4 py-2">
-          <p className="flex items-center gap-2 text-[11px] font-semibold sm:text-xs">
-            <Sparkles className="h-3.5 w-3.5 shrink-0" />
-            Private workspace. You only see records available to your signed-in role.
-          </p>
-          <div className="flex items-center gap-2">
-            <span className="hidden text-[11px] font-semibold opacity-80 sm:inline">View as</span>
-            <RoleSwitcher />
+      {/* Sticky application header */}
+      <header className="sticky top-0 z-40">
+        <div className="flex items-center justify-between border-b border-border bg-card px-4 py-3 lg:hidden">
+          <Link
+            to={ROLE_HOME[role]}
+            className="flex items-center gap-2"
+            aria-label="Go to dashboard"
+          >
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-xs font-black text-primary-foreground">
+              PT
+            </span>
+            <span className="text-sm font-extrabold">ProgressTutors</span>
+          </Link>
+          <button
+            type="button"
+            onClick={async () => {
+              await supabase.auth.signOut();
+              navigate({ to: "/auth" });
+            }}
+            className="flex h-8 items-center justify-center rounded-full bg-secondary px-3 text-[11px] font-bold text-primary"
+          >
+            {initials} · Sign out
+          </button>
+        </div>
+        <div className="bg-primary text-primary-foreground">
+          <div className="mx-auto flex max-w-[1500px] flex-wrap items-center justify-between gap-2 px-4 py-2">
+            <p className="flex items-center gap-2 text-[11px] font-semibold sm:text-xs">
+              <Sparkles className="h-3.5 w-3.5 shrink-0" />
+              Private workspace. You only see records available to your signed-in role.
+            </p>
+            <div className="flex items-center gap-2">
+              <span className="hidden text-[11px] font-semibold opacity-80 sm:inline">View as</span>
+              <RoleSwitcher />
+            </div>
           </div>
         </div>
-      </div>
+      </header>
 
       <div className="mx-auto flex w-full min-w-0 max-w-[1500px]">
         {/* Desktop sidebar */}
         <aside className="sticky top-[46px] hidden h-[calc(100vh-46px)] w-64 shrink-0 flex-col border-r border-border px-4 py-6 lg:flex">
-          <Link to="/" className="flex items-center gap-2 px-2">
+          <Link
+            to={ROLE_HOME[role]}
+            className="flex items-center gap-2 px-2"
+            aria-label="Go to dashboard"
+          >
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-sm font-black text-primary-foreground">
               PT
             </span>
@@ -195,27 +223,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </aside>
 
         {/* Content */}
-        <main className="w-full min-w-0 max-w-full flex-1 pb-24 lg:pb-0">
-          {/* Mobile top bar */}
-          <div className="flex items-center justify-between border-b border-border px-4 py-3 lg:hidden">
-            <Link to="/" className="flex items-center gap-2">
-              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-xs font-black text-primary-foreground">
-                PT
-              </span>
-              <span className="text-sm font-extrabold">ProgressTutors</span>
-            </Link>
-            <button
-              type="button"
-              onClick={async () => {
-                await supabase.auth.signOut();
-                navigate({ to: "/auth" });
-              }}
-              className="flex h-8 items-center justify-center rounded-full bg-secondary px-3 text-[11px] font-bold text-primary"
-            >
-              {initials} · Sign out
-            </button>
-          </div>
-
+        <main className="w-full min-w-0 max-w-full flex-1 pb-28 lg:pb-0">
           {children}
 
           <footer className="footer-curve mt-12 px-6 py-8 sm:px-10">
@@ -235,7 +243,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       </div>
 
       {/* Mobile bottom nav */}
-      <nav className="fixed inset-x-0 bottom-0 z-40 flex border-t border-border bg-card/95 backdrop-blur lg:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-50 flex border-t border-border bg-card/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-6px_20px_rgba(15,23,42,0.08)] backdrop-blur lg:hidden">
         {items.slice(0, 5).map((item) => (
           <Link
             key={item.label}
