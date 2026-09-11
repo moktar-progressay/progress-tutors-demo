@@ -1,9 +1,9 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Search } from "lucide-react";
+import { ArrowLeft, Search } from "lucide-react";
 import { toast } from "sonner";
 import { Page } from "@/components/AppShell";
-import { Empty, GoProgressLink, PageHeader, Pill } from "@/components/kit";
+import { Avatar, avatarTone, Empty, GoProgressLink, PageHeader, Pill } from "@/components/kit";
 import { FormDialog, SelectField, TextAreaField, TextField } from "@/components/form-kit";
 import { SessionRegister } from "@/components/session-register";
 import { Button } from "@/components/ui/button";
@@ -24,8 +24,10 @@ import {
   money,
   prettyDate,
   useTable,
+  useDeleteRow,
   useUpdateRow,
   useUpsert,
+  weekdayOf,
 } from "@/lib/db";
 
 export const Route = createFileRoute("/_authenticated/admin/classes/$id")({
@@ -38,7 +40,7 @@ export const Route = createFileRoute("/_authenticated/admin/classes/$id")({
 const TABS = [
   "Overview",
   "Students",
-  "Sessions",
+  "Registers",
   "Attendance",
   "Lesson Reviews",
   "Payments",
@@ -63,6 +65,7 @@ function ClassProfile() {
   const subscriptions = useTable("client_subscriptions");
   const payments = useTable("client_payments", "payment_date");
   const updateClass = useUpdateRow("classes");
+  const deleteClass = useDeleteRow("classes");
   const addEnrolment = useUpsert("class_enrolments");
   const updateEnrolment = useUpdateRow("class_enrolments");
   const addSession = useUpsert("sessions");
@@ -78,6 +81,11 @@ function ClassProfile() {
   const [editOpen, setEditOpen] = useState(false);
   const [edit, setEdit] = useState({
     name: "",
+    start_date: DEMO_DATE,
+    start_time: "10:00",
+    end_time: "11:00",
+    recurrence: "weekly",
+    end_date: "",
     tutor_id: "",
     room: "",
     active: "active",
@@ -183,6 +191,11 @@ function ClassProfile() {
   const openEdit = () => {
     setEdit({
       name: c.name,
+      start_date: c.start_date ?? DEMO_DATE,
+      start_time: hhmm(c.start_time),
+      end_time: hhmm(c.end_time),
+      recurrence: c.recurrence ?? "weekly",
+      end_date: c.end_date ?? "",
       tutor_id: c.tutor_id ?? "",
       room: c.room ?? "",
       active: c.active ? "active" : "archived",
@@ -196,8 +209,11 @@ function ClassProfile() {
     <Page className="space-y-5">
       <PageHeader
         breadcrumb={
-          <Link to="/admin/classes" className="hover:text-primary">
-            Schedule
+          <Link
+            to="/admin/classes"
+            className="inline-flex items-center gap-1 font-bold hover:text-primary"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" /> Schedule
           </Link>
         }
         title="Lesson"
@@ -244,9 +260,11 @@ function ClassProfile() {
               </p>
             </div>
             <div className="flex items-center gap-3">
-              <span className="flex h-11 w-11 items-center justify-center rounded-full bg-tile-pink text-sm font-bold text-tile-pink-ink">
-                {initialsOf(fullName(tutor))}
-              </span>
+              <Avatar
+                initials={initialsOf(fullName(tutor))}
+                tone={avatarTone(fullName(tutor))}
+                size="lg"
+              />
               <div>
                 <p className="text-sm font-bold">
                   {tutor ? fullName(tutor) : "Tutor not assigned"}
@@ -259,8 +277,8 @@ function ClassProfile() {
             {[
               ["Students", `${activeRoster.length}/${c.capacity}`],
               ["Attendance", attendanceRate === null ? "No data" : `${attendanceRate}%`],
-              ["Sessions", String(classSessions.length)],
-              ["Per session", money(c.price_per_session)],
+              ["Lessons held", String(classSessions.length)],
+              ["Per lesson", money(c.price_per_session)],
             ].map(([label, value]) => (
               <div key={label} className="px-3 py-4 text-center">
                 <p className="text-xl font-extrabold">{value}</p>
@@ -297,19 +315,19 @@ function ClassProfile() {
             </dl>
           </section>
           <aside className="rounded-2xl border border-border bg-card p-5">
-            <h2 className="font-bold">Next session</h2>
+            <h2 className="font-bold">Next lesson</h2>
             {nextSession ? (
               <>
                 <p className="mt-3 text-sm font-bold">{prettyDate(nextSession.session_date)}</p>
                 <p className="text-sm text-muted-foreground">
                   {hhmm(nextSession.start_time)}–{hhmm(nextSession.end_time)}
                 </p>
-                <Button className="mt-4 w-full" onClick={() => setTab("Sessions")}>
+                <Button className="mt-4 w-full" onClick={() => setTab("Registers")}>
                   Start register
                 </Button>
               </>
             ) : (
-              <p className="mt-3 text-sm text-muted-foreground">No upcoming session.</p>
+              <p className="mt-3 text-sm text-muted-foreground">No upcoming lesson.</p>
             )}
             <p className="mt-4 border-t border-border pt-4 text-xs text-muted-foreground">
               {Math.max(c.capacity - activeRoster.length, 0)} spaces available
@@ -363,13 +381,20 @@ function ClassProfile() {
                     return (
                       <tr key={item.id}>
                         <td className="px-3 py-3">
-                          <Link
-                            to="/admin/students/$id"
-                            params={{ id: item.student_id }}
-                            className="font-bold hover:text-primary"
-                          >
-                            {fullName(student)}
-                          </Link>
+                          <span className="flex items-center gap-2">
+                            <Avatar
+                              initials={initialsOf(fullName(student))}
+                              tone={avatarTone(fullName(student))}
+                              size="sm"
+                            />
+                            <Link
+                              to="/admin/students/$id"
+                              params={{ id: item.student_id }}
+                              className="font-bold hover:text-primary"
+                            >
+                              {fullName(student)}
+                            </Link>
+                          </span>
                         </td>
                         <td className="px-3 py-3 text-muted-foreground">
                           {student?.year_group ?? "—"}
@@ -411,18 +436,18 @@ function ClassProfile() {
         </section>
       ) : null}
 
-      {tab === "Sessions" ? (
+      {tab === "Registers" ? (
         <section className="rounded-2xl border border-border bg-card p-4 sm:p-5">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-lg font-bold">Sessions</h2>
+              <h2 className="text-lg font-bold">Lesson registers</h2>
               <p className="text-xs text-muted-foreground">Registers and tutor sign-ins</p>
             </div>
-            <Button onClick={() => setSessionOpen(true)}>Add session</Button>
+            <Button onClick={() => setSessionOpen(true)}>Add lesson date</Button>
           </div>
           {classSessions.length === 0 ? (
             <div className="mt-4">
-              <Empty>No sessions yet.</Empty>
+              <Empty>No lesson registers yet.</Empty>
             </div>
           ) : (
             <div className="mt-4 space-y-4">
@@ -490,7 +515,7 @@ function ClassProfile() {
                   <article key={review.id} className="py-4">
                     <div className="flex justify-between gap-2">
                       <p className="font-bold">
-                        {session ? prettyDate(session.session_date) : "Session"}
+                        {session ? prettyDate(session.session_date) : "Lesson"}
                       </p>
                       <p className="text-xs text-muted-foreground">{fullName(reviewTutor)}</p>
                     </div>
@@ -580,7 +605,9 @@ function ClassProfile() {
       {tab === "Notes" ? (
         <Notes
           initial={c.notes ?? ""}
-          save={(notes) => updateClass.mutateAsync({ id: c.id, values: { notes } })}
+          save={async (notes) => {
+            await updateClass.mutateAsync({ id: c.id, values: { notes } });
+          }}
         />
       ) : null}
 
@@ -741,7 +768,7 @@ function ClassProfile() {
       <FormDialog
         open={sessionOpen}
         onOpenChange={setSessionOpen}
-        title="Add a session"
+        title="Add a lesson date"
         busy={addSession.isPending}
         onSubmit={async () => {
           await addSession.mutateAsync({
@@ -755,9 +782,9 @@ function ClassProfile() {
             status: "scheduled",
             agreed_amount: c.session_rate,
           });
-          toast.success("Session added");
+          toast.success("Lesson date added");
           setSessionOpen(false);
-          setTab("Sessions");
+          setTab("Registers");
         }}
       >
         <TextField full label="Date" type="date" value={sessionDate} onChange={setSessionDate} />
@@ -773,6 +800,12 @@ function ClassProfile() {
             id: c.id,
             values: {
               name: edit.name,
+              start_date: edit.start_date,
+              weekday: weekdayOf(edit.start_date),
+              start_time: edit.start_time,
+              end_time: edit.end_time,
+              recurrence: edit.recurrence,
+              end_date: edit.recurrence === "once" ? edit.start_date : edit.end_date || null,
               tutor_id: edit.tutor_id || null,
               room: edit.room || null,
               active: edit.active === "active",
@@ -791,6 +824,41 @@ function ClassProfile() {
           value={edit.name}
           onChange={(name) => setEdit({ ...edit, name })}
         />
+        <TextField
+          label="Start date"
+          type="date"
+          value={edit.start_date}
+          onChange={(start_date) => setEdit({ ...edit, start_date })}
+        />
+        <SelectField
+          label="Repeats"
+          value={edit.recurrence}
+          onChange={(recurrence) => setEdit({ ...edit, recurrence })}
+          options={[
+            { value: "once", label: "Does not repeat" },
+            { value: "weekly", label: "Every week" },
+          ]}
+        />
+        <TextField
+          label="Start time"
+          type="time"
+          value={edit.start_time}
+          onChange={(start_time) => setEdit({ ...edit, start_time })}
+        />
+        <TextField
+          label="End time"
+          type="time"
+          value={edit.end_time}
+          onChange={(end_time) => setEdit({ ...edit, end_time })}
+        />
+        {edit.recurrence === "weekly" ? (
+          <TextField
+            label="Repeat until"
+            type="date"
+            value={edit.end_date}
+            onChange={(end_date) => setEdit({ ...edit, end_date })}
+          />
+        ) : null}
         <SelectField
           label="Tutor"
           value={edit.tutor_id}
@@ -820,6 +888,31 @@ function ClassProfile() {
           value={edit.notes}
           onChange={(notes) => setEdit({ ...edit, notes })}
         />
+        <div className="border-t border-border pt-4 sm:col-span-2">
+          <Button
+            type="button"
+            variant="destructive"
+            disabled={deleteClass.isPending}
+            onClick={async () => {
+              if (
+                !window.confirm(
+                  "Delete this lesson permanently? Its enrolments, registers and linked lesson records will also be removed.",
+                )
+              )
+                return;
+              try {
+                await deleteClass.mutateAsync(c.id);
+                toast.success("Lesson deleted");
+                setEditOpen(false);
+                navigate({ to: "/admin/classes" });
+              } catch (error) {
+                toast.error(error instanceof Error ? error.message : "Could not delete the lesson");
+              }
+            }}
+          >
+            {deleteClass.isPending ? "Deleting…" : "Delete lesson"}
+          </Button>
+        </div>
       </FormDialog>
     </Page>
   );
