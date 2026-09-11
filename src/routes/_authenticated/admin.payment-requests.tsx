@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Page } from "@/components/AppShell";
@@ -11,7 +11,10 @@ export const Route = createFileRoute("/_authenticated/admin/payment-requests")({
   head: () => ({
     meta: [
       { title: "Payment Requests — ProgressTutors" },
-      { name: "description", content: "Review, approve, query and mark paid the payment requests tutors submit." },
+      {
+        name: "description",
+        content: "Review, approve, query and mark paid the payment requests tutors submit.",
+      },
       { property: "og:title", content: "Payment Requests — ProgressTutors" },
       { property: "og:description", content: "Approve and pay tutor payment requests." },
       { name: "robots", content: "noindex" },
@@ -21,7 +24,15 @@ export const Route = createFileRoute("/_authenticated/admin/payment-requests")({
 });
 
 const tone = (s: string) =>
-  s === "approved" ? "green" : s === "paid" ? "blue" : s === "queried" ? "amber" : s === "rejected" ? "pink" : "purple";
+  s === "approved"
+    ? "green"
+    : s === "paid"
+      ? "blue"
+      : s === "queried"
+        ? "amber"
+        : s === "rejected"
+          ? "pink"
+          : "purple";
 
 function AdminPaymentRequests() {
   const requests = useTable("payment_requests", "submitted_at");
@@ -38,7 +49,9 @@ function AdminPaymentRequests() {
 
   const rows = (requests.data ?? []).filter((r) => {
     const t = (tutors.data ?? []).find((x) => x.id === r.tutor_id);
-    return q === "" || `${fullName(t)} ${r.reference ?? ""}`.toLowerCase().includes(q.toLowerCase());
+    return (
+      q === "" || `${fullName(t)} ${r.reference ?? ""}`.toLowerCase().includes(q.toLowerCase())
+    );
   });
 
   const submitted = rows.filter((r) => r.status === "submitted");
@@ -52,7 +65,9 @@ function AdminPaymentRequests() {
       linked.map((e) =>
         updateEarning.mutateAsync({
           id: e.id,
-          values: { status: status === "paid" ? "paid" : status === "approved" ? "approved" : "eligible" },
+          values: {
+            status: status === "paid" ? "paid" : status === "approved" ? "approved" : "eligible",
+          },
         }),
       ),
     );
@@ -61,7 +76,22 @@ function AdminPaymentRequests() {
 
   return (
     <Page>
-      <PageHeader title="Payment Requests" subtitle="Tutor pay is based on agreed session amounts, not timers" />
+      <PageHeader
+        title="Payments"
+        subtitle="Collect from families and manage tutor payouts in one place."
+      />
+
+      <div className="flex gap-1 rounded-xl bg-muted p-1">
+        <Link
+          to="/admin/payments"
+          className="flex-1 rounded-lg px-4 py-2 text-center text-sm font-bold text-muted-foreground hover:text-foreground"
+        >
+          Client payments
+        </Link>
+        <span className="flex-1 rounded-lg bg-card px-4 py-2 text-center text-sm font-bold text-primary shadow-sm">
+          Tutor payouts
+        </span>
+      </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard label="Waiting" value={String(submitted.length)} tone="amber" />
@@ -112,7 +142,11 @@ function AdminPaymentRequests() {
                         <Button size="sm" onClick={() => decide(r.id, "approved")}>
                           Approve
                         </Button>
-                        <Button size="sm" variant="secondary" onClick={() => decide(r.id, "queried")}>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => decide(r.id, "queried")}
+                        >
                           Query
                         </Button>
                         <Button size="sm" variant="ghost" onClick={() => decide(r.id, "rejected")}>
@@ -137,7 +171,8 @@ function AdminPaymentRequests() {
                           return (
                             <li key={l.id} className="flex flex-wrap gap-2">
                               <span className="min-w-0 flex-1">
-                                {s ? prettyDate(s.session_date) : "—"} · {c?.name ?? l.description ?? "Session"}
+                                {s ? prettyDate(s.session_date) : "—"} ·{" "}
+                                {c?.name ?? l.description ?? "Session"}
                               </span>
                               <span>{num(l.hours)}h</span>
                               <span className="font-semibold">{money(l.amount)}</span>
