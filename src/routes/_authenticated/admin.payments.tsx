@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Page } from "@/components/AppShell";
@@ -11,9 +11,12 @@ import { DEMO_DATE, fullName, money, num, useTable, useUpdateRow, useUpsert } fr
 export const Route = createFileRoute("/_authenticated/admin/payments")({
   head: () => ({
     meta: [
-      { title: "Client Billing — ProgressTutors" },
-      { name: "description", content: "Record parent subscriptions and manual payments, and see who still owes." },
-      { property: "og:title", content: "Client Billing — ProgressTutors" },
+      { title: "Payments — ProgressTutors" },
+      {
+        name: "description",
+        content: "Collect family payments and manage tutor payouts from one money workspace.",
+      },
+      { property: "og:title", content: "Payments — ProgressTutors" },
       { property: "og:description", content: "Subscriptions and manual payments for families." },
       { name: "robots", content: "noindex" },
     ],
@@ -61,17 +64,22 @@ function Billing() {
   const expected = dueSoon.reduce((a, s) => a + num(s.amount), 0);
 
   const parentName = (id: string | null) => fullName((parents.data ?? []).find((p) => p.id === id));
-  const studentName = (id: string | null) => fullName((students.data ?? []).find((s) => s.id === id));
+  const studentName = (id: string | null) =>
+    fullName((students.data ?? []).find((s) => s.id === id));
 
   const filteredPayments = (payments.data ?? []).filter((p) =>
-    q === "" ? true : `${parentName(p.parent_id)} ${studentName(p.student_id)} ${p.reference ?? ""}`.toLowerCase().includes(q.toLowerCase()),
+    q === ""
+      ? true
+      : `${parentName(p.parent_id)} ${studentName(p.student_id)} ${p.reference ?? ""}`
+          .toLowerCase()
+          .includes(q.toLowerCase()),
   );
 
   return (
     <Page>
       <PageHeader
-        title="Client billing"
-        subtitle="Manual, operational record keeping — no card processing in this demo"
+        title="Payments"
+        subtitle="Collect from families and manage tutor payouts in one place."
         actions={
           <>
             <Button variant="secondary" onClick={() => setSubOpen(true)}>
@@ -82,20 +90,43 @@ function Billing() {
         }
       />
 
+      <div className="flex gap-1 rounded-xl bg-muted p-1">
+        <span className="flex-1 rounded-lg bg-card px-4 py-2 text-center text-sm font-bold text-primary shadow-sm">
+          Client payments
+        </span>
+        <Link
+          to="/admin/payment-requests"
+          className="flex-1 rounded-lg px-4 py-2 text-center text-sm font-bold text-muted-foreground hover:text-foreground"
+        >
+          Tutor payouts
+        </Link>
+      </div>
+
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard label="Received" value={money(total)} tone="green" />
-        <StatCard label="Payments logged" value={String((payments.data ?? []).length)} tone="blue" />
+        <StatCard
+          label="Payments logged"
+          value={String((payments.data ?? []).length)}
+          tone="blue"
+        />
         <StatCard label="Active plans" value={String(dueSoon.length)} tone="purple" />
         <StatCard label="Expected per cycle" value={money(expected)} tone="pink" />
       </div>
 
-      <Section id="billing-plans" title="Family plans" subtitle="Amounts follow the agreed programme pricing">
+      <Section
+        id="billing-plans"
+        title="Family plans"
+        subtitle="Amounts follow the agreed programme pricing"
+      >
         {(subs.data ?? []).length === 0 ? (
           <Empty>No plans set up yet.</Empty>
         ) : (
           <ul className="space-y-2">
             {(subs.data ?? []).map((s) => (
-              <li key={s.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-border px-4 py-3">
+              <li
+                key={s.id}
+                className="flex flex-wrap items-center gap-3 rounded-xl border border-border px-4 py-3"
+              >
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-bold">
                     {parentName(s.parent_id)} · {studentName(s.student_id)}
@@ -138,11 +169,13 @@ function Billing() {
             <table className="w-full min-w-[640px] text-sm">
               <thead>
                 <tr className="text-left text-xs text-muted-foreground">
-                  {["Date", "Family", "Child", "Method", "Reference", "Amount", "Status"].map((h) => (
-                    <th key={h} className="pb-2 font-semibold">
-                      {h}
-                    </th>
-                  ))}
+                  {["Date", "Family", "Child", "Method", "Reference", "Amount", "Status"].map(
+                    (h) => (
+                      <th key={h} className="pb-2 font-semibold">
+                        {h}
+                      </th>
+                    ),
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -192,13 +225,19 @@ function Billing() {
           label="Family"
           value={sub.parent_id}
           onChange={(v) => setSub({ ...sub, parent_id: v })}
-          options={[{ value: "", label: "Choose" }, ...(parents.data ?? []).map((p) => ({ value: p.id, label: fullName(p) }))]}
+          options={[
+            { value: "", label: "Choose" },
+            ...(parents.data ?? []).map((p) => ({ value: p.id, label: fullName(p) })),
+          ]}
         />
         <SelectField
           label="Child"
           value={sub.student_id}
           onChange={(v) => setSub({ ...sub, student_id: v })}
-          options={[{ value: "", label: "Choose" }, ...(students.data ?? []).map((s) => ({ value: s.id, label: fullName(s) }))]}
+          options={[
+            { value: "", label: "Choose" },
+            ...(students.data ?? []).map((s) => ({ value: s.id, label: fullName(s) })),
+          ]}
         />
         <SelectField
           label="Plan"
@@ -217,7 +256,12 @@ function Billing() {
             })),
           ]}
         />
-        <TextField label="Amount (£)" type="number" value={sub.amount} onChange={(v) => setSub({ ...sub, amount: v })} />
+        <TextField
+          label="Amount (£)"
+          type="number"
+          value={sub.amount}
+          onChange={(v) => setSub({ ...sub, amount: v })}
+        />
         <SelectField
           label="Billing cycle"
           value={sub.cadence}
@@ -235,7 +279,11 @@ function Billing() {
           value={sub.next_due_date}
           onChange={(v) => setSub({ ...sub, next_due_date: v })}
         />
-        <TextAreaField label="Notes" value={sub.notes} onChange={(v) => setSub({ ...sub, notes: v })} />
+        <TextAreaField
+          label="Notes"
+          value={sub.notes}
+          onChange={(v) => setSub({ ...sub, notes: v })}
+        />
       </FormDialog>
 
       <FormDialog
@@ -262,15 +310,27 @@ function Billing() {
           label="Family"
           value={pay.parent_id}
           onChange={(v) => setPay({ ...pay, parent_id: v })}
-          options={[{ value: "", label: "Choose" }, ...(parents.data ?? []).map((p) => ({ value: p.id, label: fullName(p) }))]}
+          options={[
+            { value: "", label: "Choose" },
+            ...(parents.data ?? []).map((p) => ({ value: p.id, label: fullName(p) })),
+          ]}
         />
         <SelectField
           label="Child"
           value={pay.student_id}
           onChange={(v) => setPay({ ...pay, student_id: v })}
-          options={[{ value: "", label: "Choose" }, ...(students.data ?? []).map((s) => ({ value: s.id, label: fullName(s) }))]}
+          options={[
+            { value: "", label: "Choose" },
+            ...(students.data ?? []).map((s) => ({ value: s.id, label: fullName(s) })),
+          ]}
         />
-        <TextField label="Amount (£)" type="number" value={pay.amount} onChange={(v) => setPay({ ...pay, amount: v })} required />
+        <TextField
+          label="Amount (£)"
+          type="number"
+          value={pay.amount}
+          onChange={(v) => setPay({ ...pay, amount: v })}
+          required
+        />
         <TextField
           label="Date"
           type="date"
@@ -288,8 +348,16 @@ function Billing() {
             { value: "other", label: "Other" },
           ]}
         />
-        <TextField label="Reference" value={pay.reference} onChange={(v) => setPay({ ...pay, reference: v })} />
-        <TextAreaField label="Note" value={pay.note} onChange={(v) => setPay({ ...pay, note: v })} />
+        <TextField
+          label="Reference"
+          value={pay.reference}
+          onChange={(v) => setPay({ ...pay, reference: v })}
+        />
+        <TextAreaField
+          label="Note"
+          value={pay.note}
+          onChange={(v) => setPay({ ...pay, note: v })}
+        />
       </FormDialog>
     </Page>
   );
