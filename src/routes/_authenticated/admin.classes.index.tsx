@@ -149,6 +149,7 @@ function SchedulePage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [detail, setDetail] = useState<ClassRow | null>(null);
+  const [quickEditing, setQuickEditing] = useState(false);
   const [showMore, setShowMore] = useState(false);
   const [studentSearch, setStudentSearch] = useState("");
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
@@ -221,6 +222,14 @@ function SchedulePage() {
     (enrolments.data ?? []).filter(
       (item) => item.class_id === lesson.id && item.status === "active",
     ).length;
+  const studentsFor = (lesson: ClassRow) => {
+    const ids = new Set(
+      (enrolments.data ?? [])
+        .filter((item) => item.class_id === lesson.id && item.status === "active")
+        .map((item) => item.student_id),
+    );
+    return (students.data ?? []).filter((student) => ids.has(student.id));
+  };
   const colourFor = (lesson: ClassRow) => {
     const index = Math.max(
       0,
@@ -265,6 +274,67 @@ function SchedulePage() {
     setShowMore(true);
     setDetail(null);
     setFormOpen(true);
+  }
+
+  function beginQuickEdit(lesson: ClassRow) {
+    setEditingId(lesson.id);
+    setForm({
+      ...BLANK,
+      name: lesson.name,
+      date: lesson.start_date ?? selectedDate,
+      start_time: hhmm(lesson.start_time),
+      end_time: hhmm(lesson.end_time),
+      recurrence: lesson.recurrence ?? "weekly",
+      end_date: lesson.end_date ?? "",
+      delivery_mode: lesson.delivery_mode,
+      site_id: lesson.site_id ?? "",
+      venue_name: lesson.venue_name ?? "",
+      room: lesson.room ?? "",
+      online_url: lesson.online_url ?? "",
+      tutor_id: lesson.tutor_id ?? "",
+      subject: lesson.subject ?? "",
+      level: lesson.level ?? "",
+      capacity: String(lesson.capacity),
+      session_rate: lesson.session_rate === null ? "" : String(lesson.session_rate),
+      price_per_session: lesson.price_per_session === null ? "" : String(lesson.price_per_session),
+      notes: lesson.notes ?? "",
+    });
+    setQuickEditing(true);
+  }
+
+  async function saveQuickEdit() {
+    if (!detail) return;
+    if (!form.name.trim()) {
+      toast.error("Add a lesson name");
+      return;
+    }
+    if (minutes(form.end_time) <= minutes(form.start_time)) {
+      toast.error("End time must be after start time");
+      return;
+    }
+    try {
+      const updated = await updateLesson.mutateAsync({
+        id: detail.id,
+        values: {
+          name: form.name.trim(),
+          start_date: form.date,
+          weekday: format(parseISO(form.date), "EEEE"),
+          start_time: form.start_time,
+          end_time: form.end_time,
+          tutor_id: form.tutor_id || null,
+          delivery_mode: form.delivery_mode,
+          site_id: form.delivery_mode === "online" ? null : form.site_id || null,
+          online_url: form.delivery_mode === "online" ? form.online_url.trim() || null : null,
+          capacity: Number(form.capacity) || 0,
+        },
+      });
+      setDetail(updated);
+      setQuickEditing(false);
+      setEditingId(null);
+      toast.success("Lesson updated");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not update the lesson");
+    }
   }
 
   function editLesson(lesson: ClassRow) {
@@ -707,7 +777,16 @@ function SchedulePage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={Boolean(detail)} onOpenChange={(open) => !open && setDetail(null)}>
+      <Dialog
+        open={Boolean(detail)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDetail(null);
+            setQuickEditing(false);
+            setEditingId(null);
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-md">
           {detail ? (
             <>
@@ -717,45 +796,174 @@ function SchedulePage() {
                   {detail.weekday} · {hhmm(detail.start_time)}–{hhmm(detail.end_time)}
                 </DialogDescription>
               </DialogHeader>
-              <div className="space-y-3 text-sm">
-                <p className="flex items-center gap-2">
-                  <Avatar
-                    initials={initialsOf(fullName(tutorFor(detail)))}
-                    tone={avatarTone(fullName(tutorFor(detail)))}
-                    size="sm"
+              {quickEditing ? (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <TextField
+                    full
+                    required
+                    label="Lesson name"
+                    value={form.name}
+                    onChange={(name) => setForm({ ...form, name })}
                   />
-                  {fullName(tutorFor(detail))}
-                </p>
-                <p className="flex items-center gap-2">
-                  {detail.delivery_mode === "online" ? (
-                    <Video className="h-4 w-4 text-primary" />
+                  <TextField
+                    label="Date"
+                    type="date"
+                    value={form.date}
+                    onChange={(date) => setForm({ ...form, date })}
+                  />
+                  <SelectField
+                    label="Tutor"
+                    value={form.tutor_id}
+                    onChange={(tutor_id) => setForm({ ...form, tutor_id })}
+                    options={[
+                      { value: "", label: "Tutor not assigned" },
+                      ...(tutors.data ?? []).map((item) => ({
+                        value: item.id,
+                        label: fullName(item),
+                      })),
+                    ]}
+                  />
+                  <TextField
+                    label="Start time"
+                    type="time"
+                    value={form.start_time}
+                    onChange={(start_time) => setForm({ ...form, start_time })}
+                  />
+                  <TextField
+                    label="End time"
+                    type="time"
+                    value={form.end_time}
+                    onChange={(end_time) => setForm({ ...form, end_time })}
+                  />
+                  <SelectField
+                    label="Delivery"
+                    value={form.delivery_mode}
+                    onChange={(delivery_mode) => setForm({ ...form, delivery_mode })}
+                    options={[
+                      { value: "in_person", label: "Face-to-face" },
+                      { value: "online", label: "Online" },
+                      { value: "hybrid", label: "Hybrid" },
+                    ]}
+                  />
+                  {form.delivery_mode === "online" ? (
+                    <TextField
+                      label="Meeting link"
+                      value={form.online_url}
+                      onChange={(online_url) => setForm({ ...form, online_url })}
+                    />
                   ) : (
-                    <MapPin className="h-4 w-4 text-primary" />
+                    <SelectField
+                      label="Venue"
+                      value={form.site_id}
+                      onChange={(site_id) => setForm({ ...form, site_id })}
+                      options={[
+                        { value: "", label: "Venue to confirm" },
+                        ...(sites.data ?? []).map((item) => ({
+                          value: item.id,
+                          label: item.name,
+                        })),
+                      ]}
+                    />
                   )}
-                  {detail.delivery_mode === "online"
-                    ? "Online lesson"
-                    : (siteFor(detail)?.name ?? detail.venue_name ?? "Venue to confirm")}
-                </p>
-                <p className="flex items-center gap-2">
-                  <Clock3 className="h-4 w-4 text-primary" />
-                  {detail.recurrence === "once" ? "One-off lesson" : "Repeats weekly"}
-                </p>
-                <Pill tone={capacityTone(countFor(detail), detail.capacity)}>
-                  {countFor(detail)}/{detail.capacity} students
-                </Pill>
-              </div>
-              <div className="flex flex-wrap justify-end gap-2">
-                <Button variant="secondary" onClick={() => editLesson(detail)}>
-                  <Pencil className="h-4 w-4" /> Edit
-                </Button>
-                <Button variant="secondary" onClick={() => cloneLesson(detail)}>
-                  <Copy className="h-4 w-4" /> Clone lesson
-                </Button>
-                <Button asChild>
-                  <Link to="/admin/classes/$id" params={{ id: detail.id }}>
-                    Open lesson
-                  </Link>
-                </Button>
+                  <TextField
+                    label="Capacity"
+                    type="number"
+                    value={form.capacity}
+                    onChange={(capacity) => setForm({ ...form, capacity })}
+                  />
+                </div>
+              ) : (
+                <div className="space-y-3 text-sm">
+                  <p className="flex items-center gap-2">
+                    <Avatar
+                      initials={initialsOf(fullName(tutorFor(detail)))}
+                      tone={avatarTone(fullName(tutorFor(detail)))}
+                      size="sm"
+                    />
+                    {fullName(tutorFor(detail))}
+                  </p>
+                  <p className="flex items-center gap-2">
+                    {detail.delivery_mode === "online" ? (
+                      <Video className="h-4 w-4 text-primary" />
+                    ) : (
+                      <MapPin className="h-4 w-4 text-primary" />
+                    )}
+                    {detail.delivery_mode === "online"
+                      ? "Online lesson"
+                      : (siteFor(detail)?.name ?? detail.venue_name ?? "Venue to confirm")}
+                  </p>
+                  <p className="flex items-center gap-2">
+                    <Clock3 className="h-4 w-4 text-primary" />
+                    {detail.recurrence === "once" ? "One-off lesson" : "Repeats weekly"}
+                  </p>
+                  <Pill tone={capacityTone(countFor(detail), detail.capacity)}>
+                    {countFor(detail)}/{detail.capacity} students
+                  </Pill>
+                  <div className="flex items-center gap-3 border-t border-border pt-3">
+                    <div className="flex -space-x-2">
+                      {studentsFor(detail)
+                        .slice(0, 6)
+                        .map((student) => (
+                          <Avatar
+                            key={student.id}
+                            initials={initialsOf(fullName(student))}
+                            tone={avatarTone(fullName(student))}
+                            size="sm"
+                          />
+                        ))}
+                    </div>
+                    <span className="text-xs text-muted-foreground">
+                      {studentsFor(detail).length
+                        ? `${studentsFor(detail).length} enrolled`
+                        : "No students enrolled"}
+                    </span>
+                  </div>
+                </div>
+              )}
+              <div className="grid grid-cols-3 gap-2 border-t border-border pt-4">
+                {quickEditing ? (
+                  <>
+                    <Button
+                      className="col-span-1 px-2 text-xs"
+                      variant="ghost"
+                      onClick={() => {
+                        setQuickEditing(false);
+                        setEditingId(null);
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      className="col-span-2 px-2 text-xs"
+                      disabled={updateLesson.isPending}
+                      onClick={saveQuickEdit}
+                    >
+                      {updateLesson.isPending ? "Saving…" : "Save changes"}
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button
+                      className="px-2 text-xs"
+                      variant="secondary"
+                      onClick={() => beginQuickEdit(detail)}
+                    >
+                      <Pencil className="h-4 w-4" /> Edit
+                    </Button>
+                    <Button
+                      className="px-2 text-xs"
+                      variant="secondary"
+                      onClick={() => cloneLesson(detail)}
+                    >
+                      <Copy className="h-4 w-4" /> Clone
+                    </Button>
+                    <Button asChild className="px-2 text-xs">
+                      <Link to="/admin/classes/$id" params={{ id: detail.id }}>
+                        Open
+                      </Link>
+                    </Button>
+                  </>
+                )}
               </div>
             </>
           ) : null}
