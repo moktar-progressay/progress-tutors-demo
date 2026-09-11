@@ -1,254 +1,683 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
-import { ChevronRight, Search } from "lucide-react";
+import {
+  addDays,
+  addMonths,
+  addWeeks,
+  eachDayOfInterval,
+  endOfMonth,
+  endOfWeek,
+  format,
+  isSameMonth,
+  parseISO,
+  startOfMonth,
+  startOfWeek,
+  subMonths,
+  subWeeks,
+} from "date-fns";
+import {
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
+  Clock3,
+  Copy,
+  Filter,
+  MapPin,
+  Search,
+  UserRound,
+  Video,
+} from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Page } from "@/components/AppShell";
-import { Empty, PageHeader, Pill } from "@/components/kit";
+import { Avatar, Empty, PageHeader, Pill } from "@/components/kit";
 import { FormDialog, SelectField, TextAreaField, TextField } from "@/components/form-kit";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { capacityTone, fullName, hhmm, useTable, useUpsert, WEEKDAYS } from "@/lib/db";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  capacityTone,
+  DEMO_DATE,
+  fullName,
+  hhmm,
+  initialsOf,
+  type ClassRow,
+  useTable,
+  useUpsert,
+  WEEKDAYS,
+} from "@/lib/db";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/admin/classes/")({
   head: () => ({
     meta: [
       { title: "Schedule | ProgressTutors" },
-      { name: "description", content: "Filter lessons and open one lesson workspace." },
+      { name: "description", content: "One calendar for every online and face-to-face lesson." },
       { name: "robots", content: "noindex" },
     ],
   }),
   component: SchedulePage,
 });
 
+type CalendarView = "day" | "week" | "month" | "list";
+
 const BLANK = {
   name: "",
-  schedule_block_id: "",
-  tutor_id: "",
-  subject: "",
-  level: "",
-  age_group: "",
-  capacity: "12",
-  room: "",
+  date: DEMO_DATE,
+  start_time: "10:00",
+  end_time: "11:00",
+  recurrence: "weekly",
+  end_date: "",
   delivery_mode: "in_person",
-  goprogress_course_url: "",
+  site_id: "",
+  venue_name: "",
+  room: "",
+  online_url: "",
+  tutor_id: "",
+  subject: "English",
+  level: "",
+  capacity: "12",
   session_rate: "",
   price_per_session: "",
   notes: "",
 };
 
+const COLOURS = [
+  "border-pink-500 bg-pink-50 text-pink-950",
+  "border-blue-500 bg-blue-50 text-blue-950",
+  "border-emerald-500 bg-emerald-50 text-emerald-950",
+  "border-amber-500 bg-amber-50 text-amber-950",
+  "border-violet-500 bg-violet-50 text-violet-950",
+];
+
+const HOURS = Array.from({ length: 13 }, (_, index) => index + 8);
+
+function minutes(time: string | null) {
+  if (!time) return 0;
+  const [hour, minute] = time.split(":").map(Number);
+  return (hour ?? 0) * 60 + (minute ?? 0);
+}
+
+function lessonRunsOn(lesson: ClassRow, date: Date) {
+  const iso = format(date, "yyyy-MM-dd");
+  if (lesson.start_date && iso < lesson.start_date) return false;
+  if (lesson.end_date && iso > lesson.end_date) return false;
+  if (lesson.recurrence === "once") return lesson.start_date === iso;
+  return lesson.weekday === format(date, "EEEE");
+}
+
 function SchedulePage() {
-  const lessons = useTable("classes", "name");
+  const lessons = useTable("classes", "start_time");
   const sites = useTable("sites", "name");
-  const blocks = useTable("recurring_schedule_blocks", "weekday");
   const tutors = useTable("tutors", "first_name");
+  const students = useTable("students", "first_name");
   const enrolments = useTable("class_enrolments");
   const createLesson = useUpsert("classes");
+  const addEnrolments = useUpsert("class_enrolments", ["classes"]);
 
+  const [view, setView] = useState<CalendarView>("week");
+  const [selectedDate, setSelectedDate] = useState(DEMO_DATE);
   const [search, setSearch] = useState("");
-  const [day, setDay] = useState("all");
-  const [siteId, setSiteId] = useState("all");
   const [tutorId, setTutorId] = useState("all");
-  const [status, setStatus] = useState("active");
-  const [open, setOpen] = useState(false);
+  const [siteId, setSiteId] = useState("all");
+  const [formatFilter, setFormatFilter] = useState("all");
+  const [subjectFilter, setSubjectFilter] = useState("all");
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [formOpen, setFormOpen] = useState(false);
+  const [detail, setDetail] = useState<ClassRow | null>(null);
+  const [showMore, setShowMore] = useState(false);
+  const [studentSearch, setStudentSearch] = useState("");
+  const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
   const [form, setForm] = useState(BLANK);
 
-  const rows = lessons.data ?? [];
-  const enrolmentRows = (enrolments.data ?? []).filter((item) => item.status === "active");
+  useEffect(() => {
+    if (window.matchMedia("(max-width: 767px)").matches) setView("day");
+  }, []);
+
+  const anchor = parseISO(selectedDate);
+  const weekStart = startOfWeek(anchor, { weekStartsOn: 1 });
+  const weekDays = Array.from({ length: 7 }, (_, index) => addDays(weekStart, index));
+  const monthStart = startOfWeek(startOfMonth(anchor), { weekStartsOn: 1 });
+  const monthEnd = endOfWeek(endOfMonth(anchor), { weekStartsOn: 1 });
+  const monthDays = eachDayOfInterval({ start: monthStart, end: monthEnd });
 
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
-    return rows
-      .filter((lesson) => {
-        const tutor = (tutors.data ?? []).find((item) => item.id === lesson.tutor_id);
-        const haystack = [lesson.name, lesson.subject, lesson.level, fullName(tutor)]
-          .filter(Boolean)
-          .join(" ")
-          .toLowerCase();
-        return (
-          (!query || haystack.includes(query)) &&
-          (day === "all" || lesson.weekday === day) &&
-          (siteId === "all" || lesson.site_id === siteId) &&
-          (tutorId === "all" ||
-            (tutorId === "unassigned" ? !lesson.tutor_id : lesson.tutor_id === tutorId)) &&
-          (status === "all" || (status === "active" ? lesson.active : !lesson.active))
-        );
-      })
-      .sort((a, b) => {
-        const firstDay = WEEKDAYS.indexOf(a.weekday as (typeof WEEKDAYS)[number]);
-        const secondDay = WEEKDAYS.indexOf(b.weekday as (typeof WEEKDAYS)[number]);
-        return firstDay - secondDay || (a.start_time ?? "").localeCompare(b.start_time ?? "");
-      });
-  }, [day, rows, search, siteId, status, tutorId, tutors.data]);
+    return (lessons.data ?? []).filter((lesson) => {
+      const tutor = (tutors.data ?? []).find((item) => item.id === lesson.tutor_id);
+      const haystack = [lesson.name, lesson.subject, lesson.level, fullName(tutor)]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return (
+        lesson.active &&
+        (!query || haystack.includes(query)) &&
+        (tutorId === "all" ||
+          (tutorId === "unassigned" ? !lesson.tutor_id : lesson.tutor_id === tutorId)) &&
+        (siteId === "all" || lesson.site_id === siteId) &&
+        (formatFilter === "all" || lesson.delivery_mode === formatFilter) &&
+        (subjectFilter === "all" || lesson.subject === subjectFilter)
+      );
+    });
+  }, [formatFilter, lessons.data, search, siteId, subjectFilter, tutorId, tutors.data]);
 
-  function openNew() {
-    if ((blocks.data ?? []).length === 0) {
-      toast.error("Add a weekly schedule on the dashboard first");
-      return;
-    }
-    setForm({ ...BLANK, schedule_block_id: blocks.data?.[0]?.id ?? "" });
-    setOpen(true);
+  const subjects = Array.from(
+    new Set(
+      (lessons.data ?? [])
+        .map((item) => item.subject)
+        .filter((value): value is string => Boolean(value)),
+    ),
+  ).sort();
+  const activeFilterCount = [tutorId, siteId, formatFilter, subjectFilter].filter(
+    (value) => value !== "all",
+  ).length;
+  const visibleStudents = (students.data ?? []).filter((student) => {
+    const query = studentSearch.trim().toLowerCase();
+    return (
+      !query ||
+      [fullName(student), student.school, student.year_group]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+        .includes(query)
+    );
+  });
+
+  const tutorFor = (lesson: ClassRow) =>
+    (tutors.data ?? []).find((item) => item.id === lesson.tutor_id);
+  const siteFor = (lesson: ClassRow) =>
+    (sites.data ?? []).find((item) => item.id === lesson.site_id);
+  const countFor = (lesson: ClassRow) =>
+    (enrolments.data ?? []).filter(
+      (item) => item.class_id === lesson.id && item.status === "active",
+    ).length;
+  const colourFor = (lesson: ClassRow) => {
+    const index = Math.max(
+      0,
+      (tutors.data ?? []).findIndex((item) => item.id === lesson.tutor_id),
+    );
+    return COLOURS[index % COLOURS.length];
+  };
+
+  function openNew(date = selectedDate) {
+    setForm({ ...BLANK, date });
+    setSelectedStudentIds([]);
+    setStudentSearch("");
+    setShowMore(false);
+    setFormOpen(true);
+  }
+
+  function cloneLesson(lesson: ClassRow) {
+    setForm({
+      ...BLANK,
+      name: lesson.name,
+      date: selectedDate,
+      start_time: hhmm(lesson.start_time),
+      end_time: hhmm(lesson.end_time),
+      recurrence: lesson.recurrence ?? "weekly",
+      end_date: lesson.end_date ?? "",
+      delivery_mode: lesson.delivery_mode,
+      site_id: lesson.site_id ?? "",
+      venue_name: lesson.venue_name ?? "",
+      room: lesson.room ?? "",
+      online_url: lesson.online_url ?? "",
+      tutor_id: lesson.tutor_id ?? "",
+      subject: lesson.subject ?? "",
+      level: lesson.level ?? "",
+      capacity: String(lesson.capacity),
+      session_rate: lesson.session_rate === null ? "" : String(lesson.session_rate),
+      price_per_session: lesson.price_per_session === null ? "" : String(lesson.price_per_session),
+      notes: lesson.notes ?? "",
+    });
+    setSelectedStudentIds([]);
+    setShowMore(true);
+    setDetail(null);
+    setFormOpen(true);
   }
 
   async function save() {
-    const block = (blocks.data ?? []).find((item) => item.id === form.schedule_block_id);
-    if (!block) {
-      toast.error("Choose a weekly schedule");
-      return;
-    }
-
     try {
-      await createLesson.mutateAsync({
+      const created = await createLesson.mutateAsync({
         name: form.name.trim(),
-        programme_id: block.programme_id,
-        site_id: block.site_id,
-        schedule_block_id: block.id,
+        schedule_block_id: null,
+        site_id: form.site_id || null,
         tutor_id: form.tutor_id || null,
-        subject: form.subject.trim() || null,
+        subject: form.subject || null,
         level: form.level.trim() || null,
-        age_group: form.age_group.trim() || null,
-        weekday: block.weekday,
-        start_time: block.start_time,
-        end_time: block.end_time,
+        weekday: format(parseISO(form.date), "EEEE"),
+        start_date: form.date,
+        end_date: form.recurrence === "once" ? form.date : form.end_date || null,
+        recurrence: form.recurrence,
+        start_time: form.start_time,
+        end_time: form.end_time,
         capacity: Number(form.capacity) || 0,
-        room: form.room.trim() || null,
         delivery_mode: form.delivery_mode,
-        goprogress_course_url: form.goprogress_course_url.trim() || null,
+        venue_name: form.venue_name.trim() || null,
+        room: form.room.trim() || null,
+        online_url: form.online_url.trim() || null,
         session_rate: form.session_rate ? Number(form.session_rate) : null,
         price_per_session: form.price_per_session ? Number(form.price_per_session) : null,
         notes: form.notes.trim() || null,
       });
-      toast.success("Lesson added to your schedule");
-      setOpen(false);
+      const lessonId = created[0]?.id;
+      if (lessonId && selectedStudentIds.length > 0) {
+        await addEnrolments.mutateAsync(
+          selectedStudentIds.map((studentId) => ({
+            class_id: lessonId,
+            student_id: studentId,
+            status: "active",
+          })),
+        );
+      }
+      toast.success("Lesson added to your calendar");
+      setFormOpen(false);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not create the lesson");
     }
   }
 
+  function move(direction: -1 | 1) {
+    const next =
+      view === "month"
+        ? direction < 0
+          ? subMonths(anchor, 1)
+          : addMonths(anchor, 1)
+        : direction < 0
+          ? subWeeks(anchor, 1)
+          : addWeeks(anchor, 1);
+    setSelectedDate(format(next, "yyyy-MM-dd"));
+  }
+
+  const dateTitle =
+    view === "day"
+      ? format(anchor, "EEE d MMM yyyy")
+      : view === "month"
+        ? format(anchor, "MMMM yyyy")
+        : `${format(weekStart, "d MMM")} – ${format(addDays(weekStart, 6), "d MMM yyyy")}`;
+
+  const renderCard = (lesson: ClassRow, compact = false) => {
+    const tutor = tutorFor(lesson);
+    const site = siteFor(lesson);
+    return (
+      <button
+        key={lesson.id}
+        type="button"
+        onClick={() => setDetail(lesson)}
+        className={cn(
+          "w-full overflow-hidden rounded-lg border-l-4 p-2 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md",
+          colourFor(lesson),
+          compact ? "text-[10px]" : "text-xs",
+        )}
+      >
+        <p className="font-extrabold">{lesson.name}</p>
+        <p className="mt-0.5 opacity-75">
+          {hhmm(lesson.start_time)}–{hhmm(lesson.end_time)}
+        </p>
+        {!compact ? (
+          <div className="mt-1 flex items-center justify-between gap-1">
+            <span className="truncate">{tutor ? fullName(tutor) : "Tutor needed"}</span>
+            <span className="shrink-0">
+              {countFor(lesson)}/{lesson.capacity}
+            </span>
+          </div>
+        ) : null}
+        {!compact ? (
+          <p className="mt-1 flex items-center gap-1 truncate opacity-75">
+            {lesson.delivery_mode === "online" ? (
+              <Video className="h-3 w-3" />
+            ) : (
+              <MapPin className="h-3 w-3" />
+            )}
+            {lesson.delivery_mode === "online"
+              ? "Online"
+              : (site?.name ?? lesson.venue_name ?? "Venue TBC")}
+          </p>
+        ) : null}
+      </button>
+    );
+  };
+
+  const timeline = (days: Date[]) => (
+    <div className="overflow-x-auto rounded-2xl border border-border bg-card">
+      <div className={cn("min-w-[760px]", days.length === 1 && "min-w-0")}>
+        <div
+          className="grid border-b border-border"
+          style={{ gridTemplateColumns: `4rem repeat(${days.length}, minmax(0, 1fr))` }}
+        >
+          <div className="p-2" />
+          {days.map((day) => (
+            <button
+              key={day.toISOString()}
+              type="button"
+              onClick={() => setSelectedDate(format(day, "yyyy-MM-dd"))}
+              className="border-l border-border p-2 text-center hover:bg-muted"
+            >
+              <span className="block text-[10px] font-bold uppercase text-muted-foreground">
+                {format(day, "EEE")}
+              </span>
+              <span
+                className={cn(
+                  "mt-1 inline-flex h-8 w-8 items-center justify-center rounded-full text-sm font-extrabold",
+                  format(day, "yyyy-MM-dd") === selectedDate &&
+                    "bg-primary text-primary-foreground",
+                )}
+              >
+                {format(day, "d")}
+              </span>
+            </button>
+          ))}
+        </div>
+        <div
+          className="grid"
+          style={{ gridTemplateColumns: `4rem repeat(${days.length}, minmax(0, 1fr))` }}
+        >
+          <div className="relative h-[780px]">
+            {HOURS.map((hour) => (
+              <span
+                key={hour}
+                className="absolute right-2 -translate-y-2 text-[10px] text-muted-foreground"
+                style={{ top: `${(hour - 8) * 60}px` }}
+              >
+                {hour}:00
+              </span>
+            ))}
+          </div>
+          {days.map((day) => (
+            <div
+              key={day.toISOString()}
+              className="relative h-[780px] border-l border-border bg-[repeating-linear-gradient(to_bottom,transparent_0,transparent_59px,var(--border)_60px)]"
+              onDoubleClick={() => openNew(format(day, "yyyy-MM-dd"))}
+            >
+              {filtered
+                .filter((lesson) => lessonRunsOn(lesson, day))
+                .map((lesson, index, dayLessons) => {
+                  const top = Math.max(0, minutes(lesson.start_time) - 8 * 60);
+                  const height = Math.max(
+                    44,
+                    minutes(lesson.end_time) - minutes(lesson.start_time),
+                  );
+                  const width = dayLessons.length > 1 ? 92 / dayLessons.length : 94;
+                  return (
+                    <div
+                      key={lesson.id}
+                      className="absolute px-1"
+                      style={{ top, height, left: `${3 + index * width}%`, width: `${width}%` }}
+                    >
+                      {renderCard(lesson, days.length > 3)}
+                    </div>
+                  );
+                })}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
   return (
-    <Page className="space-y-5">
+    <Page className="space-y-4">
       <PageHeader
         title="Schedule"
-        subtitle="See every lesson, then filter by day, venue or tutor."
-        actions={<Button onClick={openNew}>Add lesson</Button>}
+        subtitle="One calendar for every online and face-to-face lesson."
+        actions={<Button onClick={() => openNew()}>Add lesson</Button>}
       />
 
-      <section className="border-y border-border bg-card px-4 py-4 sm:rounded-2xl sm:border">
+      <section className="space-y-3 rounded-2xl border border-border bg-card p-3 sm:p-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button size="sm" variant="secondary" onClick={() => setSelectedDate(DEMO_DATE)}>
+            Today
+          </Button>
+          <Button size="icon" variant="ghost" onClick={() => move(-1)} aria-label="Previous">
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <Button size="icon" variant="ghost" onClick={() => move(1)} aria-label="Next">
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+          <p className="min-w-40 flex-1 text-sm font-extrabold sm:text-base">{dateTitle}</p>
+          <div className="flex rounded-xl bg-muted p-1">
+            {(["day", "week", "month", "list"] as CalendarView[]).map((item) => (
+              <button
+                key={item}
+                type="button"
+                onClick={() => setView(item)}
+                className={cn(
+                  "rounded-lg px-3 py-1.5 text-xs font-bold capitalize",
+                  view === item ? "bg-card text-primary shadow-sm" : "text-muted-foreground",
+                )}
+              >
+                {item}
+              </button>
+            ))}
+          </div>
+          <Button size="sm" variant="secondary" onClick={() => setFiltersOpen(true)}>
+            <Filter className="h-4 w-4" /> Filters{activeFilterCount ? ` ${activeFilterCount}` : ""}
+          </Button>
+        </div>
         <div className="relative">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Search lessons, subjects or tutors"
-            className="h-11 rounded-xl pl-10"
-          />
-        </div>
-        <div className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-4">
-          <SelectField
-            label="Day"
-            value={day}
-            onChange={setDay}
-            options={[
-              { value: "all", label: "All days" },
-              ...WEEKDAYS.map((item) => ({ value: item, label: item })),
-            ]}
-          />
-          <SelectField
-            label="Venue"
-            value={siteId}
-            onChange={setSiteId}
-            options={[
-              { value: "all", label: "All venues" },
-              ...(sites.data ?? []).map((item) => ({ value: item.id, label: item.name })),
-            ]}
-          />
-          <SelectField
-            label="Tutor"
-            value={tutorId}
-            onChange={setTutorId}
-            options={[
-              { value: "all", label: "All tutors" },
-              { value: "unassigned", label: "Unassigned" },
-              ...(tutors.data ?? []).map((item) => ({ value: item.id, label: fullName(item) })),
-            ]}
-          />
-          <SelectField
-            label="Status"
-            value={status}
-            onChange={setStatus}
-            options={[
-              { value: "all", label: "All lessons" },
-              { value: "active", label: "Active" },
-              { value: "archived", label: "Archived" },
-            ]}
+            className="h-10 rounded-xl pl-10"
           />
         </div>
       </section>
 
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="text-lg font-extrabold">Lessons</h2>
-        <p className="text-sm text-muted-foreground">{filtered.length} shown</p>
-      </div>
-
-      {filtered.length === 0 ? (
-        <Empty>No lessons match these filters.</Empty>
-      ) : (
-        <section className="overflow-hidden border-y border-border bg-card sm:rounded-2xl sm:border">
-          <ul className="divide-y divide-border">
-            {filtered.map((lesson) => {
-              const site = (sites.data ?? []).find((item) => item.id === lesson.site_id);
-              const block = (blocks.data ?? []).find(
-                (item) => item.id === lesson.schedule_block_id,
-              );
-              const tutor = (tutors.data ?? []).find((item) => item.id === lesson.tutor_id);
-              const enrolled = enrolmentRows.filter((item) => item.class_id === lesson.id).length;
-              return (
+      {view === "day" ? timeline([anchor]) : null}
+      {view === "week" ? timeline(weekDays) : null}
+      {view === "month" ? (
+        <div className="grid grid-cols-7 overflow-hidden rounded-2xl border border-border bg-card">
+          {WEEKDAYS.map((day) => (
+            <div
+              key={day}
+              className="border-b border-border p-2 text-center text-[10px] font-bold uppercase text-muted-foreground"
+            >
+              {day.slice(0, 3)}
+            </div>
+          ))}
+          {monthDays.map((day) => {
+            const dayLessons = filtered.filter((lesson) => lessonRunsOn(lesson, day));
+            return (
+              <div
+                key={day.toISOString()}
+                role="button"
+                tabIndex={0}
+                onClick={() => {
+                  setSelectedDate(format(day, "yyyy-MM-dd"));
+                  setView("day");
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    setSelectedDate(format(day, "yyyy-MM-dd"));
+                    setView("day");
+                  }
+                }}
+                className={cn(
+                  "min-h-24 border-b border-r border-border p-1.5 text-left hover:bg-muted/40",
+                  !isSameMonth(day, anchor) && "bg-muted/30 text-muted-foreground",
+                )}
+              >
+                <span className="text-xs font-bold">{format(day, "d")}</span>
+                <div className="mt-1 space-y-1">
+                  {dayLessons.slice(0, 3).map((lesson) => renderCard(lesson, true))}
+                </div>
+                {dayLessons.length > 3 ? (
+                  <span className="text-[10px] font-bold text-primary">
+                    +{dayLessons.length - 3} more
+                  </span>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
+      {view === "list" ? (
+        filtered.length === 0 ? (
+          <Empty>No lessons match your filters.</Empty>
+        ) : (
+          <section className="overflow-hidden rounded-2xl border border-border bg-card">
+            <ul className="divide-y divide-border">
+              {filtered.map((lesson) => (
                 <li key={lesson.id}>
-                  <Link
-                    to="/admin/classes/$id"
-                    params={{ id: lesson.id }}
-                    className="grid grid-cols-[4.5rem_minmax(0,1fr)_auto] items-center gap-3 px-4 py-4 transition-colors hover:bg-muted/50"
+                  <button
+                    type="button"
+                    onClick={() => setDetail(lesson)}
+                    className="grid w-full grid-cols-[4.5rem_minmax(0,1fr)_auto] items-center gap-3 px-4 py-4 text-left hover:bg-muted/50"
                   >
-                    <div className="text-center">
+                    <div>
                       <p className="text-xs font-bold text-primary">
-                        {(lesson.weekday ?? "Day").slice(0, 3)}
+                        {lesson.weekday?.slice(0, 3)}
                       </p>
-                      <p className="mt-1 text-sm font-extrabold">{hhmm(lesson.start_time)}</p>
+                      <p className="text-sm font-extrabold">{hhmm(lesson.start_time)}</p>
                     </div>
                     <div className="min-w-0">
                       <p className="truncate font-bold">{lesson.name}</p>
-                      <p className="mt-1 truncate text-xs text-muted-foreground">
-                        {[
-                          lesson.subject,
-                          site?.name ?? block?.venue_name,
-                          tutor ? fullName(tutor) : "Tutor unassigned",
-                        ]
-                          .filter(Boolean)
-                          .join(" · ")}
+                      <p className="truncate text-xs text-muted-foreground">
+                        {fullName(tutorFor(lesson))} ·{" "}
+                        {lesson.delivery_mode === "online"
+                          ? "Online"
+                          : (siteFor(lesson)?.name ?? lesson.venue_name ?? "Venue TBC")}
                       </p>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        <Pill tone={capacityTone(enrolled, lesson.capacity)}>
-                          {enrolled}/{lesson.capacity}
-                        </Pill>
-                        {!lesson.tutor_id ? <Pill tone="amber">Tutor needed</Pill> : null}
-                      </div>
                     </div>
-                    <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                  </Link>
+                    <Pill tone={capacityTone(countFor(lesson), lesson.capacity)}>
+                      {countFor(lesson)}/{lesson.capacity}
+                    </Pill>
+                  </button>
                 </li>
-              );
-            })}
-          </ul>
-        </section>
-      )}
+              ))}
+            </ul>
+          </section>
+        )
+      ) : null}
+
+      <Dialog open={filtersOpen} onOpenChange={setFiltersOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Filter lessons</DialogTitle>
+            <DialogDescription>
+              Filters change the view, never the calendar itself.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3">
+            <SelectField
+              label="Tutor"
+              value={tutorId}
+              onChange={setTutorId}
+              options={[
+                { value: "all", label: "All tutors" },
+                { value: "unassigned", label: "Tutor needed" },
+                ...(tutors.data ?? []).map((item) => ({ value: item.id, label: fullName(item) })),
+              ]}
+            />
+            <SelectField
+              label="Delivery"
+              value={formatFilter}
+              onChange={setFormatFilter}
+              options={[
+                { value: "all", label: "Online and face-to-face" },
+                { value: "online", label: "Online" },
+                { value: "in_person", label: "Face-to-face" },
+                { value: "hybrid", label: "Hybrid" },
+              ]}
+            />
+            <SelectField
+              label="Venue"
+              value={siteId}
+              onChange={setSiteId}
+              options={[
+                { value: "all", label: "All venues" },
+                ...(sites.data ?? []).map((item) => ({ value: item.id, label: item.name })),
+              ]}
+            />
+            <SelectField
+              label="Subject"
+              value={subjectFilter}
+              onChange={setSubjectFilter}
+              options={[
+                { value: "all", label: "All subjects" },
+                ...subjects.map((item) => ({ value: item, label: item })),
+              ]}
+            />
+            <div className="flex justify-between">
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setTutorId("all");
+                  setSiteId("all");
+                  setFormatFilter("all");
+                  setSubjectFilter("all");
+                }}
+              >
+                Clear filters
+              </Button>
+              <Button onClick={() => setFiltersOpen(false)}>Show lessons</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={Boolean(detail)} onOpenChange={(open) => !open && setDetail(null)}>
+        <DialogContent className="sm:max-w-md">
+          {detail ? (
+            <>
+              <DialogHeader>
+                <DialogTitle>{detail.name}</DialogTitle>
+                <DialogDescription>
+                  {detail.weekday} · {hhmm(detail.start_time)}–{hhmm(detail.end_time)}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-3 text-sm">
+                <p className="flex items-center gap-2">
+                  <UserRound className="h-4 w-4 text-primary" />
+                  {fullName(tutorFor(detail))}
+                </p>
+                <p className="flex items-center gap-2">
+                  {detail.delivery_mode === "online" ? (
+                    <Video className="h-4 w-4 text-primary" />
+                  ) : (
+                    <MapPin className="h-4 w-4 text-primary" />
+                  )}
+                  {detail.delivery_mode === "online"
+                    ? "Online lesson"
+                    : (siteFor(detail)?.name ?? detail.venue_name ?? "Venue to confirm")}
+                </p>
+                <p className="flex items-center gap-2">
+                  <Clock3 className="h-4 w-4 text-primary" />
+                  {detail.recurrence === "once" ? "One-off lesson" : "Repeats weekly"}
+                </p>
+                <Pill tone={capacityTone(countFor(detail), detail.capacity)}>
+                  {countFor(detail)}/{detail.capacity} students
+                </Pill>
+              </div>
+              <div className="flex flex-wrap justify-end gap-2">
+                <Button variant="secondary" onClick={() => cloneLesson(detail)}>
+                  <Copy className="h-4 w-4" /> Clone lesson
+                </Button>
+                <Button asChild>
+                  <Link to="/admin/classes/$id" params={{ id: detail.id }}>
+                    Open lesson
+                  </Link>
+                </Button>
+              </div>
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
 
       <FormDialog
-        open={open}
-        onOpenChange={setOpen}
+        open={formOpen}
+        onOpenChange={setFormOpen}
         wide
         title="Add lesson"
-        description="Choose the weekly schedule first. Its day, time and venue will be used automatically."
+        description="Add an event to your calendar. You are not creating another schedule."
         onSubmit={save}
-        busy={createLesson.isPending}
+        busy={createLesson.isPending || addEnrolments.isPending}
         submitLabel="Add lesson"
       >
         <TextField
@@ -258,84 +687,172 @@ function SchedulePage() {
           required
           full
         />
+        <TextField
+          label="Date"
+          type="date"
+          value={form.date}
+          onChange={(date) => setForm({ ...form, date })}
+          required
+        />
         <SelectField
-          label="Weekly schedule"
-          value={form.schedule_block_id}
-          onChange={(schedule_block_id) => setForm({ ...form, schedule_block_id })}
-          options={(blocks.data ?? []).map((block) => ({
-            value: block.id,
-            label: `${block.title} · ${block.weekday} ${hhmm(block.start_time)}`,
-          }))}
-          full
+          label="Repeats"
+          value={form.recurrence}
+          onChange={(recurrence) => setForm({ ...form, recurrence })}
+          options={[
+            { value: "once", label: "Does not repeat" },
+            { value: "weekly", label: "Every week" },
+          ]}
+        />
+        <TextField
+          label="Start time"
+          type="time"
+          value={form.start_time}
+          onChange={(start_time) => setForm({ ...form, start_time })}
+          required
+        />
+        <TextField
+          label="End time"
+          type="time"
+          value={form.end_time}
+          onChange={(end_time) => setForm({ ...form, end_time })}
+          required
+        />
+        <SelectField
+          label="Delivery"
+          value={form.delivery_mode}
+          onChange={(delivery_mode) => setForm({ ...form, delivery_mode })}
+          options={[
+            { value: "in_person", label: "Face-to-face" },
+            { value: "online", label: "Online" },
+            { value: "hybrid", label: "Hybrid" },
+          ]}
         />
         <SelectField
           label="Tutor"
           value={form.tutor_id}
           onChange={(tutor_id) => setForm({ ...form, tutor_id })}
           options={[
-            { value: "", label: "Not assigned" },
-            ...(tutors.data ?? []).map((tutor) => ({ value: tutor.id, label: fullName(tutor) })),
+            { value: "", label: "Tutor not assigned" },
+            ...(tutors.data ?? []).map((item) => ({ value: item.id, label: fullName(item) })),
           ]}
-        />
-        <TextField
-          label="Subject or activity"
-          value={form.subject}
-          onChange={(subject) => setForm({ ...form, subject })}
-        />
-        <TextField
-          label="Level"
-          value={form.level}
-          onChange={(level) => setForm({ ...form, level })}
-        />
-        <TextField
-          label="Age group"
-          value={form.age_group}
-          onChange={(age_group) => setForm({ ...form, age_group })}
-        />
-        <TextField
-          label="Capacity"
-          type="number"
-          value={form.capacity}
-          onChange={(capacity) => setForm({ ...form, capacity })}
-        />
-        <TextField
-          label="Room or pitch"
-          value={form.room}
-          onChange={(room) => setForm({ ...form, room })}
         />
         <SelectField
-          label="Format"
-          value={form.delivery_mode}
-          onChange={(delivery_mode) => setForm({ ...form, delivery_mode })}
-          options={[
-            { value: "in_person", label: "In person" },
-            { value: "online", label: "Online" },
-            { value: "hybrid", label: "Hybrid" },
-          ]}
+          label="Subject"
+          value={form.subject}
+          onChange={(subject) => setForm({ ...form, subject })}
+          options={Array.from(new Set(["English", "Maths", "Science", ...subjects])).map(
+            (item) => ({ value: item, label: item }),
+          )}
         />
-        <TextField
-          label="Tutor amount per session (£)"
-          type="number"
-          value={form.session_rate}
-          onChange={(session_rate) => setForm({ ...form, session_rate })}
-        />
-        <TextField
-          label="Price per session (£)"
-          type="number"
-          value={form.price_per_session}
-          onChange={(price_per_session) => setForm({ ...form, price_per_session })}
-        />
-        <TextField
-          label="GoProgress course link"
-          value={form.goprogress_course_url}
-          onChange={(goprogress_course_url) => setForm({ ...form, goprogress_course_url })}
-          full
-        />
-        <TextAreaField
-          label="Notes"
-          value={form.notes}
-          onChange={(notes) => setForm({ ...form, notes })}
-        />
+        {form.delivery_mode !== "online" ? (
+          <SelectField
+            label="Venue"
+            value={form.site_id}
+            onChange={(site_id) => setForm({ ...form, site_id })}
+            options={[
+              { value: "", label: "Choose venue" },
+              ...(sites.data ?? []).map((item) => ({ value: item.id, label: item.name })),
+            ]}
+          />
+        ) : (
+          <TextField
+            label="Online meeting link"
+            value={form.online_url}
+            onChange={(online_url) => setForm({ ...form, online_url })}
+          />
+        )}
+        <div className="sm:col-span-2">
+          <Button type="button" variant="ghost" onClick={() => setShowMore(!showMore)}>
+            {showMore ? "Show fewer options" : "See more options"}
+          </Button>
+        </div>
+        {showMore ? (
+          <>
+            <TextField
+              label="Repeat until"
+              type="date"
+              value={form.end_date}
+              onChange={(end_date) => setForm({ ...form, end_date })}
+            />
+            <TextField
+              label="Level"
+              value={form.level}
+              onChange={(level) => setForm({ ...form, level })}
+            />
+            <TextField
+              label="Venue name"
+              value={form.venue_name}
+              onChange={(venue_name) => setForm({ ...form, venue_name })}
+            />
+            <TextField
+              label="Room"
+              value={form.room}
+              onChange={(room) => setForm({ ...form, room })}
+            />
+            <TextField
+              label="Capacity"
+              type="number"
+              value={form.capacity}
+              onChange={(capacity) => setForm({ ...form, capacity })}
+            />
+            <TextField
+              label="Client price (£)"
+              type="number"
+              value={form.price_per_session}
+              onChange={(price_per_session) => setForm({ ...form, price_per_session })}
+            />
+            <TextField
+              label="Tutor amount (£)"
+              type="number"
+              value={form.session_rate}
+              onChange={(session_rate) => setForm({ ...form, session_rate })}
+            />
+            <TextAreaField
+              label="Notes"
+              value={form.notes}
+              onChange={(notes) => setForm({ ...form, notes })}
+            />
+            <div className="space-y-2 sm:col-span-2">
+              <p className="text-xs font-semibold text-muted-foreground">
+                Students ({selectedStudentIds.length} selected)
+              </p>
+              <Input
+                value={studentSearch}
+                onChange={(event) => setStudentSearch(event.target.value)}
+                placeholder="Search students by name, school or year"
+                className="h-10 rounded-xl"
+              />
+              <div className="max-h-52 divide-y divide-border overflow-y-auto rounded-xl border border-border">
+                {visibleStudents.map((student) => (
+                  <label
+                    key={student.id}
+                    className="flex cursor-pointer items-center gap-3 px-3 py-2 hover:bg-muted"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedStudentIds.includes(student.id)}
+                      onChange={() =>
+                        setSelectedStudentIds((current) =>
+                          current.includes(student.id)
+                            ? current.filter((id) => id !== student.id)
+                            : [...current, student.id],
+                        )
+                      }
+                      className="h-4 w-4 accent-[var(--color-primary)]"
+                    />
+                    <Avatar initials={initialsOf(fullName(student))} size="sm" tone="pink" />
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-bold">{fullName(student)}</span>
+                      <span className="block truncate text-xs text-muted-foreground">
+                        {[student.year_group, student.school].filter(Boolean).join(" · ")}
+                      </span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          </>
+        ) : null}
       </FormDialog>
     </Page>
   );
