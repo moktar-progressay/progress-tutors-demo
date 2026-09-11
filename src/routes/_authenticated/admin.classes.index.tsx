@@ -24,13 +24,12 @@ import {
   MapPin,
   Pencil,
   Search,
-  UserRound,
   Video,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Page } from "@/components/AppShell";
-import { Avatar, Empty, PageHeader, Pill } from "@/components/kit";
+import { Avatar, avatarTone, Empty, PageHeader, Pill } from "@/components/kit";
 import { FormDialog, SelectField, TextAreaField, TextField } from "@/components/form-kit";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,6 +48,7 @@ import {
   initialsOf,
   type ClassRow,
   useTable,
+  useDeleteRow,
   useUpdateRow,
   useUpsert,
   WEEKDAYS,
@@ -56,6 +56,9 @@ import {
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/admin/classes/")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    add: search["add"] === true || search["add"] === "true",
+  }),
   head: () => ({
     meta: [
       { title: "Schedule | ProgressTutors" },
@@ -105,6 +108,13 @@ function minutes(time: string | null) {
   return (hour ?? 0) * 60 + (minute ?? 0);
 }
 
+function subjectLabel(value: string | null | undefined) {
+  return (value ?? "")
+    .trim()
+    .toLocaleLowerCase("en-GB")
+    .replace(/(^|[\s/-])\p{L}/gu, (character) => character.toLocaleUpperCase("en-GB"));
+}
+
 function lessonRunsOn(lesson: ClassRow, date: Date) {
   const iso = format(date, "yyyy-MM-dd");
   if (lesson.start_date && iso < lesson.start_date) return false;
@@ -114,6 +124,7 @@ function lessonRunsOn(lesson: ClassRow, date: Date) {
 }
 
 function SchedulePage() {
+  const { add } = Route.useSearch();
   const lessons = useTable("classes", "start_time");
   const sites = useTable("sites", "name");
   const tutors = useTable("tutors", "first_name");
@@ -121,6 +132,7 @@ function SchedulePage() {
   const enrolments = useTable("class_enrolments");
   const createLesson = useUpsert("classes");
   const updateLesson = useUpdateRow("classes");
+  const deleteLesson = useDeleteRow("classes");
   const addEnrolments = useUpsert("class_enrolments", ["classes"]);
 
   const [view, setView] = useState<CalendarView>("week");
@@ -142,6 +154,16 @@ function SchedulePage() {
   useEffect(() => {
     if (window.matchMedia("(max-width: 767px)").matches) setView("day");
   }, []);
+
+  useEffect(() => {
+    if (!add) return;
+    setEditingId(null);
+    setSelectedStudentIds([]);
+    setStudentSearch("");
+    setShowMore(false);
+    setForm({ ...BLANK, date: selectedDate });
+    setFormOpen(true);
+  }, [add, selectedDate]);
 
   const anchor = parseISO(selectedDate);
   const weekStart = startOfWeek(anchor, { weekStartsOn: 1 });
@@ -165,17 +187,13 @@ function SchedulePage() {
           (tutorId === "unassigned" ? !lesson.tutor_id : lesson.tutor_id === tutorId)) &&
         (siteId === "all" || lesson.site_id === siteId) &&
         (formatFilter === "all" || lesson.delivery_mode === formatFilter) &&
-        (subjectFilter === "all" || lesson.subject === subjectFilter)
+        (subjectFilter === "all" || subjectLabel(lesson.subject) === subjectFilter)
       );
     });
   }, [formatFilter, lessons.data, search, siteId, subjectFilter, tutorId, tutors.data]);
 
   const subjects = Array.from(
-    new Set(
-      (lessons.data ?? [])
-        .map((item) => item.subject)
-        .filter((value): value is string => Boolean(value)),
-    ),
+    new Set((lessons.data ?? []).map((item) => subjectLabel(item.subject)).filter(Boolean)),
   ).sort();
   const activeFilterCount = [tutorId, siteId, formatFilter, subjectFilter].filter(
     (value) => value !== "all",
@@ -287,7 +305,7 @@ function SchedulePage() {
         schedule_block_id: null,
         site_id: form.site_id || null,
         tutor_id: form.tutor_id || null,
-        subject: form.subject || null,
+        subject: subjectLabel(form.subject) || null,
         level: form.level.trim() || null,
         weekday: format(parseISO(form.date), "EEEE"),
         start_date: form.date,
@@ -337,9 +355,11 @@ function SchedulePage() {
         ? direction < 0
           ? subMonths(anchor, 1)
           : addMonths(anchor, 1)
-        : direction < 0
-          ? subWeeks(anchor, 1)
-          : addWeeks(anchor, 1);
+        : view === "day"
+          ? addDays(anchor, direction)
+          : direction < 0
+            ? subWeeks(anchor, 1)
+            : addWeeks(anchor, 1);
     setSelectedDate(format(next, "yyyy-MM-dd"));
   }
 
@@ -370,7 +390,14 @@ function SchedulePage() {
         </p>
         {!compact ? (
           <div className="mt-1 flex items-center justify-between gap-1">
-            <span className="truncate">{tutor ? fullName(tutor) : "Tutor needed"}</span>
+            <span className="flex min-w-0 items-center gap-1.5">
+              <Avatar
+                initials={initialsOf(fullName(tutor))}
+                tone={avatarTone(fullName(tutor))}
+                size="sm"
+              />
+              <span className="truncate">{tutor ? fullName(tutor) : "Tutor needed"}</span>
+            </span>
             <span className="shrink-0">
               {countFor(lesson)}/{lesson.capacity}
             </span>
@@ -684,7 +711,11 @@ function SchedulePage() {
               </DialogHeader>
               <div className="space-y-3 text-sm">
                 <p className="flex items-center gap-2">
-                  <UserRound className="h-4 w-4 text-primary" />
+                  <Avatar
+                    initials={initialsOf(fullName(tutorFor(detail)))}
+                    tone={avatarTone(fullName(tutorFor(detail)))}
+                    size="sm"
+                  />
                   {fullName(tutorFor(detail))}
                 </p>
                 <p className="flex items-center gap-2">
@@ -793,13 +824,12 @@ function SchedulePage() {
             ...(tutors.data ?? []).map((item) => ({ value: item.id, label: fullName(item) })),
           ]}
         />
-        <SelectField
-          label="Subject"
+        <SubjectPicker
           value={form.subject}
           onChange={(subject) => setForm({ ...form, subject })}
-          options={Array.from(new Set(["English", "Maths", "Science", ...subjects])).map(
-            (item) => ({ value: item, label: item }),
-          )}
+          options={Array.from(
+            new Set(["English", "Maths", "Science", ...subjects, subjectLabel(form.subject)]),
+          ).filter(Boolean)}
         />
         {form.delivery_mode !== "online" ? (
           <SelectField
@@ -853,13 +883,13 @@ function SchedulePage() {
               onChange={(capacity) => setForm({ ...form, capacity })}
             />
             <TextField
-              label="Client price (£)"
+              label="Client price per lesson (£)"
               type="number"
               value={form.price_per_session}
               onChange={(price_per_session) => setForm({ ...form, price_per_session })}
             />
             <TextField
-              label="Tutor amount (£)"
+              label="Tutor pay per lesson (£)"
               type="number"
               value={form.session_rate}
               onChange={(session_rate) => setForm({ ...form, session_rate })}
@@ -897,7 +927,11 @@ function SchedulePage() {
                       }
                       className="h-4 w-4 accent-[var(--color-primary)]"
                     />
-                    <Avatar initials={initialsOf(fullName(student))} size="sm" tone="pink" />
+                    <Avatar
+                      initials={initialsOf(fullName(student))}
+                      size="sm"
+                      tone={avatarTone(fullName(student))}
+                    />
                     <span className="min-w-0">
                       <span className="block truncate text-sm font-bold">{fullName(student)}</span>
                       <span className="block truncate text-xs text-muted-foreground">
@@ -910,7 +944,113 @@ function SchedulePage() {
             </div>
           </>
         ) : null}
+        {editingId ? (
+          <div className="border-t border-border pt-4 sm:col-span-2">
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={deleteLesson.isPending}
+              onClick={async () => {
+                if (
+                  !window.confirm(
+                    "Delete this lesson permanently? Its enrolments, registers and linked lesson records will also be removed.",
+                  )
+                )
+                  return;
+                try {
+                  await deleteLesson.mutateAsync(editingId);
+                  toast.success("Lesson deleted");
+                  setFormOpen(false);
+                  setEditingId(null);
+                } catch (error) {
+                  toast.error(
+                    error instanceof Error ? error.message : "Could not delete the lesson",
+                  );
+                }
+              }}
+            >
+              {deleteLesson.isPending ? "Deleting…" : "Delete lesson"}
+            </Button>
+          </div>
+        ) : null}
       </FormDialog>
     </Page>
+  );
+}
+
+function SubjectPicker({
+  value,
+  onChange,
+  options,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  options: string[];
+}) {
+  const [adding, setAdding] = useState(false);
+  const [custom, setCustom] = useState("");
+  const colours = [
+    "bg-tile-pink text-tile-pink-ink",
+    "bg-tile-blue text-tile-blue-ink",
+    "bg-tile-green text-tile-green-ink",
+    "bg-tile-amber text-tile-amber-ink",
+    "bg-tile-purple text-tile-purple-ink",
+  ];
+  const selected = subjectLabel(value);
+  const addCustom = () => {
+    const next = subjectLabel(custom);
+    if (!next) return;
+    onChange(next);
+    setCustom("");
+    setAdding(false);
+  };
+
+  return (
+    <div className="min-w-0 space-y-2 sm:col-span-2">
+      <p className="text-xs font-semibold text-muted-foreground">Subject</p>
+      <div className="flex flex-wrap gap-2">
+        {options.map((option, index) => (
+          <button
+            key={option}
+            type="button"
+            onClick={() => onChange(option)}
+            className={cn(
+              "rounded-full px-3 py-2 text-xs font-bold ring-offset-2 transition",
+              colours[index % colours.length],
+              selected === option && "ring-2 ring-primary",
+            )}
+          >
+            {option}
+          </button>
+        ))}
+        <button
+          type="button"
+          onClick={() => setAdding((current) => !current)}
+          className="rounded-full border border-dashed border-primary px-3 py-2 text-xs font-bold text-primary"
+        >
+          + Add subject
+        </button>
+      </div>
+      {adding ? (
+        <div className="flex min-w-0 gap-2">
+          <Input
+            value={custom}
+            onChange={(event) => setCustom(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                addCustom();
+              }
+            }}
+            placeholder="New subject"
+            className="min-w-0 flex-1 rounded-xl"
+            autoFocus
+          />
+          <Button type="button" size="sm" onClick={addCustom}>
+            Add
+          </Button>
+        </div>
+      ) : null}
+    </div>
   );
 }
