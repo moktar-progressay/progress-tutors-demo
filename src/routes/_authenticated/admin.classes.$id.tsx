@@ -4,7 +4,13 @@ import { ArrowLeft, Check, Filter, Pencil, Plus, Search } from "lucide-react";
 import { toast } from "sonner";
 import { Page } from "@/components/AppShell";
 import { Avatar, avatarTone, Empty, GoProgressLink, PageHeader, Pill } from "@/components/kit";
-import { FormDialog, SelectField, TextAreaField, TextField } from "@/components/form-kit";
+import {
+  ConfirmDeleteDialog,
+  FormDialog,
+  SelectField,
+  TextAreaField,
+  TextField,
+} from "@/components/form-kit";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -68,6 +74,7 @@ function ClassProfile() {
   const [studentSchool, setStudentSchool] = useState("all");
   const [studentYear, setStudentYear] = useState("all");
   const [editOpen, setEditOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [edit, setEdit] = useState({
     name: "",
     start_date: DEMO_DATE,
@@ -799,6 +806,9 @@ function ClassProfile() {
         wide
         title="Edit lesson"
         busy={updateClass.isPending}
+        dangerLabel="Delete"
+        dangerBusy={deleteClass.isPending}
+        onDanger={() => setDeleteOpen(true)}
         onSubmit={async () => {
           await updateClass.mutateAsync({
             id: c.id,
@@ -892,32 +902,28 @@ function ClassProfile() {
           value={edit.notes}
           onChange={(notes) => setEdit({ ...edit, notes })}
         />
-        <div className="border-t border-border pt-4 sm:col-span-2">
-          <Button
-            type="button"
-            variant="destructive"
-            disabled={deleteClass.isPending}
-            onClick={async () => {
-              if (
-                !window.confirm(
-                  "Delete this lesson permanently? Its enrolments, registers and linked lesson records will also be removed.",
-                )
-              )
-                return;
-              try {
-                await deleteClass.mutateAsync(c.id);
-                toast.success("Lesson deleted");
-                setEditOpen(false);
-                navigate({ to: "/admin/classes" });
-              } catch (error) {
-                toast.error(error instanceof Error ? error.message : "Could not delete the lesson");
-              }
-            }}
-          >
-            {deleteClass.isPending ? "Deleting…" : "Delete lesson"}
-          </Button>
-        </div>
       </FormDialog>
+      <ConfirmDeleteDialog
+        open={deleteOpen}
+        onOpenChange={(nextOpen) => {
+          if (!deleteClass.isPending) setDeleteOpen(nextOpen);
+        }}
+        title="Are you sure you want to delete this lesson?"
+        description="This cannot be undone. Enrolments and linked lesson records will also be removed."
+        confirmLabel="Delete lesson"
+        busy={deleteClass.isPending}
+        onConfirm={async () => {
+          try {
+            await deleteClass.mutateAsync(c.id);
+            toast.success("Lesson deleted");
+            setDeleteOpen(false);
+            setEditOpen(false);
+            navigate({ to: "/admin/classes" });
+          } catch (error) {
+            toast.error(error instanceof Error ? error.message : "Could not delete the lesson");
+          }
+        }}
+      />
     </Page>
   );
 }

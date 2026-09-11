@@ -3,13 +3,21 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Page } from "@/components/AppShell";
 import { Avatar, Empty, PageHeader, Pill, Section, StatCard } from "@/components/kit";
-import { CheckField, FormDialog, SelectField, TextAreaField, TextField } from "@/components/form-kit";
+import {
+  CheckField,
+  ConfirmDeleteDialog,
+  FormDialog,
+  SelectField,
+  TextAreaField,
+  TextField,
+} from "@/components/form-kit";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   fullName,
   initialsOf,
   useTable,
+  useDeleteRow,
   useUpdateRow,
   useUpsert,
   type Insert,
@@ -20,7 +28,10 @@ export const Route = createFileRoute("/_authenticated/admin/students/")({
   head: () => ({
     meta: [
       { title: "Students — ProgressTutors" },
-      { name: "description", content: "Add, edit, archive and search real student records in the shared demo." },
+      {
+        name: "description",
+        content: "Add, edit, archive and search real student records in the shared demo.",
+      },
       { property: "og:title", content: "Students — ProgressTutors" },
       { property: "og:description", content: "Shared student roster with search and filters." },
       { name: "robots", content: "noindex" },
@@ -61,6 +72,7 @@ function StudentsPage() {
 
   const createStudent = useUpsert("students");
   const updateStudent = useUpdateRow("students");
+  const deleteStudent = useDeleteRow("students");
   const linkParent = useUpsert("parent_students", ["students"]);
 
   const [q, setQ] = useState("");
@@ -70,6 +82,7 @@ function StudentsPage() {
   const [classId, setClassId] = useState("all");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<StudentRow | null>(null);
+  const [studentPendingDelete, setStudentPendingDelete] = useState<StudentRow | null>(null);
   const [form, setForm] = useState<FormState>(BLANK);
 
   const rows = students.data ?? [];
@@ -90,12 +103,17 @@ function StudentsPage() {
   const filtered = rows.filter((s) => {
     const name = fullName(s).toLowerCase();
     const matchesQ =
-      q === "" || name.includes(q.toLowerCase()) || (s.email ?? "").toLowerCase().includes(q.toLowerCase());
+      q === "" ||
+      name.includes(q.toLowerCase()) ||
+      (s.email ?? "").toLowerCase().includes(q.toLowerCase());
     const matchesStatus = status === "all" || s.status === status;
     const scoped = siteId === "all" && programmeId === "all" && classId === "all";
     const matchesClass =
       scoped ||
-      enrolList.some((e) => e.student_id === s.id && classIdsForFilters.includes(e.class_id) && e.status === "active");
+      enrolList.some(
+        (e) =>
+          e.student_id === s.id && classIdsForFilters.includes(e.class_id) && e.status === "active",
+      );
     return matchesQ && matchesStatus && matchesClass;
   });
 
@@ -222,7 +240,10 @@ function StudentsPage() {
           label="Site"
           value={siteId}
           onChange={setSiteId}
-          options={[{ value: "all", label: "All sites" }, ...(sites.data ?? []).map((s) => ({ value: s.id, label: s.name }))]}
+          options={[
+            { value: "all", label: "All sites" },
+            ...(sites.data ?? []).map((s) => ({ value: s.id, label: s.name })),
+          ]}
         />
         <SelectField
           label="Programme"
@@ -237,7 +258,10 @@ function StudentsPage() {
           label="Class"
           value={classId}
           onChange={setClassId}
-          options={[{ value: "all", label: "All classes" }, ...classList.map((c) => ({ value: c.id, label: c.name }))]}
+          options={[
+            { value: "all", label: "All classes" },
+            ...classList.map((c) => ({ value: c.id, label: c.name })),
+          ]}
         />
       </div>
 
@@ -272,7 +296,11 @@ function StudentsPage() {
                       <td className="py-3">
                         <div className="flex items-center gap-2">
                           <Avatar initials={initialsOf(name)} size="sm" tone="purple" />
-                          <Link to="/admin/students/$id" params={{ id: s.id }} className="font-semibold hover:text-primary">
+                          <Link
+                            to="/admin/students/$id"
+                            params={{ id: s.id }}
+                            className="font-semibold hover:text-primary"
+                          >
                             {name}
                           </Link>
                         </div>
@@ -300,6 +328,13 @@ function StudentsPage() {
                         <Button size="sm" variant="ghost" onClick={() => archive(s)}>
                           {s.status === "archived" ? "Restore" : "Archive"}
                         </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => setStudentPendingDelete(s)}
+                        >
+                          Delete
+                        </Button>
                       </td>
                     </tr>
                   );
@@ -309,7 +344,8 @@ function StudentsPage() {
           </div>
         )}
         <p className="mt-3 text-xs text-muted-foreground">
-          Medical, allergy and emergency details are kept on the student's own page, not on this list.
+          Medical, allergy and emergency details are kept on the student's own page, not on this
+          list.
         </p>
       </Section>
 
@@ -321,12 +357,37 @@ function StudentsPage() {
         description="Only first name is required. Sensitive details stay on the student record."
         onSubmit={save}
         busy={createStudent.isPending || updateStudent.isPending}
+        dangerLabel={editing ? "Delete" : undefined}
+        dangerBusy={deleteStudent.isPending}
+        onDanger={editing ? () => setStudentPendingDelete(editing) : undefined}
       >
-        <TextField label="First name" value={form.first_name} onChange={(v) => setForm({ ...form, first_name: v })} required />
-        <TextField label="Last name" value={form.last_name} onChange={(v) => setForm({ ...form, last_name: v })} />
-        <TextField label="Date of birth" type="date" value={form.date_of_birth} onChange={(v) => setForm({ ...form, date_of_birth: v })} />
-        <TextField label="Year group" value={form.year_group} onChange={(v) => setForm({ ...form, year_group: v })} />
-        <TextField label="School / college" value={form.school} onChange={(v) => setForm({ ...form, school: v })} />
+        <TextField
+          label="First name"
+          value={form.first_name}
+          onChange={(v) => setForm({ ...form, first_name: v })}
+          required
+        />
+        <TextField
+          label="Last name"
+          value={form.last_name}
+          onChange={(v) => setForm({ ...form, last_name: v })}
+        />
+        <TextField
+          label="Date of birth"
+          type="date"
+          value={form.date_of_birth}
+          onChange={(v) => setForm({ ...form, date_of_birth: v })}
+        />
+        <TextField
+          label="Year group"
+          value={form.year_group}
+          onChange={(v) => setForm({ ...form, year_group: v })}
+        />
+        <TextField
+          label="School / college"
+          value={form.school}
+          onChange={(v) => setForm({ ...form, school: v })}
+        />
         <SelectField
           label="Parent / guardian"
           value={form.parent_id}
@@ -336,8 +397,17 @@ function StudentsPage() {
             ...(parents.data ?? []).map((p) => ({ value: p.id, label: fullName(p) })),
           ]}
         />
-        <TextField label="Email" type="email" value={form.email} onChange={(v) => setForm({ ...form, email: v })} />
-        <TextField label="Phone" value={form.phone} onChange={(v) => setForm({ ...form, phone: v })} />
+        <TextField
+          label="Email"
+          type="email"
+          value={form.email}
+          onChange={(v) => setForm({ ...form, email: v })}
+        />
+        <TextField
+          label="Phone"
+          value={form.phone}
+          onChange={(v) => setForm({ ...form, phone: v })}
+        />
         <TextField
           label="Emergency contact name"
           value={form.emergency_contact_name}
@@ -360,13 +430,57 @@ function StudentsPage() {
           ]}
         />
         <div className="flex items-center gap-6 sm:col-span-2">
-          <CheckField label="SEND" checked={form.send_flag} onChange={(v) => setForm({ ...form, send_flag: v })} />
-          <CheckField label="EHCP" checked={form.ehcp_flag} onChange={(v) => setForm({ ...form, ehcp_flag: v })} />
+          <CheckField
+            label="SEND"
+            checked={form.send_flag}
+            onChange={(v) => setForm({ ...form, send_flag: v })}
+          />
+          <CheckField
+            label="EHCP"
+            checked={form.ehcp_flag}
+            onChange={(v) => setForm({ ...form, ehcp_flag: v })}
+          />
         </div>
-        <TextAreaField label="Medical conditions" value={form.medical_notes} onChange={(v) => setForm({ ...form, medical_notes: v })} />
-        <TextAreaField label="Allergies" value={form.allergy_notes} onChange={(v) => setForm({ ...form, allergy_notes: v })} />
-        <TextAreaField label="Notes" value={form.notes} onChange={(v) => setForm({ ...form, notes: v })} />
+        <TextAreaField
+          label="Medical conditions"
+          value={form.medical_notes}
+          onChange={(v) => setForm({ ...form, medical_notes: v })}
+        />
+        <TextAreaField
+          label="Allergies"
+          value={form.allergy_notes}
+          onChange={(v) => setForm({ ...form, allergy_notes: v })}
+        />
+        <TextAreaField
+          label="Notes"
+          value={form.notes}
+          onChange={(v) => setForm({ ...form, notes: v })}
+        />
       </FormDialog>
+      <ConfirmDeleteDialog
+        open={Boolean(studentPendingDelete)}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen && !deleteStudent.isPending) setStudentPendingDelete(null);
+        }}
+        title="Are you sure you want to delete this student?"
+        description="This cannot be undone. Their enrolments, attendance, progress and other linked student records will also be removed."
+        confirmLabel="Delete student"
+        busy={deleteStudent.isPending}
+        onConfirm={async () => {
+          if (!studentPendingDelete) return;
+          try {
+            await deleteStudent.mutateAsync(studentPendingDelete.id);
+            toast.success("Student deleted");
+            setStudentPendingDelete(null);
+            if (editing?.id === studentPendingDelete.id) {
+              setEditing(null);
+              setOpen(false);
+            }
+          } catch (error) {
+            toast.error(error instanceof Error ? error.message : "Could not delete the student");
+          }
+        }}
+      />
     </Page>
   );
 }

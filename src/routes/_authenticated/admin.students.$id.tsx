@@ -3,7 +3,13 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Page } from "@/components/AppShell";
 import { Empty, PageHeader, Pill, Section, StatCard } from "@/components/kit";
-import { FormDialog, SelectField, TextAreaField, TextField } from "@/components/form-kit";
+import {
+  ConfirmDeleteDialog,
+  FormDialog,
+  SelectField,
+  TextAreaField,
+  TextField,
+} from "@/components/form-kit";
 import { Button } from "@/components/ui/button";
 import { fullName, prettyDate, useTable, useUpsert, useDeleteRow, useUpdateRow } from "@/lib/db";
 
@@ -11,7 +17,10 @@ export const Route = createFileRoute("/_authenticated/admin/students/$id")({
   head: () => ({
     meta: [
       { title: "Student record — ProgressTutors" },
-      { name: "description", content: "Full student record including classes, attendance, progress and homework." },
+      {
+        name: "description",
+        content: "Full student record including classes, attendance, progress and homework.",
+      },
       { property: "og:title", content: "Student record — ProgressTutors" },
       { property: "og:description", content: "Admin view of a single student record." },
       { name: "robots", content: "noindex" },
@@ -39,6 +48,10 @@ function StudentDetail() {
 
   const [classDialog, setClassDialog] = useState(false);
   const [chosenClass, setChosenClass] = useState("");
+  const [enrolmentPendingDelete, setEnrolmentPendingDelete] = useState<{
+    id: string;
+    lessonName: string;
+  } | null>(null);
   const [progressDialog, setProgressDialog] = useState(false);
   const [progressForm, setProgressForm] = useState({
     subject: "",
@@ -76,7 +89,8 @@ function StudentDetail() {
   const myEnrolments = (enrolments.data ?? []).filter((e) => e.student_id === id);
   const myAttendance = (attendance.data ?? []).filter((a) => a.student_id === id);
   const present = myAttendance.filter((a) => a.status === "present" || a.status === "late").length;
-  const attendancePct = myAttendance.length === 0 ? 0 : Math.round((present / myAttendance.length) * 100);
+  const attendancePct =
+    myAttendance.length === 0 ? 0 : Math.round((present / myAttendance.length) * 100);
   const parent = (parents.data ?? []).find((p) =>
     (links.data ?? []).some((l) => l.student_id === id && l.parent_id === p.id),
   );
@@ -92,13 +106,24 @@ function StudentDetail() {
           </Link>
         }
         title={fullName(student)}
-        subtitle={[student.year_group, student.school].filter(Boolean).join(" · ") || "No year group recorded"}
+        subtitle={
+          [student.year_group, student.school].filter(Boolean).join(" · ") ||
+          "No year group recorded"
+        }
         actions={<Button onClick={() => setClassDialog(true)}>Add to class</Button>}
       />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard label="Classes" value={String(myEnrolments.filter((e) => e.status === "active").length)} tone="blue" />
-        <StatCard label="Attendance" value={myAttendance.length === 0 ? "—" : `${attendancePct}%`} tone="green" />
+        <StatCard
+          label="Classes"
+          value={String(myEnrolments.filter((e) => e.status === "active").length)}
+          tone="blue"
+        />
+        <StatCard
+          label="Attendance"
+          value={myAttendance.length === 0 ? "—" : `${attendancePct}%`}
+          tone="green"
+        />
         <StatCard label="Sessions recorded" value={String(myAttendance.length)} tone="purple" />
         <StatCard label="Status" value={student.status} tone="pink" />
       </div>
@@ -119,12 +144,18 @@ function StudentDetail() {
           </div>
           <div>
             <dt className="text-xs text-muted-foreground">Date of birth</dt>
-            <dd className="font-semibold">{student.date_of_birth ? prettyDate(student.date_of_birth) : "—"}</dd>
+            <dd className="font-semibold">
+              {student.date_of_birth ? prettyDate(student.date_of_birth) : "—"}
+            </dd>
           </div>
         </dl>
       </Section>
 
-      <Section id="sd-sensitive" title="Safeguarding & medical" subtitle="Admin only — not shown on dashboards">
+      <Section
+        id="sd-sensitive"
+        title="Safeguarding & medical"
+        subtitle="Admin only — not shown on dashboards"
+      >
         <dl className="grid gap-3 text-sm sm:grid-cols-2">
           <div>
             <dt className="text-xs text-muted-foreground">Emergency contact</dt>
@@ -136,8 +167,12 @@ function StudentDetail() {
           <div>
             <dt className="text-xs text-muted-foreground">SEND / EHCP</dt>
             <dd className="flex gap-2">
-              <Pill tone={student.send_flag ? "amber" : "neutral"}>SEND {student.send_flag ? "yes" : "no"}</Pill>
-              <Pill tone={student.ehcp_flag ? "amber" : "neutral"}>EHCP {student.ehcp_flag ? "yes" : "no"}</Pill>
+              <Pill tone={student.send_flag ? "amber" : "neutral"}>
+                SEND {student.send_flag ? "yes" : "no"}
+              </Pill>
+              <Pill tone={student.ehcp_flag ? "amber" : "neutral"}>
+                EHCP {student.ehcp_flag ? "yes" : "no"}
+              </Pill>
             </dd>
           </div>
           <div>
@@ -163,8 +198,13 @@ function StudentDetail() {
             {myEnrolments.map((e) => {
               const c = classList.find((x) => x.id === e.class_id);
               return (
-                <li key={e.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-border px-4 py-3">
-                  <span className="min-w-0 flex-1 text-sm font-bold">{c?.name ?? "Class removed"}</span>
+                <li
+                  key={e.id}
+                  className="flex flex-wrap items-center gap-3 rounded-xl border border-border px-4 py-3"
+                >
+                  <span className="min-w-0 flex-1 text-sm font-bold">
+                    {c?.name ?? "Class removed"}
+                  </span>
                   <Pill tone={e.status === "active" ? "green" : "neutral"}>{e.status}</Pill>
                   <Button
                     size="sm"
@@ -182,10 +222,12 @@ function StudentDetail() {
                   <Button
                     size="sm"
                     variant="ghost"
-                    onClick={async () => {
-                      await removeEnrolment.mutateAsync(e.id);
-                      toast.success("Removed from class");
-                    }}
+                    onClick={() =>
+                      setEnrolmentPendingDelete({
+                        id: e.id,
+                        lessonName: c?.name ?? "this lesson",
+                      })
+                    }
                   >
                     Remove
                   </Button>
@@ -217,7 +259,8 @@ function StudentDetail() {
                     {p.subject ?? "General"} · {prettyDate(p.record_date)}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {p.score !== null ? `Score ${p.score}` : "No score"} · Target {p.target ?? "—"} · {p.status}
+                    {p.score !== null ? `Score ${p.score}` : "No score"} · Target {p.target ?? "—"}{" "}
+                    · {p.status}
                   </p>
                   {p.note ? <p className="mt-1 text-sm">{p.note}</p> : null}
                 </li>
@@ -242,7 +285,10 @@ function StudentDetail() {
             {(homework.data ?? [])
               .filter((h) => h.student_id === id)
               .map((h) => (
-                <li key={h.id} className="flex items-center justify-between rounded-xl border border-border px-4 py-3">
+                <li
+                  key={h.id}
+                  className="flex items-center justify-between rounded-xl border border-border px-4 py-3"
+                >
                   <span>
                     <span className="block font-bold">{h.title}</span>
                     <span className="block text-xs text-muted-foreground">
@@ -273,9 +319,32 @@ function StudentDetail() {
           full
           value={chosenClass}
           onChange={setChosenClass}
-          options={[{ value: "", label: "Choose a class" }, ...available.map((c) => ({ value: c.id, label: c.name }))]}
+          options={[
+            { value: "", label: "Choose a class" },
+            ...available.map((c) => ({ value: c.id, label: c.name })),
+          ]}
         />
       </FormDialog>
+      <ConfirmDeleteDialog
+        open={Boolean(enrolmentPendingDelete)}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen && !removeEnrolment.isPending) setEnrolmentPendingDelete(null);
+        }}
+        title="Remove this student from the lesson?"
+        description={`This permanently removes the enrolment from ${enrolmentPendingDelete?.lessonName ?? "this lesson"}.`}
+        confirmLabel="Remove student"
+        busy={removeEnrolment.isPending}
+        onConfirm={async () => {
+          if (!enrolmentPendingDelete) return;
+          try {
+            await removeEnrolment.mutateAsync(enrolmentPendingDelete.id);
+            toast.success("Removed from lesson");
+            setEnrolmentPendingDelete(null);
+          } catch (error) {
+            toast.error(error instanceof Error ? error.message : "Could not remove the student");
+          }
+        }}
+      />
 
       <FormDialog
         open={progressDialog}
@@ -296,10 +365,28 @@ function StudentDetail() {
         }}
         busy={addProgress.isPending}
       >
-        <TextField label="Subject / activity" value={progressForm.subject} onChange={(v) => setProgressForm({ ...progressForm, subject: v })} />
-        <TextField label="Date" type="date" value={progressForm.record_date} onChange={(v) => setProgressForm({ ...progressForm, record_date: v })} />
-        <TextField label="Score" type="number" value={progressForm.score} onChange={(v) => setProgressForm({ ...progressForm, score: v })} />
-        <TextField label="Target" value={progressForm.target} onChange={(v) => setProgressForm({ ...progressForm, target: v })} />
+        <TextField
+          label="Subject / activity"
+          value={progressForm.subject}
+          onChange={(v) => setProgressForm({ ...progressForm, subject: v })}
+        />
+        <TextField
+          label="Date"
+          type="date"
+          value={progressForm.record_date}
+          onChange={(v) => setProgressForm({ ...progressForm, record_date: v })}
+        />
+        <TextField
+          label="Score"
+          type="number"
+          value={progressForm.score}
+          onChange={(v) => setProgressForm({ ...progressForm, score: v })}
+        />
+        <TextField
+          label="Target"
+          value={progressForm.target}
+          onChange={(v) => setProgressForm({ ...progressForm, target: v })}
+        />
         <SelectField
           label="Status"
           value={progressForm.status}
@@ -310,7 +397,11 @@ function StudentDetail() {
             { value: "below", label: "Below target" },
           ]}
         />
-        <TextAreaField label="Note" value={progressForm.note} onChange={(v) => setProgressForm({ ...progressForm, note: v })} />
+        <TextAreaField
+          label="Note"
+          value={progressForm.note}
+          onChange={(v) => setProgressForm({ ...progressForm, note: v })}
+        />
       </FormDialog>
 
       <FormDialog
@@ -331,15 +422,33 @@ function StudentDetail() {
         }}
         busy={addHomework.isPending}
       >
-        <TextField label="Title" value={hwForm.title} onChange={(v) => setHwForm({ ...hwForm, title: v })} required full />
-        <TextField label="Due date" type="date" value={hwForm.due_date} onChange={(v) => setHwForm({ ...hwForm, due_date: v })} />
+        <TextField
+          label="Title"
+          value={hwForm.title}
+          onChange={(v) => setHwForm({ ...hwForm, title: v })}
+          required
+          full
+        />
+        <TextField
+          label="Due date"
+          type="date"
+          value={hwForm.due_date}
+          onChange={(v) => setHwForm({ ...hwForm, due_date: v })}
+        />
         <SelectField
           label="Class"
           value={hwForm.class_id}
           onChange={(v) => setHwForm({ ...hwForm, class_id: v })}
-          options={[{ value: "", label: "No class" }, ...classList.map((c) => ({ value: c.id, label: c.name }))]}
+          options={[
+            { value: "", label: "No class" },
+            ...classList.map((c) => ({ value: c.id, label: c.name })),
+          ]}
         />
-        <TextAreaField label="Description" value={hwForm.description} onChange={(v) => setHwForm({ ...hwForm, description: v })} />
+        <TextAreaField
+          label="Description"
+          value={hwForm.description}
+          onChange={(v) => setHwForm({ ...hwForm, description: v })}
+        />
       </FormDialog>
     </Page>
   );

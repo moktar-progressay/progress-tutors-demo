@@ -10,6 +10,16 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export function FormDialog({
   open,
@@ -21,6 +31,9 @@ export function FormDialog({
   busy,
   children,
   wide,
+  dangerLabel,
+  onDanger,
+  dangerBusy,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -31,6 +44,9 @@ export function FormDialog({
   busy?: boolean;
   children: ReactNode;
   wide?: boolean;
+  dangerLabel?: string | undefined;
+  onDanger?: (() => void) | undefined;
+  dangerBusy?: boolean | undefined;
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -52,6 +68,17 @@ export function FormDialog({
         >
           {children}
           <DialogFooter className="flex-row gap-2 sm:col-span-2">
+            {dangerLabel && onDanger ? (
+              <Button
+                type="button"
+                variant="destructive"
+                className="min-w-0 flex-1 sm:mr-auto sm:flex-none"
+                disabled={dangerBusy}
+                onClick={onDanger}
+              >
+                {dangerBusy ? "Deleting…" : dangerLabel}
+              </Button>
+            ) : null}
             <Button
               type="button"
               variant="ghost"
@@ -67,6 +94,48 @@ export function FormDialog({
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+export function ConfirmDeleteDialog({
+  open,
+  onOpenChange,
+  title,
+  description,
+  confirmLabel,
+  busy,
+  onConfirm,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  title: string;
+  description: string;
+  confirmLabel: string;
+  busy?: boolean;
+  onConfirm: () => void | Promise<void>;
+}) {
+  return (
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      <AlertDialogContent className="w-[calc(100%-2rem)] rounded-3xl">
+        <AlertDialogHeader>
+          <AlertDialogTitle>{title}</AlertDialogTitle>
+          <AlertDialogDescription>{description}</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter className="flex-row gap-2">
+          <AlertDialogCancel className="mt-0 min-w-0 flex-1">Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            className="min-w-0 flex-1 bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            disabled={busy}
+            onClick={(event) => {
+              event.preventDefault();
+              void onConfirm();
+            }}
+          >
+            {busy ? "Deleting…" : confirmLabel}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
 

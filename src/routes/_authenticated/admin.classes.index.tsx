@@ -26,13 +26,20 @@ import {
   Pencil,
   Plus,
   Search,
+  Trash2,
   Video,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Page } from "@/components/AppShell";
 import { Avatar, avatarTone, Empty, PageHeader, Pill } from "@/components/kit";
-import { FormDialog, SelectField, TextAreaField, TextField } from "@/components/form-kit";
+import {
+  ConfirmDeleteDialog,
+  FormDialog,
+  SelectField,
+  TextAreaField,
+  TextField,
+} from "@/components/form-kit";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
@@ -183,6 +190,7 @@ function SchedulePage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [detail, setDetail] = useState<ClassRow | null>(null);
+  const [lessonPendingDelete, setLessonPendingDelete] = useState<ClassRow | null>(null);
   const [quickEditing, setQuickEditing] = useState(false);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const dragRef = useRef<{
@@ -1197,7 +1205,7 @@ function SchedulePage() {
                   </div>
                 </div>
               )}
-              <div className="sticky bottom-0 z-10 -mx-2 grid grid-cols-3 gap-2 border-t border-border bg-background px-2 py-3">
+              <div className="sticky bottom-0 z-10 -mx-2 grid grid-cols-4 gap-2 border-t border-border bg-background px-2 py-3">
                 {quickEditing ? (
                   <>
                     <Button
@@ -1239,6 +1247,15 @@ function SchedulePage() {
                         Open
                       </Link>
                     </Button>
+                    <Button
+                      className="px-2 text-xs"
+                      variant="destructive"
+                      aria-label="Delete lesson"
+                      onClick={() => setLessonPendingDelete(detail)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      <span className="hidden sm:inline">Delete</span>
+                    </Button>
                   </>
                 )}
               </div>
@@ -1260,6 +1277,16 @@ function SchedulePage() {
         onSubmit={save}
         busy={createLesson.isPending || updateLesson.isPending || addEnrolments.isPending}
         submitLabel={editingId ? "Save changes" : "Add lesson"}
+        dangerLabel={editingId ? "Delete" : undefined}
+        dangerBusy={deleteLesson.isPending}
+        onDanger={
+          editingId
+            ? () => {
+                const lesson = (lessons.data ?? []).find((item) => item.id === editingId);
+                if (lesson) setLessonPendingDelete(lesson);
+              }
+            : undefined
+        }
       >
         <TextField
           label="Lesson name"
@@ -1426,36 +1453,32 @@ function SchedulePage() {
             </div>
           </>
         ) : null}
-        {editingId ? (
-          <div className="border-t border-border pt-4 sm:col-span-2">
-            <Button
-              type="button"
-              variant="destructive"
-              disabled={deleteLesson.isPending}
-              onClick={async () => {
-                if (
-                  !window.confirm(
-                    "Delete this lesson permanently? Its enrolments, registers and linked lesson records will also be removed.",
-                  )
-                )
-                  return;
-                try {
-                  await deleteLesson.mutateAsync(editingId);
-                  toast.success("Lesson deleted");
-                  setFormOpen(false);
-                  setEditingId(null);
-                } catch (error) {
-                  toast.error(
-                    error instanceof Error ? error.message : "Could not delete the lesson",
-                  );
-                }
-              }}
-            >
-              {deleteLesson.isPending ? "Deleting…" : "Delete lesson"}
-            </Button>
-          </div>
-        ) : null}
       </FormDialog>
+
+      <ConfirmDeleteDialog
+        open={Boolean(lessonPendingDelete)}
+        onOpenChange={(open) => {
+          if (!open && !deleteLesson.isPending) setLessonPendingDelete(null);
+        }}
+        title="Are you sure you want to delete this lesson?"
+        description="This cannot be undone. Enrolments and linked lesson records will also be removed."
+        confirmLabel="Delete lesson"
+        busy={deleteLesson.isPending}
+        onConfirm={async () => {
+          if (!lessonPendingDelete) return;
+          try {
+            await deleteLesson.mutateAsync(lessonPendingDelete.id);
+            toast.success("Lesson deleted");
+            setLessonPendingDelete(null);
+            setDetail(null);
+            setFormOpen(false);
+            setEditingId(null);
+            setQuickEditing(false);
+          } catch (error) {
+            toast.error(error instanceof Error ? error.message : "Could not delete the lesson");
+          }
+        }}
+      />
     </Page>
   );
 }
@@ -1508,42 +1531,66 @@ function TutorPicker({
   onChange: (value: string) => void;
   tutors: TutorRow[];
 }) {
+  const [expanded, setExpanded] = useState(!value);
+  const selectedTutor = tutors.find((tutor) => tutor.id === value);
   return (
     <div className="min-w-0 space-y-2 sm:col-span-2">
-      <p className="text-xs font-semibold text-muted-foreground">Tutor</p>
-      <div className="overflow-x-auto pb-1">
-        <div className="flex w-max min-w-full gap-2">
-          <button
-            type="button"
-            onClick={() => onChange("")}
-            className={cn(
-              "shrink-0 rounded-full border bg-card px-3 py-2 text-xs font-bold",
-              !value ? "border-primary ring-2 ring-primary/20" : "border-border",
-            )}
-          >
-            Tutor needed
-          </button>
-          {tutors.map((tutor) => (
-            <button
-              key={tutor.id}
-              type="button"
-              aria-label={`Choose ${fullName(tutor)}`}
-              onClick={() => onChange(tutor.id)}
-              className={cn(
-                "flex shrink-0 items-center gap-2 rounded-full border bg-card py-1.5 pl-1.5 pr-3 text-xs font-bold",
-                value === tutor.id ? "border-primary ring-2 ring-primary/20" : "border-border",
-              )}
-            >
-              <Avatar
-                initials={initialsOf(fullName(tutor))}
-                tone={avatarTone(fullName(tutor))}
-                size="sm"
-              />
-              {tutor.first_name}
-            </button>
-          ))}
-        </div>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs font-semibold text-muted-foreground">Tutor</p>
+        <button
+          type="button"
+          className="text-xs font-bold text-primary"
+          onClick={() => setExpanded((current) => !current)}
+        >
+          {expanded ? "Close" : selectedTutor ? "Edit" : "+ Add"}
+        </button>
       </div>
+      <div className="inline-flex max-w-full items-center gap-2 rounded-full border border-primary/30 bg-card py-1.5 pl-1.5 pr-3 text-xs font-bold">
+        <Avatar
+          initials={initialsOf(selectedTutor ? fullName(selectedTutor) : "Tutor needed")}
+          tone={avatarTone(selectedTutor ? fullName(selectedTutor) : "Tutor needed")}
+          size="sm"
+        />
+        <span className="truncate">{selectedTutor ? fullName(selectedTutor) : "Tutor needed"}</span>
+      </div>
+      {expanded ? (
+        <div className="overflow-x-auto rounded-2xl bg-muted/40 p-2">
+          <div className="flex w-max min-w-full gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                onChange("");
+                setExpanded(false);
+              }}
+              className="shrink-0 rounded-full border border-border bg-card px-3 py-2 text-xs font-bold"
+            >
+              Tutor needed
+            </button>
+            {tutors.map((tutor) => (
+              <button
+                key={tutor.id}
+                type="button"
+                aria-label={`Choose ${fullName(tutor)}`}
+                onClick={() => {
+                  onChange(tutor.id);
+                  setExpanded(false);
+                }}
+                className={cn(
+                  "flex shrink-0 items-center gap-2 rounded-full border bg-card py-1.5 pl-1.5 pr-3 text-xs font-bold",
+                  value === tutor.id ? "border-primary ring-2 ring-primary/20" : "border-border",
+                )}
+              >
+                <Avatar
+                  initials={initialsOf(fullName(tutor))}
+                  tone={avatarTone(fullName(tutor))}
+                  size="sm"
+                />
+                {fullName(tutor)}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -1666,6 +1713,7 @@ function SubjectPicker({
   onChange: (value: string) => void;
   options: string[];
 }) {
+  const [expanded, setExpanded] = useState(!value);
   const [adding, setAdding] = useState(false);
   const [custom, setCustom] = useState("");
   const colours = [
@@ -1682,54 +1730,74 @@ function SubjectPicker({
     onChange(next);
     setCustom("");
     setAdding(false);
+    setExpanded(false);
   };
 
   return (
     <div className="min-w-0 space-y-2 sm:col-span-2">
-      <p className="text-xs font-semibold text-muted-foreground">Subject</p>
-      <div className="overflow-x-auto pb-1">
-        <div className="flex w-max min-w-full gap-2">
-          {options.map((option, index) => (
-            <button
-              key={option}
-              type="button"
-              onClick={() => onChange(option)}
-              className={cn(
-                "shrink-0 rounded-full px-3 py-2 text-xs font-bold ring-offset-2 transition",
-                colours[index % colours.length],
-                selected === option && "ring-2 ring-primary",
-              )}
-            >
-              {option}
-            </button>
-          ))}
-          <button
-            type="button"
-            onClick={() => setAdding((current) => !current)}
-            className="shrink-0 rounded-full border border-dashed border-primary px-3 py-2 text-xs font-bold text-primary"
-          >
-            + Add subject
-          </button>
-        </div>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs font-semibold text-muted-foreground">Subject</p>
+        <button
+          type="button"
+          className="text-xs font-bold text-primary"
+          onClick={() => setExpanded((current) => !current)}
+        >
+          {expanded ? "Close" : selected ? "Edit" : "+ Add"}
+        </button>
       </div>
-      {adding ? (
-        <div className="flex min-w-0 gap-2">
-          <Input
-            value={custom}
-            onChange={(event) => setCustom(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.preventDefault();
-                addCustom();
-              }
-            }}
-            placeholder="New subject"
-            className="min-w-0 flex-1 rounded-xl"
-            autoFocus
-          />
-          <Button type="button" size="sm" onClick={addCustom}>
-            Add
-          </Button>
+      <span className="inline-flex max-w-full rounded-full bg-tile-blue px-3 py-2 text-xs font-bold text-tile-blue-ink">
+        {selected || "No subject selected"}
+      </span>
+      {expanded ? (
+        <div className="space-y-2 rounded-2xl bg-muted/40 p-2">
+          <div className="overflow-x-auto pb-1">
+            <div className="flex w-max min-w-full gap-2">
+              {options.map((option, index) => (
+                <button
+                  key={option}
+                  type="button"
+                  onClick={() => {
+                    onChange(option);
+                    setExpanded(false);
+                  }}
+                  className={cn(
+                    "shrink-0 rounded-full px-3 py-2 text-xs font-bold ring-offset-2 transition",
+                    colours[index % colours.length],
+                    selected === option && "ring-2 ring-primary",
+                  )}
+                >
+                  {option}
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => setAdding((current) => !current)}
+                className="shrink-0 rounded-full border border-dashed border-primary px-3 py-2 text-xs font-bold text-primary"
+              >
+                + New subject
+              </button>
+            </div>
+          </div>
+          {adding ? (
+            <div className="flex min-w-0 gap-2">
+              <Input
+                value={custom}
+                onChange={(event) => setCustom(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    addCustom();
+                  }
+                }}
+                placeholder="New subject"
+                className="min-w-0 flex-1 rounded-xl"
+                autoFocus
+              />
+              <Button type="button" size="sm" onClick={addCustom}>
+                Add
+              </Button>
+            </div>
+          ) : null}
         </div>
       ) : null}
     </div>
