@@ -126,7 +126,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   if (isPublic) return <>{children}</>;
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen max-w-full overflow-x-clip bg-background">
       {/* Private-workspace banner + demo role switcher */}
       <div className="sticky top-0 z-40 bg-primary text-primary-foreground">
         <div className="mx-auto flex max-w-[1500px] flex-wrap items-center justify-between gap-2 px-4 py-2">
@@ -141,7 +141,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </div>
 
-      <div className="mx-auto flex max-w-[1500px]">
+      <div className="mx-auto flex w-full min-w-0 max-w-[1500px]">
         {/* Desktop sidebar */}
         <aside className="sticky top-[46px] hidden h-[calc(100vh-46px)] w-64 shrink-0 flex-col border-r border-border px-4 py-6 lg:flex">
           <Link to="/" className="flex items-center gap-2 px-2">
@@ -195,7 +195,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </aside>
 
         {/* Content */}
-        <main className="min-w-0 flex-1 pb-24 lg:pb-0">
+        <main className="w-full min-w-0 max-w-full flex-1 pb-24 lg:pb-0">
           {/* Mobile top bar */}
           <div className="flex items-center justify-between border-b border-border px-4 py-3 lg:hidden">
             <Link to="/" className="flex items-center gap-2">
@@ -253,5 +253,9 @@ export function AppShell({ children }: { children: ReactNode }) {
 }
 
 export function Page({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cn("space-y-6 px-4 py-6 sm:px-6 lg:px-8", className)}>{children}</div>;
+  return (
+    <div className={cn("w-full min-w-0 max-w-full space-y-6 px-4 py-6 sm:px-6 lg:px-8", className)}>
+      {children}
+    </div>
+  );
 }
