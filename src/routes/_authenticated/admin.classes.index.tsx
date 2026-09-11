@@ -411,7 +411,6 @@ function SchedulePage() {
       armed: event.pointerType !== "touch",
       moved: false,
     };
-    event.currentTarget.setPointerCapture(event.pointerId);
     if (event.pointerType === "touch") {
       dragHoldTimerRef.current = setTimeout(() => {
         if (!dragRef.current || dragRef.current.pointerId !== event.pointerId) return;
@@ -438,6 +437,9 @@ function SchedulePage() {
       return;
     }
     if (distance < 8) return;
+    if (!event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    }
     drag.moved = true;
     setDraggingId(drag.lesson.id);
     event.preventDefault();
@@ -1071,6 +1073,7 @@ function SchedulePage() {
                     label="Lesson name"
                     value={form.name}
                     onChange={(name) => setForm({ ...form, name })}
+                    placeholder="Enter lesson name"
                   />
                   <div className="grid grid-cols-2 gap-3">
                     <TextField
@@ -1292,6 +1295,7 @@ function SchedulePage() {
           label="Lesson name"
           value={form.name}
           onChange={(name) => setForm({ ...form, name })}
+          placeholder="Enter lesson name"
           required
           full
         />
@@ -1608,7 +1612,9 @@ function LocationPicker({
   onCustomChange: (value: string) => void;
   sites: Site[];
 }) {
-  const [adding, setAdding] = useState(Boolean(customValue));
+  const [expanded, setExpanded] = useState(!value && !customValue);
+  const [adding, setAdding] = useState(Boolean(customValue) && !value);
+  const selectedSite = sites.find((site) => site.id === value);
   const colours = [
     "bg-tile-blue text-tile-blue-ink",
     "bg-tile-green text-tile-green-ink",
@@ -1618,50 +1624,80 @@ function LocationPicker({
   ];
   return (
     <div className="min-w-0 space-y-2 sm:col-span-2">
-      <p className="text-xs font-semibold text-muted-foreground">Location</p>
-      <div className="overflow-x-auto pb-1">
-        <div className="flex w-max min-w-full gap-2">
-          {sites.map((site, index) => (
-            <button
-              key={site.id}
-              type="button"
-              onClick={() => {
-                onChange(site.id);
-                onCustomChange("");
-                setAdding(false);
-              }}
-              className={cn(
-                "flex shrink-0 items-center gap-1.5 rounded-full px-3 py-2 text-xs font-bold ring-offset-2",
-                colours[index % colours.length],
-                value === site.id && "ring-2 ring-primary",
-              )}
-            >
-              <MapPin className="h-3.5 w-3.5" /> {site.name}
-            </button>
-          ))}
-          <button
-            type="button"
-            onClick={() => {
-              onChange("");
-              setAdding(true);
-            }}
-            className={cn(
-              "shrink-0 rounded-full border border-dashed border-primary px-3 py-2 text-xs font-bold text-primary",
-              !value && customValue && "ring-2 ring-primary",
-            )}
-          >
-            + Other location
-          </button>
-        </div>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs font-semibold text-muted-foreground">Location</p>
+        <button
+          type="button"
+          className="text-xs font-bold text-primary"
+          onClick={() => setExpanded((current) => !current)}
+        >
+          {expanded ? "Close" : selectedSite || customValue ? "Edit" : "+ Add"}
+        </button>
       </div>
-      {adding ? (
-        <Input
-          value={customValue}
-          onChange={(event) => onCustomChange(event.target.value)}
-          placeholder="Type the location"
-          className="h-10 rounded-xl"
-          autoFocus={!customValue}
-        />
+      <span className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-tile-blue px-3 py-2 text-xs font-bold text-tile-blue-ink">
+        <MapPin className="h-3.5 w-3.5 shrink-0" />
+        <span className="truncate">
+          {selectedSite?.name || customValue.trim() || "No location selected"}
+        </span>
+      </span>
+      {expanded ? (
+        <div className="space-y-2 rounded-2xl bg-muted/40 p-2">
+          <div className="overflow-x-auto pb-1">
+            <div className="flex w-max min-w-full gap-2">
+              {sites.map((site, index) => (
+                <button
+                  key={site.id}
+                  type="button"
+                  onClick={() => {
+                    onChange(site.id);
+                    onCustomChange("");
+                    setAdding(false);
+                    setExpanded(false);
+                  }}
+                  className={cn(
+                    "flex shrink-0 items-center gap-1.5 rounded-full px-3 py-2 text-xs font-bold ring-offset-2",
+                    colours[index % colours.length],
+                    value === site.id && "ring-2 ring-primary",
+                  )}
+                >
+                  <MapPin className="h-3.5 w-3.5" /> {site.name}
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => {
+                  onChange("");
+                  setAdding(true);
+                }}
+                className={cn(
+                  "shrink-0 rounded-full border border-dashed border-primary px-3 py-2 text-xs font-bold text-primary",
+                  !value && customValue && "ring-2 ring-primary",
+                )}
+              >
+                + Other location
+              </button>
+            </div>
+          </div>
+          {adding ? (
+            <div className="flex min-w-0 gap-2">
+              <Input
+                value={customValue}
+                onChange={(event) => onCustomChange(event.target.value)}
+                placeholder="Type the location"
+                className="h-10 min-w-0 flex-1 rounded-xl"
+                autoFocus={!customValue}
+              />
+              <Button
+                type="button"
+                size="sm"
+                disabled={!customValue.trim()}
+                onClick={() => setExpanded(false)}
+              >
+                Add
+              </Button>
+            </div>
+          ) : null}
+        </div>
       ) : null}
     </div>
   );
