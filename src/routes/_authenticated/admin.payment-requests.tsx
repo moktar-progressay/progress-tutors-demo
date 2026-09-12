@@ -1,21 +1,22 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { Check, ChevronDown, CircleHelp, Filter, WalletCards, X } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Page } from "@/components/AppShell";
-import { Empty, PageHeader, Pill, Section, StatCard } from "@/components/kit";
+import { Avatar, Empty, PageHeader, Pill, Section, StatCard, avatarTone } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { fullName, money, num, prettyDate, useTable, useUpdateRow } from "@/lib/db";
+import { fullName, initialsOf, money, num, prettyDate, useTable, useUpdateRow } from "@/lib/db";
 
 export const Route = createFileRoute("/_authenticated/admin/payment-requests")({
   head: () => ({
     meta: [
-      { title: "Payment Requests — ProgressTutors" },
+      { title: "Payment Requests - ProgressTutors" },
       {
         name: "description",
         content: "Review, approve, query and mark paid the payment requests tutors submit.",
       },
-      { property: "og:title", content: "Payment Requests — ProgressTutors" },
+      { property: "og:title", content: "Payment Requests - ProgressTutors" },
       { property: "og:description", content: "Approve and pay tutor payment requests." },
       { name: "robots", content: "noindex" },
     ],
@@ -34,6 +35,19 @@ const tone = (s: string) =>
           ? "pink"
           : "purple";
 
+const statusLabel = (status: string) =>
+  status === "submitted"
+    ? "Needs review"
+    : status === "approved"
+      ? "Approved"
+      : status === "paid"
+        ? "Paid"
+        : status === "queried"
+          ? "Query sent"
+          : status === "rejected"
+            ? "Declined"
+            : status;
+
 function AdminPaymentRequests() {
   const requests = useTable("payment_requests", "submitted_at");
   const items = useTable("payment_request_items");
@@ -45,13 +59,15 @@ function AdminPaymentRequests() {
   const earnings = useTable("tutor_earnings");
 
   const [q, setQ] = useState("");
+  const [status, setStatus] = useState("all");
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
 
   const rows = (requests.data ?? []).filter((r) => {
     const t = (tutors.data ?? []).find((x) => x.id === r.tutor_id);
-    return (
-      q === "" || `${fullName(t)} ${r.reference ?? ""}`.toLowerCase().includes(q.toLowerCase())
-    );
+    const matchesQuery =
+      q === "" || `${fullName(t)} ${r.reference ?? ""}`.toLowerCase().includes(q.toLowerCase());
+    return matchesQuery && (status === "all" || r.status === status);
   });
 
   const submitted = rows.filter((r) => r.status === "submitted");
@@ -78,7 +94,7 @@ function AdminPaymentRequests() {
     <Page>
       <PageHeader
         title="Payments"
-        subtitle="Collect from families and manage tutor payouts in one place."
+        subtitle="Manage money coming in from parents and requests from tutors."
       />
 
       <div className="flex gap-1 rounded-xl bg-muted p-1">
@@ -86,31 +102,66 @@ function AdminPaymentRequests() {
           to="/admin/payments"
           className="flex-1 rounded-lg px-4 py-2 text-center text-sm font-bold text-muted-foreground hover:text-foreground"
         >
-          Client payments
+          Parent payments
         </Link>
         <span className="flex-1 rounded-lg bg-card px-4 py-2 text-center text-sm font-bold text-primary shadow-sm">
-          Tutor payouts
+          Tutor requests
         </span>
       </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard label="Waiting" value={String(submitted.length)} tone="amber" />
+        <StatCard label="Needs review" value={String(submitted.length)} tone="amber" />
         <StatCard label="Approved" value={String(approved.length)} tone="green" />
         <StatCard label="Paid" value={String(paid.length)} tone="blue" />
         <StatCard
-          label="Value waiting"
+          label="Requested value"
           value={money(submitted.reduce((a, r) => a + num(r.total_amount), 0))}
           tone="pink"
         />
       </div>
 
-      <Section id="pr-list" title="All requests">
-        <Input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Search by tutor or reference"
-          className="mb-3 h-10 max-w-sm rounded-xl"
-        />
+      <Section
+        id="pr-list"
+        title="Tutor payment requests"
+        subtitle="Review each request, approve it, then mark it paid"
+        action={
+          <Button size="sm" variant="secondary" onClick={() => setFiltersOpen((open) => !open)}>
+            <Filter className="h-4 w-4" /> Filters
+            <ChevronDown className={`h-3.5 w-3.5 ${filtersOpen ? "rotate-180" : ""}`} />
+          </Button>
+        }
+      >
+        {filtersOpen ? (
+          <div className="mb-4 grid gap-2 rounded-2xl bg-muted p-3 sm:grid-cols-[1fr_180px_auto]">
+            <Input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Search tutor or reference"
+              className="h-10 rounded-xl bg-card"
+            />
+            <select
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+              className="h-10 rounded-xl border border-border bg-card px-3 text-sm font-medium"
+            >
+              <option value="all">All statuses</option>
+              <option value="submitted">Needs review</option>
+              <option value="approved">Approved</option>
+              <option value="paid">Paid</option>
+              <option value="queried">Query sent</option>
+              <option value="rejected">Declined</option>
+            </select>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setQ("");
+                setStatus("all");
+              }}
+            >
+              Clear
+            </Button>
+          </div>
+        ) : null}
         {rows.length === 0 ? (
           <Empty>No payment requests have been submitted yet.</Empty>
         ) : (
@@ -120,45 +171,29 @@ function AdminPaymentRequests() {
               const lines = (items.data ?? []).filter((i) => i.payment_request_id === r.id);
               const open = expanded === r.id;
               return (
-                <li key={r.id} className="rounded-2xl border border-border px-4 py-3">
-                  <div className="flex flex-wrap items-center gap-3">
+                <li key={r.id} className="rounded-2xl border border-border p-3 sm:p-4">
+                  <div className="flex items-start gap-3">
+                    <Avatar initials={initialsOf(fullName(t))} tone={avatarTone(fullName(t))} />
                     <button
                       type="button"
                       className="min-w-0 flex-1 text-left"
                       onClick={() => setExpanded(open ? null : r.id)}
                     >
-                      <p className="text-sm font-bold">
-                        {r.reference ?? "Request"} · {fullName(t)}
-                      </p>
+                      <p className="text-sm font-bold">{fullName(t)}</p>
                       <p className="text-xs text-muted-foreground">
-                        {lines.length} lessons · {num(r.total_hours)} hours · submitted{" "}
+                        {r.reference ?? "Payment request"} · submitted{" "}
                         {prettyDate(r.submitted_at.slice(0, 10))}
                       </p>
+                      <p className="mt-1 text-xs font-semibold">
+                        {lines.length} lessons · {num(r.total_hours)} hours
+                      </p>
                     </button>
-                    <span className="font-bold">{money(r.total_amount)}</span>
-                    <Pill tone={tone(r.status)}>{r.status}</Pill>
-                    {r.status === "submitted" ? (
-                      <>
-                        <Button size="sm" onClick={() => decide(r.id, "approved")}>
-                          Approve
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          onClick={() => decide(r.id, "queried")}
-                        >
-                          Query
-                        </Button>
-                        <Button size="sm" variant="ghost" onClick={() => decide(r.id, "rejected")}>
-                          Reject
-                        </Button>
-                      </>
-                    ) : null}
-                    {r.status === "approved" ? (
-                      <Button size="sm" onClick={() => decide(r.id, "paid")}>
-                        Mark paid
-                      </Button>
-                    ) : null}
+                    <div className="shrink-0 text-right">
+                      <p className="font-extrabold">{money(r.total_amount)}</p>
+                      <Pill tone={tone(r.status)} className="mt-1">
+                        {statusLabel(r.status)}
+                      </Pill>
+                    </div>
                   </div>
                   {open ? (
                     <ul className="mt-3 space-y-1 border-t border-border pt-3 text-sm">
@@ -171,7 +206,7 @@ function AdminPaymentRequests() {
                           return (
                             <li key={l.id} className="flex flex-wrap gap-2">
                               <span className="min-w-0 flex-1">
-                                {s ? prettyDate(s.session_date) : "—"} ·{" "}
+                                {s ? prettyDate(s.session_date) : "Date unavailable"} ·{" "}
                                 {c?.name ?? l.description ?? "Session"}
                               </span>
                               <span>{num(l.hours)}h</span>
@@ -181,6 +216,26 @@ function AdminPaymentRequests() {
                         })
                       )}
                     </ul>
+                  ) : null}
+                  {r.status === "submitted" ? (
+                    <div className="mt-3 grid grid-cols-3 gap-2 border-t border-border pt-3">
+                      <Button size="sm" onClick={() => decide(r.id, "approved")}>
+                        <Check className="h-4 w-4" /> Approve
+                      </Button>
+                      <Button size="sm" variant="secondary" onClick={() => decide(r.id, "queried")}>
+                        <CircleHelp className="h-4 w-4" /> Query
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => decide(r.id, "rejected")}>
+                        <X className="h-4 w-4" /> Decline
+                      </Button>
+                    </div>
+                  ) : null}
+                  {r.status === "approved" ? (
+                    <div className="mt-3 flex justify-end border-t border-border pt-3">
+                      <Button size="sm" onClick={() => decide(r.id, "paid")}>
+                        <WalletCards className="h-4 w-4" /> Mark paid
+                      </Button>
+                    </div>
                   ) : null}
                 </li>
               );

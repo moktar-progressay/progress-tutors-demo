@@ -188,10 +188,13 @@ export type Database = {
         Row: {
           amount: number;
           created_at: string;
+          due_date: string | null;
           id: string;
           method: string | null;
           note: string | null;
           parent_id: string | null;
+          paid_at: string | null;
+          payment_link: string | null;
           payment_date: string;
           reference: string | null;
           status: string;
@@ -202,10 +205,13 @@ export type Database = {
         Insert: {
           amount: number;
           created_at?: string;
+          due_date?: string | null;
           id?: string;
           method?: string | null;
           note?: string | null;
           parent_id?: string | null;
+          paid_at?: string | null;
+          payment_link?: string | null;
           payment_date?: string;
           reference?: string | null;
           status?: string;
@@ -216,10 +222,13 @@ export type Database = {
         Update: {
           amount?: number;
           created_at?: string;
+          due_date?: string | null;
           id?: string;
           method?: string | null;
           note?: string | null;
           parent_id?: string | null;
+          paid_at?: string | null;
+          payment_link?: string | null;
           payment_date?: string;
           reference?: string | null;
           status?: string;
