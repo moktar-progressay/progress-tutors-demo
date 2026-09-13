@@ -65,6 +65,7 @@ function ClassProfile() {
   const deleteClass = useDeleteRow("classes");
   const addEnrolment = useUpsert("class_enrolments");
   const updateEnrolment = useUpdateRow("class_enrolments");
+  const addSession = useUpsert("sessions", ["student_attendance"]);
   const addAttendance = useUpsert("student_attendance");
   const updateAttendance = useUpdateRow("student_attendance");
 
@@ -80,7 +81,8 @@ function ClassProfile() {
   const [editStudentIds, setEditStudentIds] = useState<string[]>([]);
   const [editStudentSearch, setEditStudentSearch] = useState("");
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const [attendanceSessionId, setAttendanceSessionId] = useState("");
+  const [attendanceDate, setAttendanceDate] = useState(DEMO_DATE);
+  const [attendanceSearch, setAttendanceSearch] = useState("");
   const [edit, setEdit] = useState({
     name: "",
     start_date: DEMO_DATE,
@@ -185,10 +187,7 @@ function ClassProfile() {
   const nextSession = [...classSessions]
     .filter((item) => !["completed", "cancelled"].includes(item.status))
     .sort((a, b) => a.session_date.localeCompare(b.session_date))[0];
-  const attendanceSession =
-    classSessions.find((item) => item.id === attendanceSessionId) ??
-    nextSession ??
-    [...classSessions].sort((a, b) => b.session_date.localeCompare(a.session_date))[0];
+  const attendanceSession = classSessions.find((item) => item.session_date === attendanceDate);
 
   const classLabel = (item: typeof c) => {
     const classSite = (sites.data ?? []).find((value) => value.id === item.site_id);
@@ -203,17 +202,19 @@ function ClassProfile() {
     const link = links.find((item) => item.is_primary) ?? links[0];
     return (parents.data ?? []).find((item) => item.id === link?.parent_id);
   };
-  const attendanceFor = (studentIdValue: string) => {
-    const records = classAttendance.filter((item) => item.student_id === studentIdValue);
-    const attended = records.filter(
-      (item) => item.status === "present" || item.status === "late",
-    ).length;
-    return {
-      attended,
-      total: records.length,
-      rate: records.length ? Math.round((attended / records.length) * 100) : null,
-    };
-  };
+  const attendanceRoster = activeRoster.filter((item) => {
+    const student = (students.data ?? []).find((value) => value.id === item.student_id);
+    const parent = parentFor(item.student_id);
+    const query = attendanceSearch.trim().toLowerCase();
+    return (
+      !query ||
+      [fullName(student), student?.year_group, student?.school, fullName(parent)]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+        .includes(query)
+    );
+  });
   const currentAttendanceFor = (studentIdValue: string) =>
     attendanceSession
       ? classAttendance.find(
@@ -222,22 +223,36 @@ function ClassProfile() {
       : undefined;
 
   const markAttendance = async (studentIdValue: string, status: "present" | "absent") => {
-    if (!attendanceSession) {
-      toast.error("Add a lesson session before taking attendance");
-      return;
-    }
-    const existing = currentAttendanceFor(studentIdValue);
     try {
+      let session = attendanceSession;
+      if (!session) {
+        const created = await addSession.mutateAsync({
+          class_id: c.id,
+          schedule_block_id: c.schedule_block_id,
+          site_id: c.site_id,
+          tutor_id: c.tutor_id,
+          session_date: attendanceDate,
+          start_time: c.start_time,
+          end_time: c.end_time,
+          status: "scheduled",
+          agreed_amount: c.session_rate,
+        });
+        session = created[0];
+      }
+      if (!session) throw new Error("Could not create the lesson date");
+      const existing = classAttendance.find(
+        (item) => item.session_id === session.id && item.student_id === studentIdValue,
+      );
       if (existing) {
         await updateAttendance.mutateAsync({ id: existing.id, values: { status } });
       } else {
         await addAttendance.mutateAsync({
-          session_id: attendanceSession.id,
+          session_id: session.id,
           student_id: studentIdValue,
           status,
         });
       }
-      toast.success(`Marked ${status} for ${prettyDate(attendanceSession.session_date)}`);
+      toast.success(`Marked ${status} for ${prettyDate(session.session_date)}`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not save attendance");
     }
@@ -401,29 +416,17 @@ function ClassProfile() {
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
               <h2 className="text-lg font-bold">Students ({activeRoster.length})</h2>
-              <p className="text-xs text-muted-foreground">Current and previous enrolments</p>
+              <p className="text-xs text-muted-foreground">Take attendance for this lesson</p>
             </div>
             <div className="flex flex-wrap items-end gap-2">
               <label className="flex min-w-[210px] flex-col gap-1 text-xs font-semibold text-muted-foreground">
                 Attendance for
-                <select
-                  value={attendanceSession?.id ?? ""}
-                  onChange={(event) => setAttendanceSessionId(event.target.value)}
-                  disabled={classSessions.length === 0}
+                <input
+                  type="date"
+                  value={attendanceDate}
+                  onChange={(event) => setAttendanceDate(event.target.value)}
                   className="h-9 rounded-xl border border-border bg-card px-3 text-sm font-semibold text-foreground"
-                >
-                  {classSessions.length === 0 ? (
-                    <option value="">No lesson sessions</option>
-                  ) : (
-                    [...classSessions]
-                      .sort((a, b) => b.session_date.localeCompare(a.session_date))
-                      .map((session) => (
-                        <option key={session.id} value={session.id}>
-                          {prettyDate(session.session_date)}
-                        </option>
-                      ))
-                  )}
-                </select>
+                />
               </label>
               <Button
                 onClick={() => {
@@ -438,178 +441,80 @@ function ClassProfile() {
               </Button>
             </div>
           </div>
-          {roster.length === 0 ? (
+          <div className="relative mt-4">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={attendanceSearch}
+              onChange={(event) => setAttendanceSearch(event.target.value)}
+              placeholder="Search students by name, year, school or parent"
+              className="h-11 rounded-xl pl-9"
+            />
+          </div>
+          {activeRoster.length === 0 ? (
             <div className="mt-4">
               <Empty>No students enrolled yet.</Empty>
             </div>
-          ) : (
+          ) : attendanceRoster.length === 0 ? (
             <div className="mt-4">
-              <div className="space-y-3 md:hidden">
-                {roster.map((item) => {
-                  const student = (students.data ?? []).find(
-                    (value) => value.id === item.student_id,
-                  );
-                  const studentAttendance = attendanceFor(item.student_id);
-                  const currentAttendance = currentAttendanceFor(item.student_id);
-                  return (
-                    <article key={item.id} className="rounded-2xl border border-border p-3">
-                      <div className="flex items-start gap-3">
-                        <Avatar
-                          initials={initialsOf(fullName(student))}
-                          tone={avatarTone(fullName(student))}
-                        />
-                        <div className="min-w-0 flex-1">
+              <Empty>No students match your search.</Empty>
+            </div>
+          ) : (
+            <div className="mt-4 overflow-x-auto rounded-xl border border-border">
+              <table className="w-full min-w-[320px] table-fixed text-left text-sm">
+                <thead className="border-b border-border bg-muted/50 text-xs text-muted-foreground">
+                  <tr>
+                    <th className="w-[52%] px-2 py-3 sm:px-3">Student name</th>
+                    <th className="w-[24%] px-1 py-3 text-center">Present</th>
+                    <th className="w-[24%] px-1 py-3 text-center">Absent</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {attendanceRoster.map((item) => {
+                    const student = (students.data ?? []).find(
+                      (value) => value.id === item.student_id,
+                    );
+                    const currentAttendance = currentAttendanceFor(item.student_id);
+                    const saving =
+                      addSession.isPending || addAttendance.isPending || updateAttendance.isPending;
+                    return (
+                      <tr key={item.id}>
+                        <td className="px-2 py-3 sm:px-3">
                           <Link
                             to="/admin/students/$id"
                             params={{ id: item.student_id }}
-                            className="block truncate text-sm font-bold hover:text-primary"
+                            className="flex min-w-0 items-center gap-2 font-bold hover:text-primary"
                           >
-                            {fullName(student)}
-                          </Link>
-                          <p className="truncate text-xs text-muted-foreground">
-                            {[student?.year_group, fullName(parentFor(item.student_id))]
-                              .filter((value) => value && value !== "—")
-                              .join(" · ") || "No additional details"}
-                          </p>
-                        </div>
-                        <Pill tone={item.status === "active" ? "green" : "neutral"}>
-                          {item.status}
-                        </Pill>
-                      </div>
-                      <div className="mt-3 space-y-3 border-t border-border pt-3">
-                        <div className="flex items-end justify-between gap-3">
-                          <div>
-                            <p className="text-[11px] font-semibold text-muted-foreground">
-                              Attendance
-                            </p>
-                            <p className="text-sm font-bold">
-                              {studentAttendance.rate === null
-                                ? "Not recorded yet"
-                                : `${studentAttendance.attended}/${studentAttendance.total} lessons (${studentAttendance.rate}%)`}
-                            </p>
-                          </div>
-                          {item.status === "active" ? (
-                            <Button
+                            <Avatar
+                              initials={initialsOf(fullName(student))}
+                              tone={avatarTone(fullName(student))}
                               size="sm"
-                              variant="ghost"
-                              onClick={() =>
-                                updateEnrolment.mutate(
-                                  { id: item.id, values: { status: "left" } },
-                                  { onSuccess: () => toast.success("Student removed from lesson") },
-                                )
-                              }
-                            >
-                              Remove
-                            </Button>
-                          ) : null}
-                        </div>
-                        {item.status === "active" ? (
-                          <AttendanceButtons
-                            status={currentAttendance?.status}
-                            disabled={
-                              !attendanceSession ||
-                              addAttendance.isPending ||
-                              updateAttendance.isPending
-                            }
-                            onPresent={() => markAttendance(item.student_id, "present")}
-                            onAbsent={() => markAttendance(item.student_id, "absent")}
-                          />
-                        ) : null}
-                      </div>
-                    </article>
-                  );
-                })}
-              </div>
-              <div className="hidden overflow-x-auto md:block">
-                <table className="w-full min-w-[680px] text-left text-sm">
-                  <thead className="border-b border-border text-xs text-muted-foreground">
-                    <tr>
-                      <th className="px-3 py-3">Student</th>
-                      <th className="px-3 py-3">Year</th>
-                      <th className="px-3 py-3">Parent</th>
-                      <th className="px-3 py-3">Attendance</th>
-                      <th className="px-3 py-3">Status</th>
-                      <th className="px-3 py-3 text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {roster.map((item) => {
-                      const student = (students.data ?? []).find(
-                        (value) => value.id === item.student_id,
-                      );
-                      const studentAttendance = attendanceFor(item.student_id);
-                      const currentAttendance = currentAttendanceFor(item.student_id);
-                      return (
-                        <tr key={item.id}>
-                          <td className="px-3 py-3">
-                            <span className="flex items-center gap-2">
-                              <Avatar
-                                initials={initialsOf(fullName(student))}
-                                tone={avatarTone(fullName(student))}
-                                size="sm"
-                              />
-                              <Link
-                                to="/admin/students/$id"
-                                params={{ id: item.student_id }}
-                                className="font-bold hover:text-primary"
-                              >
-                                {fullName(student)}
-                              </Link>
-                            </span>
-                          </td>
-                          <td className="px-3 py-3 text-muted-foreground">
-                            {student?.year_group ?? "—"}
-                          </td>
-                          <td className="px-3 py-3 text-muted-foreground">
-                            {fullName(parentFor(item.student_id))}
-                          </td>
-                          <td className="min-w-[260px] px-3 py-3">
-                            <AttendanceButtons
-                              status={currentAttendance?.status}
-                              disabled={
-                                item.status !== "active" ||
-                                !attendanceSession ||
-                                addAttendance.isPending ||
-                                updateAttendance.isPending
-                              }
-                              onPresent={() => markAttendance(item.student_id, "present")}
-                              onAbsent={() => markAttendance(item.student_id, "absent")}
                             />
-                            <p className="mt-1.5 text-xs font-semibold text-muted-foreground">
-                              {studentAttendance.rate === null
-                                ? "No attendance history"
-                                : `${studentAttendance.attended}/${studentAttendance.total} attended (${studentAttendance.rate}%)`}
-                            </p>
-                          </td>
-                          <td className="px-3 py-3">
-                            <Pill tone={item.status === "active" ? "green" : "neutral"}>
-                              {item.status}
-                            </Pill>
-                          </td>
-                          <td className="px-3 py-3 text-right">
-                            {item.status === "active" ? (
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() =>
-                                  updateEnrolment.mutate(
-                                    { id: item.id, values: { status: "left" } },
-                                    {
-                                      onSuccess: () => toast.success("Student removed from lesson"),
-                                    },
-                                  )
-                                }
-                              >
-                                Remove
-                              </Button>
-                            ) : null}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                            <span className="min-w-0 break-words leading-tight">
+                              {fullName(student)}
+                            </span>
+                          </Link>
+                        </td>
+                        <td className="px-1 py-3 text-center">
+                          <AttendanceChoiceButton
+                            type="present"
+                            selected={currentAttendance?.status === "present"}
+                            disabled={saving}
+                            onClick={() => markAttendance(item.student_id, "present")}
+                          />
+                        </td>
+                        <td className="px-1 py-3 text-center">
+                          <AttendanceChoiceButton
+                            type="absent"
+                            selected={currentAttendance?.status === "absent"}
+                            disabled={saving}
+                            onClick={() => markAttendance(item.student_id, "absent")}
+                          />
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           )}
         </section>
@@ -1210,40 +1115,38 @@ function ClassProfile() {
   );
 }
 
-function AttendanceButtons({
-  status,
+function AttendanceChoiceButton({
+  type,
+  selected,
   disabled,
-  onPresent,
-  onAbsent,
+  onClick,
 }: {
-  status: string | undefined;
+  type: "present" | "absent";
+  selected: boolean;
   disabled: boolean;
-  onPresent: () => void;
-  onAbsent: () => void;
+  onClick: () => void;
 }) {
+  const isPresent = type === "present";
   return (
-    <div className="grid grid-cols-2 gap-2" aria-label="Attendance status">
-      <Button
-        type="button"
-        size="sm"
-        variant={status === "present" ? "default" : "outline"}
-        className={status === "present" ? "bg-emerald-600 hover:bg-emerald-700" : ""}
-        disabled={disabled}
-        onClick={onPresent}
-      >
-        <Check className="h-4 w-4" /> Present
-      </Button>
-      <Button
-        type="button"
-        size="sm"
-        variant={status === "absent" ? "destructive" : "outline"}
-        className={status === "absent" ? "" : "text-destructive hover:text-destructive"}
-        disabled={disabled}
-        onClick={onAbsent}
-      >
-        <X className="h-4 w-4" /> Absent
-      </Button>
-    </div>
+    <Button
+      type="button"
+      size="sm"
+      variant={selected ? (isPresent ? "default" : "destructive") : "outline"}
+      className={`h-9 w-full gap-1 px-1 text-[11px] sm:text-xs ${
+        selected && isPresent
+          ? "bg-emerald-600 hover:bg-emerald-700"
+          : !selected && !isPresent
+            ? "text-destructive hover:text-destructive"
+            : ""
+      }`}
+      disabled={disabled}
+      onClick={onClick}
+      aria-pressed={selected}
+      aria-label={`Mark ${type}`}
+    >
+      {isPresent ? <Check className="h-3.5 w-3.5" /> : <X className="h-3.5 w-3.5" />}
+      <span>{isPresent ? "Present" : "Absent"}</span>
+    </Button>
   );
 }
 
