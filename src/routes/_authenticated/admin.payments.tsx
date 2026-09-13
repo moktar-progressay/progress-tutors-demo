@@ -12,6 +12,7 @@ import {
 import { useState } from "react";
 import { toast } from "sonner";
 import { Page } from "@/components/AppShell";
+import { FamilyInvoiceDialog } from "@/components/family-invoice-dialog";
 import { PaymentDocumentDialog } from "@/components/payment-document-dialog";
 import { Avatar, Empty, PageHeader, Pill, Section, StatCard, avatarTone } from "@/components/kit";
 import { FormDialog, SelectField, TextAreaField, TextField } from "@/components/form-kit";
@@ -27,7 +28,6 @@ import {
   useTable,
   useUpdateRow,
   useUpsert,
-  type SubscriptionRow,
 } from "@/lib/db";
 
 export const Route = createFileRoute("/_authenticated/admin/payments")({
@@ -57,10 +57,15 @@ function ParentPayments() {
   const programmes = useTable("programmes");
   const subscriptions = useTable("client_subscriptions");
   const payments = useTable("client_payments", "payment_date");
+  const parentLinks = useTable("parent_students");
+  const billingPlans = useTable("billing_plans", "name");
+  const invoices = useTable("billing_invoices", "created_at");
+  const invoiceItems = useTable("billing_invoice_items", "sort_order");
   const addSubscription = useUpsert("client_subscriptions");
   const updateSubscription = useUpdateRow("client_subscriptions");
   const addPayment = useUpsert("client_payments", ["parents"]);
   const updatePayment = useUpdateRow("client_payments", ["parents"]);
+  const updateInvoice = useUpdateRow("billing_invoices");
 
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -68,6 +73,7 @@ function ParentPayments() {
   const [subscriptionOpen, setSubscriptionOpen] = useState(false);
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [documentOpen, setDocumentOpen] = useState(false);
+  const [familyInvoiceOpen, setFamilyInvoiceOpen] = useState(false);
   const [paymentMode, setPaymentMode] = useState<PaymentMode>("invoice");
   const [subscription, setSubscription] = useState({
     parent_id: "",
@@ -96,8 +102,6 @@ function ParentPayments() {
   const studentName = (id: string | null) =>
     fullName((students.data ?? []).find((student) => student.id === id));
   const allPayments = payments.data ?? [];
-  const received = allPayments.filter((item) => item.status === "received");
-  const outstanding = allPayments.filter((item) => item.status !== "received");
   const activeSubscriptions = (subscriptions.data ?? []).filter((item) => item.status === "active");
   const filteredPayments = allPayments.filter((item) => {
     const matchesStatus = status === "all" || item.status === status;
@@ -122,22 +126,6 @@ function ParentPayments() {
     setPaymentOpen(true);
   }
 
-  function openSubscriptionInvoice(item: SubscriptionRow) {
-    setPaymentMode("invoice");
-    setPayment({
-      parent_id: item.parent_id ?? "",
-      student_id: item.student_id ?? "",
-      subscription_id: item.id,
-      amount: String(item.amount),
-      payment_date: item.next_due_date ?? DEMO_DATE,
-      payment_link: "",
-      method: "bank_transfer",
-      reference: "",
-      note: item.plan_name ?? "Monthly tuition subscription",
-    });
-    setPaymentOpen(true);
-  }
-
   function calculatedAmount(planId: string, weeklyHours: string, cadence: string) {
     const plan = (plans.data ?? []).find((item) => item.id === planId);
     if (!plan) return "";
@@ -155,8 +143,8 @@ function ParentPayments() {
             <Button variant="secondary" onClick={() => setDocumentOpen(true)}>
               <FileText className="h-4 w-4" /> Documents
             </Button>
-            <Button onClick={() => openPayment("invoice")}>
-              <Plus className="h-4 w-4" /> Create invoice
+            <Button onClick={() => setFamilyInvoiceOpen(true)}>
+              <Plus className="h-4 w-4" /> New family invoice
             </Button>
           </>
         }
@@ -176,15 +164,15 @@ function ParentPayments() {
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard
-          label="Outstanding"
-          value={money(outstanding.reduce((total, item) => total + num(item.amount), 0))}
-          hint={`${outstanding.length} invoices`}
+          label="Draft invoices"
+          value={String((invoices.data ?? []).filter((item) => item.status === "draft").length)}
+          hint="Awaiting approval"
           tone="amber"
         />
         <StatCard
-          label="Collected"
-          value={money(received.reduce((total, item) => total + num(item.amount), 0))}
-          hint={`${received.length} payments`}
+          label="Family invoice value"
+          value={money((invoices.data ?? []).reduce((total, item) => total + num(item.total), 0))}
+          hint={`${(invoices.data ?? []).length} invoices`}
           tone="green"
         />
         <StatCard
@@ -198,6 +186,99 @@ function ParentPayments() {
           tone="blue"
         />
       </div>
+
+      <Section
+        id="family-invoices"
+        title="Family invoices"
+        subtitle="One parent invoice can contain separate charges for every linked child"
+        action={
+          <Button size="sm" onClick={() => setFamilyInvoiceOpen(true)}>
+            <Plus className="h-4 w-4" /> New draft
+          </Button>
+        }
+      >
+        {(invoices.data ?? []).length === 0 ? (
+          <Empty>
+            No family invoice drafts yet. Create one to load the parent’s linked children.
+          </Empty>
+        ) : (
+          <ul className="space-y-2">
+            {(invoices.data ?? [])
+              .slice()
+              .reverse()
+              .map((invoice) => {
+                const name = parentName(invoice.parent_id);
+                const lines = (invoiceItems.data ?? []).filter(
+                  (item) => item.invoice_id === invoice.id,
+                );
+                const childIds = new Set(lines.map((item) => item.student_id).filter(Boolean));
+                return (
+                  <li key={invoice.id} className="rounded-2xl border border-border p-3 sm:p-4">
+                    <div className="flex flex-wrap items-start gap-3">
+                      <Avatar initials={initialsOf(name)} tone={avatarTone(name)} />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-bold">{name}</p>
+                          <Pill tone={invoice.status === "draft" ? "amber" : "green"}>
+                            {invoice.status}
+                          </Pill>
+                        </div>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          {invoice.invoice_number} · {childIds.size}{" "}
+                          {childIds.size === 1 ? "child" : "children"} · {lines.length}{" "}
+                          {lines.length === 1 ? "line" : "lines"}
+                        </p>
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {lines.map((line) => (
+                            <Pill key={line.id} tone="purple">
+                              {studentName(line.student_id)} · {line.description}
+                            </Pill>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <p className="text-lg font-extrabold">{money(invoice.total)}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {invoice.due_date ? `Due ${prettyDate(invoice.due_date)}` : "No due date"}
+                        </p>
+                      </div>
+                    </div>
+                    {invoice.status === "draft" ? (
+                      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3">
+                        <p className="text-xs text-muted-foreground">
+                          Approval records the internal decision only. It does not email or charge
+                          the parent.
+                        </p>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          disabled={updateInvoice.isPending}
+                          onClick={() =>
+                            updateInvoice.mutate(
+                              {
+                                id: invoice.id,
+                                values: {
+                                  status: "approved",
+                                  approved_at: new Date().toISOString(),
+                                },
+                              },
+                              {
+                                onSuccess: () =>
+                                  toast.success("Draft approved. Nothing was emailed."),
+                              },
+                            )
+                          }
+                        >
+                          <Check className="h-4 w-4" /> Approve draft
+                        </Button>
+                      </div>
+                    ) : null}
+                  </li>
+                );
+              })}
+          </ul>
+        )}
+      </Section>
 
       <Section
         id="parent-subscriptions"
@@ -243,7 +324,7 @@ function ParentPayments() {
                         <Button
                           size="sm"
                           variant="secondary"
-                          onClick={() => openSubscriptionInvoice(item)}
+                          onClick={() => setFamilyInvoiceOpen(true)}
                         >
                           Create invoice
                         </Button>
@@ -677,6 +758,14 @@ function ParentPayments() {
         onOpenChange={setDocumentOpen}
         parents={parents.data ?? []}
         students={students.data ?? []}
+      />
+      <FamilyInvoiceDialog
+        open={familyInvoiceOpen}
+        onOpenChange={setFamilyInvoiceOpen}
+        parents={parents.data ?? []}
+        students={students.data ?? []}
+        links={parentLinks.data ?? []}
+        plans={(billingPlans.data ?? []).filter((plan) => plan.active)}
       />
     </Page>
   );
