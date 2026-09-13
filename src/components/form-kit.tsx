@@ -3,7 +3,6 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -52,27 +51,29 @@ export function FormDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         className={
-          wide ? "max-h-[90vh] overflow-y-auto sm:max-w-3xl" : "max-h-[90vh] overflow-y-auto"
+          wide
+            ? "flex max-h-[calc(100dvh-1rem)] flex-col overflow-hidden p-0 sm:max-h-[90vh] sm:max-w-3xl"
+            : "flex max-h-[calc(100dvh-1rem)] flex-col overflow-hidden p-0 sm:max-h-[90vh]"
         }
       >
-        <DialogHeader>
+        <DialogHeader className="shrink-0 border-b border-border px-6 pt-6 pb-4 pr-12">
           <DialogTitle>{title}</DialogTitle>
           {description ? <DialogDescription>{description}</DialogDescription> : null}
         </DialogHeader>
         <form
-          className="grid gap-3 sm:grid-cols-2"
+          className="grid min-h-0 flex-1 gap-3 overflow-y-auto overscroll-contain px-6 pt-4 sm:grid-cols-2"
           onSubmit={(e) => {
             e.preventDefault();
             onSubmit();
           }}
         >
           {children}
-          <DialogFooter className="flex-row gap-2 sm:col-span-2">
+          <div className="sticky bottom-0 z-20 -mx-6 mt-1 grid grid-cols-2 gap-2 border-t border-border bg-background px-6 pt-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] shadow-[0_-8px_24px_rgba(0,0,0,0.06)] sm:col-span-2 sm:flex sm:flex-row">
             {dangerLabel && onDanger ? (
               <Button
                 type="button"
                 variant="destructive"
-                className="min-w-0 flex-1 sm:mr-auto sm:flex-none"
+                className="min-w-0 w-full sm:mr-auto sm:w-auto"
                 disabled={dangerBusy}
                 onClick={onDanger}
               >
@@ -82,15 +83,19 @@ export function FormDialog({
             <Button
               type="button"
               variant="ghost"
-              className="min-w-0 flex-1 sm:flex-none"
+              className="min-w-0 w-full sm:w-auto"
               onClick={() => onOpenChange(false)}
             >
               Cancel
             </Button>
-            <Button type="submit" className="min-w-0 flex-1 sm:flex-none" disabled={busy}>
+            <Button
+              type="submit"
+              className={`${dangerLabel && onDanger ? "col-span-2" : ""} min-w-0 w-full sm:w-auto`}
+              disabled={busy}
+            >
               {busy ? "Saving…" : submitLabel}
             </Button>
-          </DialogFooter>
+          </div>
         </form>
       </DialogContent>
     </Dialog>
