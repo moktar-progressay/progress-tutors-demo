@@ -43,7 +43,7 @@ import {
 } from "@/components/form-kit";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Slider } from "@/components/ui/slider";
+import { LessonTimeRangePicker } from "@/components/lesson-time-range-picker";
 import {
   Dialog,
   DialogContent,
@@ -103,6 +103,8 @@ const BLANK = {
   session_rate: "",
   price_per_session: "",
   notes: "",
+  goprogress_course_url: "",
+  active: "active",
   card_colour: "pink",
 };
 
@@ -179,6 +181,7 @@ function SchedulePage() {
   const updateLesson = useUpdateRow("classes");
   const deleteLesson = useDeleteRow("classes");
   const addEnrolments = useUpsert("class_enrolments", ["classes"]);
+  const updateEnrolment = useUpdateRow("class_enrolments", ["classes"]);
 
   const [view, setView] = useState<CalendarView>("week");
   const [selectedDate, setSelectedDate] = useState(DEMO_DATE);
@@ -193,7 +196,6 @@ function SchedulePage() {
   const [cloningId, setCloningId] = useState<string | null>(null);
   const [detail, setDetail] = useState<ClassRow | null>(null);
   const [lessonPendingDelete, setLessonPendingDelete] = useState<ClassRow | null>(null);
-  const [quickEditing, setQuickEditing] = useState(false);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const dragRef = useRef<{
     lesson: ClassRow;
@@ -343,6 +345,8 @@ function SchedulePage() {
       session_rate: lesson.session_rate === null ? "" : String(lesson.session_rate),
       price_per_session: lesson.price_per_session === null ? "" : String(lesson.price_per_session),
       notes: lesson.notes ?? "",
+      goprogress_course_url: lesson.goprogress_course_url ?? "",
+      active: lesson.active ? "active" : "archived",
       card_colour: lesson.card_colour ?? "pink",
     });
     setSelectedStudentIds(
@@ -354,71 +358,6 @@ function SchedulePage() {
     setShowMore(true);
     setDetail(null);
     setFormOpen(true);
-  }
-
-  function beginQuickEdit(lesson: ClassRow) {
-    setEditingId(lesson.id);
-    setForm({
-      ...BLANK,
-      name: lesson.name,
-      date: lesson.start_date ?? selectedDate,
-      start_time: hhmm(lesson.start_time),
-      end_time: hhmm(lesson.end_time),
-      recurrence: lesson.recurrence ?? "weekly",
-      end_date: lesson.end_date ?? "",
-      delivery_mode: lesson.delivery_mode,
-      site_id: lesson.site_id ?? "",
-      venue_name: lesson.venue_name ?? "",
-      room: lesson.room ?? "",
-      online_url: lesson.online_url ?? "",
-      tutor_id: lesson.tutor_id ?? "",
-      subject: lesson.subject ?? "",
-      level: lesson.level ?? "",
-      capacity: String(lesson.capacity),
-      session_rate: lesson.session_rate === null ? "" : String(lesson.session_rate),
-      price_per_session: lesson.price_per_session === null ? "" : String(lesson.price_per_session),
-      notes: lesson.notes ?? "",
-      card_colour: lesson.card_colour ?? "pink",
-    });
-    setQuickEditing(true);
-  }
-
-  async function saveQuickEdit() {
-    if (!detail) return;
-    if (!form.name.trim()) {
-      toast.error("Add a lesson name");
-      return;
-    }
-    if (minutes(form.end_time) <= minutes(form.start_time)) {
-      toast.error("End time must be after start time");
-      return;
-    }
-    try {
-      const updated = await updateLesson.mutateAsync({
-        id: detail.id,
-        values: {
-          name: form.name.trim(),
-          start_date: form.date,
-          weekday: format(parseISO(form.date), "EEEE"),
-          start_time: form.start_time,
-          end_time: form.end_time,
-          tutor_id: form.tutor_id || null,
-          delivery_mode: form.delivery_mode,
-          site_id: form.delivery_mode === "online" ? null : form.site_id || null,
-          online_url: form.delivery_mode === "online" ? form.online_url.trim() || null : null,
-          capacity: Number(form.capacity) || 0,
-          subject: subjectLabel(form.subject) || null,
-          venue_name: form.delivery_mode === "online" ? null : form.venue_name.trim() || null,
-          card_colour: form.card_colour,
-        },
-      });
-      setDetail(updated);
-      setQuickEditing(false);
-      setEditingId(null);
-      toast.success("Lesson updated");
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not update the lesson");
-    }
   }
 
   function beginDrag(event: React.PointerEvent<HTMLDivElement>, lesson: ClassRow) {
@@ -535,6 +474,8 @@ function SchedulePage() {
       session_rate: lesson.session_rate === null ? "" : String(lesson.session_rate),
       price_per_session: lesson.price_per_session === null ? "" : String(lesson.price_per_session),
       notes: lesson.notes ?? "",
+      goprogress_course_url: lesson.goprogress_course_url ?? "",
+      active: lesson.active ? "active" : "archived",
       card_colour: lesson.card_colour ?? "pink",
     });
     setSelectedStudentIds(
@@ -571,19 +512,40 @@ function SchedulePage() {
         session_rate: form.session_rate ? Number(form.session_rate) : null,
         price_per_session: form.price_per_session ? Number(form.price_per_session) : null,
         notes: form.notes.trim() || null,
+        goprogress_course_url: form.goprogress_course_url.trim() || null,
+        active: form.active === "active",
         card_colour: form.card_colour,
       };
       const created = editingId ? null : await createLesson.mutateAsync(values);
       if (editingId) await updateLesson.mutateAsync({ id: editingId, values });
       const lessonId = editingId ?? created?.[0]?.id;
-      if (lessonId && selectedStudentIds.length > 0) {
-        const alreadyEnrolled = new Set(
-          (enrolments.data ?? [])
-            .filter((item) => item.class_id === lessonId && item.status === "active")
-            .map((item) => item.student_id),
+      if (lessonId) {
+        const existing = (enrolments.data ?? []).filter((item) => item.class_id === lessonId);
+        const existingByStudent = new Map(existing.map((item) => [item.student_id, item]));
+        const selected = new Set(selectedStudentIds);
+        const newStudentIds = selectedStudentIds.filter((id) => !existingByStudent.has(id));
+        const toReactivate = existing.filter(
+          (item) => selected.has(item.student_id) && item.status !== "active",
         );
-        const newStudentIds = selectedStudentIds.filter((id) => !alreadyEnrolled.has(id));
-        if (newStudentIds.length > 0)
+        const toRemove = existing.filter(
+          (item) => item.status === "active" && !selected.has(item.student_id),
+        );
+
+        await Promise.all([
+          ...toReactivate.map((item) =>
+            updateEnrolment.mutateAsync({
+              id: item.id,
+              values: { status: "active", end_date: null },
+            }),
+          ),
+          ...toRemove.map((item) =>
+            updateEnrolment.mutateAsync({
+              id: item.id,
+              values: { status: "inactive", end_date: form.date },
+            }),
+          ),
+        ]);
+        if (newStudentIds.length > 0) {
           await addEnrolments.mutateAsync(
             newStudentIds.map((studentId) => ({
               class_id: lessonId,
@@ -591,6 +553,7 @@ function SchedulePage() {
               status: "active",
             })),
           );
+        }
       }
       toast.success(
         editingId
@@ -1124,7 +1087,6 @@ function SchedulePage() {
         onOpenChange={(open) => {
           if (!open) {
             setDetail(null);
-            setQuickEditing(false);
             setEditingId(null);
           }
         }}
@@ -1138,202 +1100,103 @@ function SchedulePage() {
                   {detail.weekday} · {hhmm(detail.start_time)}–{hhmm(detail.end_time)}
                 </DialogDescription>
               </DialogHeader>
-              {quickEditing ? (
-                <div className="grid gap-3">
-                  <TextField
-                    full
-                    required
-                    label="Lesson name"
-                    value={form.name}
-                    onChange={(name) => setForm({ ...form, name })}
-                    placeholder="Enter lesson name"
+              <div className="space-y-3 text-sm">
+                <p className="flex items-center gap-2">
+                  <Avatar
+                    initials={initialsOf(fullName(tutorFor(detail)))}
+                    tone={avatarTone(fullName(tutorFor(detail)))}
+                    size="sm"
                   />
-                  <div className="grid grid-cols-2 gap-3">
-                    <TextField
-                      label="Date"
-                      type="date"
-                      value={form.date}
-                      onChange={(date) => setForm({ ...form, date })}
-                    />
-                    <SelectField
-                      label="Delivery"
-                      value={form.delivery_mode}
-                      onChange={(delivery_mode) => setForm({ ...form, delivery_mode })}
-                      options={[
-                        { value: "in_person", label: "Face-to-face" },
-                        { value: "online", label: "Online" },
-                        { value: "hybrid", label: "Hybrid" },
-                      ]}
-                    />
-                  </div>
-                  <TimeRangePicker
-                    start={form.start_time}
-                    end={form.end_time}
-                    onChange={(start_time, end_time) => setForm({ ...form, start_time, end_time })}
-                  />
-                  <TutorPicker
-                    value={form.tutor_id}
-                    onChange={(tutor_id) => setForm({ ...form, tutor_id })}
-                    tutors={tutors.data ?? []}
-                  />
-                  <SubjectPicker
-                    value={form.subject}
-                    onChange={(subject) => setForm({ ...form, subject })}
-                    options={Array.from(
-                      new Set([
-                        "English",
-                        "Maths",
-                        "Science",
-                        ...subjects,
-                        subjectLabel(form.subject),
-                      ]),
-                    ).filter(Boolean)}
-                  />
-                  {form.delivery_mode === "online" ? (
-                    <TextField
-                      full
-                      label="Meeting link"
-                      value={form.online_url}
-                      onChange={(online_url) => setForm({ ...form, online_url })}
-                    />
+                  {fullName(tutorFor(detail))}
+                </p>
+                <p className="flex items-center gap-2">
+                  {detail.delivery_mode === "online" ? (
+                    <Video className="h-4 w-4 text-primary" />
                   ) : (
-                    <LocationPicker
-                      value={form.site_id}
-                      onChange={(site_id) => setForm({ ...form, site_id })}
-                      customValue={form.venue_name}
-                      onCustomChange={(venue_name) => setForm({ ...form, venue_name })}
-                      sites={sites.data ?? []}
-                    />
+                    <MapPin className="h-4 w-4 text-primary" />
                   )}
-                  <CardColourPicker
-                    value={form.card_colour}
-                    onChange={(card_colour) => setForm({ ...form, card_colour })}
-                  />
-                  <TextField
-                    label="Capacity"
-                    type="number"
-                    value={form.capacity}
-                    onChange={(capacity) => setForm({ ...form, capacity })}
-                  />
-                </div>
-              ) : (
-                <div className="space-y-3 text-sm">
-                  <p className="flex items-center gap-2">
-                    <Avatar
-                      initials={initialsOf(fullName(tutorFor(detail)))}
-                      tone={avatarTone(fullName(tutorFor(detail)))}
-                      size="sm"
-                    />
-                    {fullName(tutorFor(detail))}
-                  </p>
-                  <p className="flex items-center gap-2">
-                    {detail.delivery_mode === "online" ? (
-                      <Video className="h-4 w-4 text-primary" />
-                    ) : (
-                      <MapPin className="h-4 w-4 text-primary" />
-                    )}
-                    {detail.delivery_mode === "online"
-                      ? "Online lesson"
-                      : (siteFor(detail)?.name ?? detail.venue_name ?? "Venue to confirm")}
-                  </p>
-                  <p className="flex items-center gap-2">
-                    <Clock3 className="h-4 w-4 text-primary" />
-                    {detail.recurrence === "once" ? "One-off lesson" : "Repeats weekly"}
-                  </p>
-                  <Pill tone={capacityTone(countFor(detail), detail.capacity)}>
-                    {countFor(detail)}/{detail.capacity} students
-                  </Pill>
-                  <div className="space-y-1.5" aria-label="Seat capacity">
-                    <div className="h-2.5 overflow-hidden rounded-full bg-muted">
-                      <div
-                        className="h-full rounded-full bg-primary transition-[width]"
-                        style={{
-                          width: `${
-                            detail.capacity > 0
-                              ? Math.min(100, (countFor(detail) / detail.capacity) * 100)
-                              : 0
-                          }%`,
-                        }}
-                      />
-                    </div>
-                    <p className="text-xs font-semibold text-muted-foreground">
-                      {Math.max(0, detail.capacity - countFor(detail))} seats remaining
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3 border-t border-border pt-3">
-                    <div className="flex -space-x-2">
-                      {studentsFor(detail)
-                        .slice(0, 6)
-                        .map((student) => (
-                          <Avatar
-                            key={student.id}
-                            initials={initialsOf(fullName(student))}
-                            tone={avatarTone(fullName(student))}
-                            size="sm"
-                          />
-                        ))}
-                    </div>
-                    <span className="text-xs text-muted-foreground">
-                      {studentsFor(detail).length
-                        ? `${studentsFor(detail).length} enrolled`
-                        : "No students enrolled"}
-                    </span>
-                  </div>
-                </div>
-              )}
-              <div className="sticky bottom-0 z-10 -mx-2 grid grid-cols-4 gap-2 border-t border-border bg-background px-2 py-3">
-                {quickEditing ? (
-                  <>
-                    <Button
-                      className="col-span-1 px-2 text-xs"
-                      variant="ghost"
-                      onClick={() => {
-                        setQuickEditing(false);
-                        setEditingId(null);
+                  {detail.delivery_mode === "online"
+                    ? "Online lesson"
+                    : (siteFor(detail)?.name ?? detail.venue_name ?? "Venue to confirm")}
+                </p>
+                <p className="flex items-center gap-2">
+                  <Clock3 className="h-4 w-4 text-primary" />
+                  {detail.recurrence === "once" ? "One-off lesson" : "Repeats weekly"}
+                </p>
+                <Pill tone={capacityTone(countFor(detail), detail.capacity)}>
+                  {countFor(detail)}/{detail.capacity} students
+                </Pill>
+                <div className="space-y-1.5" aria-label="Seat capacity">
+                  <div className="h-2.5 overflow-hidden rounded-full bg-muted">
+                    <div
+                      className="h-full rounded-full bg-primary transition-[width]"
+                      style={{
+                        width: `${
+                          detail.capacity > 0
+                            ? Math.min(100, (countFor(detail) / detail.capacity) * 100)
+                            : 0
+                        }%`,
                       }}
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      className="col-span-2 px-2 text-xs"
-                      disabled={updateLesson.isPending}
-                      onClick={saveQuickEdit}
-                    >
-                      {updateLesson.isPending ? "Saving…" : "Save changes"}
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <Button
-                      className="px-2 text-xs"
-                      variant="secondary"
-                      onClick={() => beginQuickEdit(detail)}
-                    >
-                      <Pencil className="h-4 w-4" /> Edit
-                    </Button>
-                    <Button
-                      className="px-2 text-xs"
-                      variant="secondary"
-                      onClick={() => cloneLesson(detail)}
-                    >
-                      <Copy className="h-4 w-4" /> Clone
-                    </Button>
-                    <Button asChild className="px-2 text-xs">
-                      <Link to="/admin/classes/$id" params={{ id: detail.id }}>
-                        Open
-                      </Link>
-                    </Button>
-                    <Button
-                      className="px-2 text-xs"
-                      variant="destructive"
-                      aria-label="Delete lesson"
-                      onClick={() => setLessonPendingDelete(detail)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      <span className="hidden sm:inline">Delete</span>
-                    </Button>
-                  </>
-                )}
+                    />
+                  </div>
+                  <p className="text-xs font-semibold text-muted-foreground">
+                    {Math.max(0, detail.capacity - countFor(detail))} seats remaining
+                  </p>
+                </div>
+                <div className="border-t border-border pt-3">
+                  <p className="mb-2 text-xs font-semibold text-muted-foreground">
+                    {studentsFor(detail).length
+                      ? `${studentsFor(detail).length} enrolled`
+                      : "No students enrolled"}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {studentsFor(detail).map((student) => (
+                      <span
+                        key={student.id}
+                        className="inline-flex max-w-full items-center gap-2 rounded-full border border-border bg-muted/50 py-1 pl-1 pr-2.5"
+                      >
+                        <Avatar
+                          initials={initialsOf(fullName(student))}
+                          tone={avatarTone(fullName(student))}
+                          size="sm"
+                        />
+                        <span className="truncate text-xs font-bold">{fullName(student)}</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div className="sticky bottom-0 z-10 -mx-2 grid grid-cols-4 gap-2 border-t border-border bg-background px-2 py-3">
+                <>
+                  <Button
+                    className="px-2 text-xs"
+                    variant="secondary"
+                    onClick={() => editLesson(detail)}
+                  >
+                    <Pencil className="h-4 w-4" /> Edit
+                  </Button>
+                  <Button
+                    className="px-2 text-xs"
+                    variant="secondary"
+                    onClick={() => cloneLesson(detail)}
+                  >
+                    <Copy className="h-4 w-4" /> Clone
+                  </Button>
+                  <Button asChild className="px-2 text-xs">
+                    <Link to="/admin/classes/$id" params={{ id: detail.id }}>
+                      Open
+                    </Link>
+                  </Button>
+                  <Button
+                    className="px-2 text-xs"
+                    variant="destructive"
+                    aria-label="Delete lesson"
+                    onClick={() => setLessonPendingDelete(detail)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    <span className="hidden sm:inline">Delete</span>
+                  </Button>
+                </>
               </div>
             </>
           ) : null}
@@ -1356,7 +1219,12 @@ function SchedulePage() {
               : "Add an event to your calendar. You are not creating another schedule."
         }
         onSubmit={save}
-        busy={createLesson.isPending || updateLesson.isPending || addEnrolments.isPending}
+        busy={
+          createLesson.isPending ||
+          updateLesson.isPending ||
+          addEnrolments.isPending ||
+          updateEnrolment.isPending
+        }
         submitLabel={editingId ? "Save changes" : cloningId ? "Create cloned lesson" : "Add lesson"}
         dangerLabel={editingId ? "Delete" : undefined}
         dangerBusy={deleteLesson.isPending}
@@ -1393,7 +1261,7 @@ function SchedulePage() {
             { value: "weekly", label: "Every week" },
           ]}
         />
-        <TimeRangePicker
+        <LessonTimeRangePicker
           start={form.start_time}
           end={form.end_time}
           onChange={(start_time, end_time) => setForm({ ...form, start_time, end_time })}
@@ -1490,51 +1358,65 @@ function SchedulePage() {
               value={form.notes}
               onChange={(notes) => setForm({ ...form, notes })}
             />
-            <div className="space-y-2 sm:col-span-2">
-              <p className="text-xs font-semibold text-muted-foreground">
-                Students ({selectedStudentIds.length} selected)
-              </p>
-              <Input
-                value={studentSearch}
-                onChange={(event) => setStudentSearch(event.target.value)}
-                placeholder="Search students by name, school or year"
-                className="h-10 rounded-xl"
-              />
-              <div className="max-h-52 divide-y divide-border overflow-y-auto rounded-xl border border-border">
-                {visibleStudents.map((student) => (
-                  <label
-                    key={student.id}
-                    className="flex cursor-pointer items-center gap-3 px-3 py-2 hover:bg-muted"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedStudentIds.includes(student.id)}
-                      onChange={() =>
-                        setSelectedStudentIds((current) =>
-                          current.includes(student.id)
-                            ? current.filter((id) => id !== student.id)
-                            : [...current, student.id],
-                        )
-                      }
-                      className="h-4 w-4 accent-[var(--color-primary)]"
-                    />
-                    <Avatar
-                      initials={initialsOf(fullName(student))}
-                      size="sm"
-                      tone={avatarTone(fullName(student))}
-                    />
-                    <span className="min-w-0">
-                      <span className="block truncate text-sm font-bold">{fullName(student)}</span>
-                      <span className="block truncate text-xs text-muted-foreground">
-                        {[student.year_group, student.school].filter(Boolean).join(" · ")}
-                      </span>
-                    </span>
-                  </label>
-                ))}
-              </div>
-            </div>
+            <TextField
+              label="GoProgress course URL"
+              value={form.goprogress_course_url}
+              onChange={(goprogress_course_url) => setForm({ ...form, goprogress_course_url })}
+            />
+            <SelectField
+              label="Status"
+              value={form.active}
+              onChange={(active) => setForm({ ...form, active })}
+              options={[
+                { value: "active", label: "Active" },
+                { value: "archived", label: "Archived" },
+              ]}
+            />
           </>
         ) : null}
+        <div className="space-y-2 border-t border-border pt-4 sm:col-span-2">
+          <p className="text-xs font-semibold text-muted-foreground">
+            Students ({selectedStudentIds.length} selected)
+          </p>
+          <Input
+            value={studentSearch}
+            onChange={(event) => setStudentSearch(event.target.value)}
+            placeholder="Search students by name, school or year"
+            className="h-10 rounded-xl"
+          />
+          <div className="max-h-52 divide-y divide-border overflow-y-auto rounded-xl border border-border">
+            {visibleStudents.map((student) => (
+              <label
+                key={student.id}
+                className="flex cursor-pointer items-center gap-3 px-3 py-2 hover:bg-muted"
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedStudentIds.includes(student.id)}
+                  onChange={() =>
+                    setSelectedStudentIds((current) =>
+                      current.includes(student.id)
+                        ? current.filter((id) => id !== student.id)
+                        : [...current, student.id],
+                    )
+                  }
+                  className="h-4 w-4 accent-[var(--color-primary)]"
+                />
+                <Avatar
+                  initials={initialsOf(fullName(student))}
+                  size="sm"
+                  tone={avatarTone(fullName(student))}
+                />
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-bold">{fullName(student)}</span>
+                  <span className="block truncate text-xs text-muted-foreground">
+                    {[student.year_group, student.school].filter(Boolean).join(" · ")}
+                  </span>
+                </span>
+              </label>
+            ))}
+          </div>
+        </div>
       </FormDialog>
 
       <ConfirmDeleteDialog
@@ -1555,52 +1437,12 @@ function SchedulePage() {
             setDetail(null);
             setFormOpen(false);
             setEditingId(null);
-            setQuickEditing(false);
           } catch (error) {
             toast.error(error instanceof Error ? error.message : "Could not delete the lesson");
           }
         }}
       />
     </Page>
-  );
-}
-
-function TimeRangePicker({
-  start,
-  end,
-  onChange,
-}: {
-  start: string;
-  end: string;
-  onChange: (start: string, end: string) => void;
-}) {
-  return (
-    <div className="min-w-0 space-y-3 rounded-xl border border-border bg-muted/30 p-3 sm:col-span-2">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-xs font-semibold text-muted-foreground">Time</p>
-        <div className="flex items-center gap-2 text-sm font-extrabold">
-          <span className="rounded-lg bg-card px-2.5 py-1.5 shadow-sm">{hhmm(start)}</span>
-          <span className="text-muted-foreground">to</span>
-          <span className="rounded-lg bg-card px-2.5 py-1.5 shadow-sm">{hhmm(end)}</span>
-        </div>
-      </div>
-      <Slider
-        min={6 * 60}
-        max={22 * 60}
-        step={15}
-        minStepsBetweenThumbs={1}
-        value={[minutes(start), minutes(end)]}
-        onValueChange={([nextStart, nextEnd]) => {
-          if (nextStart === undefined || nextEnd === undefined) return;
-          onChange(clock(nextStart), clock(nextEnd));
-        }}
-      />
-      <div className="flex justify-between text-[10px] font-semibold text-muted-foreground">
-        <span>06:00</span>
-        <span>Drag start and end</span>
-        <span>22:00</span>
-      </div>
-    </div>
   );
 }
 
