@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { ArrowLeft, Check, Filter, Pencil, Plus, Search } from "lucide-react";
+import { ArrowLeft, Check, Filter, Pencil, Plus, Search, X } from "lucide-react";
 import { toast } from "sonner";
 import { Page } from "@/components/AppShell";
 import { Avatar, avatarTone, Empty, GoProgressLink, PageHeader, Pill } from "@/components/kit";
@@ -64,6 +64,8 @@ function ClassProfile() {
   const deleteClass = useDeleteRow("classes");
   const addEnrolment = useUpsert("class_enrolments");
   const updateEnrolment = useUpdateRow("class_enrolments");
+  const addAttendance = useUpsert("student_attendance");
+  const updateAttendance = useUpdateRow("student_attendance");
 
   const [tab, setTab] = useState<Tab>("Students");
   const [lessonPickerOpen, setLessonPickerOpen] = useState(false);
@@ -75,6 +77,7 @@ function ClassProfile() {
   const [studentYear, setStudentYear] = useState("all");
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [attendanceSessionId, setAttendanceSessionId] = useState("");
   const [edit, setEdit] = useState({
     name: "",
     start_date: DEMO_DATE,
@@ -158,6 +161,10 @@ function ClassProfile() {
   const nextSession = [...classSessions]
     .filter((item) => !["completed", "cancelled"].includes(item.status))
     .sort((a, b) => a.session_date.localeCompare(b.session_date))[0];
+  const attendanceSession =
+    classSessions.find((item) => item.id === attendanceSessionId) ??
+    nextSession ??
+    [...classSessions].sort((a, b) => b.session_date.localeCompare(a.session_date))[0];
 
   const classLabel = (item: typeof c) => {
     const classSite = (sites.data ?? []).find((value) => value.id === item.site_id);
@@ -182,6 +189,34 @@ function ClassProfile() {
       total: records.length,
       rate: records.length ? Math.round((attended / records.length) * 100) : null,
     };
+  };
+  const currentAttendanceFor = (studentIdValue: string) =>
+    attendanceSession
+      ? classAttendance.find(
+          (item) => item.session_id === attendanceSession.id && item.student_id === studentIdValue,
+        )
+      : undefined;
+
+  const markAttendance = async (studentIdValue: string, status: "present" | "absent") => {
+    if (!attendanceSession) {
+      toast.error("Add a lesson session before taking attendance");
+      return;
+    }
+    const existing = currentAttendanceFor(studentIdValue);
+    try {
+      if (existing) {
+        await updateAttendance.mutateAsync({ id: existing.id, values: { status } });
+      } else {
+        await addAttendance.mutateAsync({
+          session_id: attendanceSession.id,
+          student_id: studentIdValue,
+          status,
+        });
+      }
+      toast.success(`Marked ${status} for ${prettyDate(attendanceSession.session_date)}`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not save attendance");
+    }
   };
   const openEdit = () => {
     setEdit({
@@ -327,22 +362,45 @@ function ClassProfile() {
 
       {tab === "Students" ? (
         <section className="rounded-2xl border border-border bg-card p-4 sm:p-5">
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
               <h2 className="text-lg font-bold">Students ({activeRoster.length})</h2>
               <p className="text-xs text-muted-foreground">Current and previous enrolments</p>
             </div>
-            <Button
-              onClick={() => {
-                setSelectedStudentIds([]);
-                setStudentSearch("");
-                setStudentSchool("all");
-                setStudentYear("all");
-                setEnrolOpen(true);
-              }}
-            >
-              <Plus className="h-4 w-4" /> Add students
-            </Button>
+            <div className="flex flex-wrap items-end gap-2">
+              <label className="flex min-w-[210px] flex-col gap-1 text-xs font-semibold text-muted-foreground">
+                Attendance for
+                <select
+                  value={attendanceSession?.id ?? ""}
+                  onChange={(event) => setAttendanceSessionId(event.target.value)}
+                  disabled={classSessions.length === 0}
+                  className="h-9 rounded-xl border border-border bg-card px-3 text-sm font-semibold text-foreground"
+                >
+                  {classSessions.length === 0 ? (
+                    <option value="">No lesson sessions</option>
+                  ) : (
+                    [...classSessions]
+                      .sort((a, b) => b.session_date.localeCompare(a.session_date))
+                      .map((session) => (
+                        <option key={session.id} value={session.id}>
+                          {prettyDate(session.session_date)}
+                        </option>
+                      ))
+                  )}
+                </select>
+              </label>
+              <Button
+                onClick={() => {
+                  setSelectedStudentIds([]);
+                  setStudentSearch("");
+                  setStudentSchool("all");
+                  setStudentYear("all");
+                  setEnrolOpen(true);
+                }}
+              >
+                <Plus className="h-4 w-4" /> Add students
+              </Button>
+            </div>
           </div>
           {roster.length === 0 ? (
             <div className="mt-4">
@@ -356,6 +414,7 @@ function ClassProfile() {
                     (value) => value.id === item.student_id,
                   );
                   const studentAttendance = attendanceFor(item.student_id);
+                  const currentAttendance = currentAttendanceFor(item.student_id);
                   return (
                     <article key={item.id} className="rounded-2xl border border-border p-3">
                       <div className="flex items-start gap-3">
@@ -381,30 +440,44 @@ function ClassProfile() {
                           {item.status}
                         </Pill>
                       </div>
-                      <div className="mt-3 flex items-center justify-between gap-3 border-t border-border pt-3">
-                        <div>
-                          <p className="text-[11px] font-semibold text-muted-foreground">
-                            Attendance
-                          </p>
-                          <p className="text-sm font-bold">
-                            {studentAttendance.rate === null
-                              ? "Not recorded yet"
-                              : `${studentAttendance.attended}/${studentAttendance.total} lessons (${studentAttendance.rate}%)`}
-                          </p>
+                      <div className="mt-3 space-y-3 border-t border-border pt-3">
+                        <div className="flex items-end justify-between gap-3">
+                          <div>
+                            <p className="text-[11px] font-semibold text-muted-foreground">
+                              Attendance
+                            </p>
+                            <p className="text-sm font-bold">
+                              {studentAttendance.rate === null
+                                ? "Not recorded yet"
+                                : `${studentAttendance.attended}/${studentAttendance.total} lessons (${studentAttendance.rate}%)`}
+                            </p>
+                          </div>
+                          {item.status === "active" ? (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() =>
+                                updateEnrolment.mutate(
+                                  { id: item.id, values: { status: "left" } },
+                                  { onSuccess: () => toast.success("Student removed from lesson") },
+                                )
+                              }
+                            >
+                              Remove
+                            </Button>
+                          ) : null}
                         </div>
                         {item.status === "active" ? (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() =>
-                              updateEnrolment.mutate(
-                                { id: item.id, values: { status: "left" } },
-                                { onSuccess: () => toast.success("Student removed from lesson") },
-                              )
+                          <AttendanceButtons
+                            status={currentAttendance?.status}
+                            disabled={
+                              !attendanceSession ||
+                              addAttendance.isPending ||
+                              updateAttendance.isPending
                             }
-                          >
-                            Remove
-                          </Button>
+                            onPresent={() => markAttendance(item.student_id, "present")}
+                            onAbsent={() => markAttendance(item.student_id, "absent")}
+                          />
                         ) : null}
                       </div>
                     </article>
@@ -429,6 +502,7 @@ function ClassProfile() {
                         (value) => value.id === item.student_id,
                       );
                       const studentAttendance = attendanceFor(item.student_id);
+                      const currentAttendance = currentAttendanceFor(item.student_id);
                       return (
                         <tr key={item.id}>
                           <td className="px-3 py-3">
@@ -453,10 +527,23 @@ function ClassProfile() {
                           <td className="px-3 py-3 text-muted-foreground">
                             {fullName(parentFor(item.student_id))}
                           </td>
-                          <td className="px-3 py-3 font-semibold">
-                            {studentAttendance.rate === null
-                              ? "Not recorded yet"
-                              : `${studentAttendance.attended}/${studentAttendance.total} attended (${studentAttendance.rate}%)`}
+                          <td className="min-w-[260px] px-3 py-3">
+                            <AttendanceButtons
+                              status={currentAttendance?.status}
+                              disabled={
+                                item.status !== "active" ||
+                                !attendanceSession ||
+                                addAttendance.isPending ||
+                                updateAttendance.isPending
+                              }
+                              onPresent={() => markAttendance(item.student_id, "present")}
+                              onAbsent={() => markAttendance(item.student_id, "absent")}
+                            />
+                            <p className="mt-1.5 text-xs font-semibold text-muted-foreground">
+                              {studentAttendance.rate === null
+                                ? "No attendance history"
+                                : `${studentAttendance.attended}/${studentAttendance.total} attended (${studentAttendance.rate}%)`}
+                            </p>
                           </td>
                           <td className="px-3 py-3">
                             <Pill tone={item.status === "active" ? "green" : "neutral"}>
@@ -925,6 +1012,43 @@ function ClassProfile() {
         }}
       />
     </Page>
+  );
+}
+
+function AttendanceButtons({
+  status,
+  disabled,
+  onPresent,
+  onAbsent,
+}: {
+  status: string | undefined;
+  disabled: boolean;
+  onPresent: () => void;
+  onAbsent: () => void;
+}) {
+  return (
+    <div className="grid grid-cols-2 gap-2" aria-label="Attendance status">
+      <Button
+        type="button"
+        size="sm"
+        variant={status === "present" ? "default" : "outline"}
+        className={status === "present" ? "bg-emerald-600 hover:bg-emerald-700" : ""}
+        disabled={disabled}
+        onClick={onPresent}
+      >
+        <Check className="h-4 w-4" /> Present
+      </Button>
+      <Button
+        type="button"
+        size="sm"
+        variant={status === "absent" ? "destructive" : "outline"}
+        className={status === "absent" ? "" : "text-destructive hover:text-destructive"}
+        disabled={disabled}
+        onClick={onAbsent}
+      >
+        <X className="h-4 w-4" /> Absent
+      </Button>
+    </div>
   );
 }
 
