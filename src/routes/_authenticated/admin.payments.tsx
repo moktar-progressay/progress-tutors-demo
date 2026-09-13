@@ -758,6 +758,7 @@ function ParentPayments() {
         onOpenChange={setDocumentOpen}
         parents={parents.data ?? []}
         students={students.data ?? []}
+        links={parentLinks.data ?? []}
       />
       <FamilyInvoiceDialog
         open={familyInvoiceOpen}
