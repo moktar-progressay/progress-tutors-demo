@@ -1,5 +1,6 @@
 name: Deploy to GitHub Pages
 
+# Rebuild the live demo whenever main changes.
 on:
   push:
     branches: [main]
