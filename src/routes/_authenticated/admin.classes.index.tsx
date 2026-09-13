@@ -3,6 +3,7 @@ import {
   addDays,
   addMonths,
   addWeeks,
+  differenceInCalendarDays,
   eachDayOfInterval,
   endOfMonth,
   endOfWeek,
@@ -189,6 +190,7 @@ function SchedulePage() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [cloningId, setCloningId] = useState<string | null>(null);
   const [detail, setDetail] = useState<ClassRow | null>(null);
   const [lessonPendingDelete, setLessonPendingDelete] = useState<ClassRow | null>(null);
   const [quickEditing, setQuickEditing] = useState(false);
@@ -217,6 +219,7 @@ function SchedulePage() {
   useEffect(() => {
     if (!add) return;
     setEditingId(null);
+    setCloningId(null);
     setSelectedStudentIds([]);
     setStudentSearch("");
     setShowMore(false);
@@ -297,6 +300,7 @@ function SchedulePage() {
 
   function openNew(date = selectedDate) {
     setEditingId(null);
+    setCloningId(null);
     setForm({ ...BLANK, date });
     setSelectedStudentIds([]);
     setStudentSearch("");
@@ -305,15 +309,28 @@ function SchedulePage() {
   }
 
   function cloneLesson(lesson: ClassRow) {
+    const cloneDate = selectedDate || lesson.start_date || DEMO_DATE;
+    const repeatDurationDays =
+      lesson.start_date && lesson.end_date
+        ? Math.max(
+            0,
+            differenceInCalendarDays(parseISO(lesson.end_date), parseISO(lesson.start_date)),
+          )
+        : null;
+
     setEditingId(null);
+    setCloningId(lesson.id);
     setForm({
       ...BLANK,
       name: lesson.name,
-      date: selectedDate,
+      date: cloneDate,
       start_time: hhmm(lesson.start_time),
       end_time: hhmm(lesson.end_time),
       recurrence: lesson.recurrence ?? "weekly",
-      end_date: lesson.end_date ?? "",
+      end_date:
+        lesson.recurrence === "weekly" && repeatDurationDays !== null
+          ? format(addDays(parseISO(cloneDate), repeatDurationDays), "yyyy-MM-dd")
+          : "",
       delivery_mode: lesson.delivery_mode,
       site_id: lesson.site_id ?? "",
       venue_name: lesson.venue_name ?? "",
@@ -328,7 +345,12 @@ function SchedulePage() {
       notes: lesson.notes ?? "",
       card_colour: lesson.card_colour ?? "pink",
     });
-    setSelectedStudentIds([]);
+    setSelectedStudentIds(
+      (enrolments.data ?? [])
+        .filter((item) => item.class_id === lesson.id && item.status === "active")
+        .map((item) => item.student_id),
+    );
+    setStudentSearch("");
     setShowMore(true);
     setDetail(null);
     setFormOpen(true);
@@ -492,6 +514,7 @@ function SchedulePage() {
 
   function editLesson(lesson: ClassRow) {
     setEditingId(lesson.id);
+    setCloningId(null);
     setForm({
       ...BLANK,
       name: lesson.name,
@@ -569,9 +592,16 @@ function SchedulePage() {
             })),
           );
       }
-      toast.success(editingId ? "Lesson updated" : "Lesson added to your calendar");
+      toast.success(
+        editingId
+          ? "Lesson updated"
+          : cloningId
+            ? "Lesson cloned with its enrolled students"
+            : "Lesson added to your calendar",
+      );
       setFormOpen(false);
       setEditingId(null);
+      setCloningId(null);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not create the lesson");
     }
@@ -1312,17 +1342,22 @@ function SchedulePage() {
 
       <FormDialog
         open={formOpen}
-        onOpenChange={setFormOpen}
+        onOpenChange={(open) => {
+          setFormOpen(open);
+          if (!open) setCloningId(null);
+        }}
         wide
-        title={editingId ? "Edit lesson" : "Add lesson"}
+        title={editingId ? "Edit lesson" : cloningId ? "Clone lesson" : "Add lesson"}
         description={
           editingId
             ? "Update this lesson without leaving the calendar."
-            : "Add an event to your calendar. You are not creating another schedule."
+            : cloningId
+              ? "Review the copied lesson, choose its date, then create the clone. Enrolled students are included."
+              : "Add an event to your calendar. You are not creating another schedule."
         }
         onSubmit={save}
         busy={createLesson.isPending || updateLesson.isPending || addEnrolments.isPending}
-        submitLabel={editingId ? "Save changes" : "Add lesson"}
+        submitLabel={editingId ? "Save changes" : cloningId ? "Create cloned lesson" : "Add lesson"}
         dangerLabel={editingId ? "Delete" : undefined}
         dangerBusy={deleteLesson.isPending}
         onDanger={
