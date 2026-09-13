@@ -1,5 +1,5 @@
 import { Download, ExternalLink, FileText } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,7 @@ type ParentOption = {
   email?: string | null;
 };
 type StudentOption = { id: string; first_name: string; last_name?: string | null };
+type ParentStudentOption = { parent_id: string; student_id: string };
 
 const emptyDocument = (): PaymentDocumentData => ({
   type: "childcare",
@@ -50,29 +51,45 @@ export function PaymentDocumentDialog({
   onOpenChange,
   parents,
   students,
+  links,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   parents: ParentOption[];
   students: StudentOption[];
+  links: ParentStudentOption[];
 }) {
   const [data, setData] = useState<PaymentDocumentData>(emptyDocument);
+  const [parentId, setParentId] = useState("");
+  const [studentId, setStudentId] = useState("");
   const update = <K extends keyof PaymentDocumentData>(key: K, value: PaymentDocumentData[K]) =>
     setData((current) => ({ ...current, [key]: value }));
   const title = data.type === "invoice" ? "Invoice" : "Childcare payment confirmation";
+  const children = useMemo(() => {
+    const childIds = new Set(
+      links.filter((link) => link.parent_id === parentId).map((link) => link.student_id),
+    );
+    return students.filter((student) => childIds.has(student.id));
+  }, [links, parentId, students]);
 
   const chooseParent = (id: string) => {
+    setParentId(id);
     const parent = parents.find((item) => item.id === id);
-    if (parent)
-      setData((current) => ({
-        ...current,
-        parentName: fullName(parent),
-        parentEmail: parent.email ?? "",
-      }));
+    const selectedChildBelongsToParent = links.some(
+      (link) => link.parent_id === id && link.student_id === studentId,
+    );
+    if (!selectedChildBelongsToParent) setStudentId("");
+    setData((current) => ({
+      ...current,
+      parentName: parent ? fullName(parent) : "",
+      parentEmail: parent?.email ?? "",
+      studentName: selectedChildBelongsToParent ? current.studentName : "",
+    }));
   };
   const chooseStudent = (id: string) => {
-    const student = students.find((item) => item.id === id);
-    if (student) update("studentName", fullName(student));
+    setStudentId(id);
+    const student = children.find((item) => item.id === id);
+    update("studentName", student ? fullName(student) : "");
   };
 
   return (
@@ -99,7 +116,7 @@ export function PaymentDocumentDialog({
             <div className="grid grid-cols-2 gap-2">
               <Field label="Choose parent">
                 <select
-                  defaultValue=""
+                  value={parentId}
                   onChange={(event) => chooseParent(event.target.value)}
                   className="h-10 w-full rounded-xl border border-border bg-card px-3 text-sm"
                 >
@@ -113,12 +130,19 @@ export function PaymentDocumentDialog({
               </Field>
               <Field label="Choose student">
                 <select
-                  defaultValue=""
+                  value={studentId}
                   onChange={(event) => chooseStudent(event.target.value)}
+                  disabled={!parentId || children.length === 0}
                   className="h-10 w-full rounded-xl border border-border bg-card px-3 text-sm"
                 >
-                  <option value="">Select</option>
-                  {students.map((item) => (
+                  <option value="">
+                    {!parentId
+                      ? "Choose parent first"
+                      : children.length === 0
+                        ? "No linked children"
+                        : "Select child"}
+                  </option>
+                  {children.map((item) => (
                     <option key={item.id} value={item.id}>
                       {fullName(item)}
                     </option>
