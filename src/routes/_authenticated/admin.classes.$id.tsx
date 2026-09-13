@@ -13,6 +13,7 @@ import {
 } from "@/components/form-kit";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { LessonTimeRangePicker } from "@/components/lesson-time-range-picker";
 import {
   Dialog,
   DialogContent,
@@ -76,6 +77,8 @@ function ClassProfile() {
   const [studentSchool, setStudentSchool] = useState("all");
   const [studentYear, setStudentYear] = useState("all");
   const [editOpen, setEditOpen] = useState(false);
+  const [editStudentIds, setEditStudentIds] = useState<string[]>([]);
+  const [editStudentSearch, setEditStudentSearch] = useState("");
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [attendanceSessionId, setAttendanceSessionId] = useState("");
   const [edit, setEdit] = useState({
@@ -85,8 +88,18 @@ function ClassProfile() {
     end_time: "11:00",
     recurrence: "weekly",
     end_date: "",
+    delivery_mode: "in_person",
+    site_id: "",
+    venue_name: "",
+    online_url: "",
     tutor_id: "",
+    subject: "",
+    level: "",
     room: "",
+    capacity: "12",
+    session_rate: "",
+    price_per_session: "",
+    card_colour: "pink",
     active: "active",
     notes: "",
     goprogress_course_url: "",
@@ -158,6 +171,17 @@ function ClassProfile() {
       (studentYear === "all" || student.year_group === studentYear)
     );
   });
+  const editableStudents = (students.data ?? []).filter((student) => {
+    const isCurrentlyEnrolled = activeRoster.some((item) => item.student_id === student.id);
+    const query = editStudentSearch.trim().toLowerCase();
+    const haystack = [fullName(student), student.email, student.school, student.year_group]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+    return (
+      (student.status === "active" || isCurrentlyEnrolled) && (!query || haystack.includes(query))
+    );
+  });
   const nextSession = [...classSessions]
     .filter((item) => !["completed", "cancelled"].includes(item.status))
     .sort((a, b) => a.session_date.localeCompare(b.session_date))[0];
@@ -226,12 +250,24 @@ function ClassProfile() {
       end_time: hhmm(c.end_time),
       recurrence: c.recurrence ?? "weekly",
       end_date: c.end_date ?? "",
+      delivery_mode: c.delivery_mode,
+      site_id: c.site_id ?? "",
+      venue_name: c.venue_name ?? "",
+      online_url: c.online_url ?? "",
       tutor_id: c.tutor_id ?? "",
+      subject: c.subject ?? "",
+      level: c.level ?? "",
       room: c.room ?? "",
+      capacity: String(c.capacity),
+      session_rate: c.session_rate === null ? "" : String(c.session_rate),
+      price_per_session: c.price_per_session === null ? "" : String(c.price_per_session),
+      card_colour: c.card_colour ?? "pink",
       active: c.active ? "active" : "archived",
       notes: c.notes ?? "",
       goprogress_course_url: c.goprogress_course_url ?? "",
     });
+    setEditStudentIds(activeRoster.map((item) => item.student_id));
+    setEditStudentSearch("");
     setEditOpen(true);
   };
 
@@ -892,30 +928,79 @@ function ClassProfile() {
         onOpenChange={setEditOpen}
         wide
         title="Edit lesson"
-        busy={updateClass.isPending}
+        busy={updateClass.isPending || addEnrolment.isPending || updateEnrolment.isPending}
         dangerLabel="Delete"
         dangerBusy={deleteClass.isPending}
         onDanger={() => setDeleteOpen(true)}
         onSubmit={async () => {
-          await updateClass.mutateAsync({
-            id: c.id,
-            values: {
-              name: edit.name,
-              start_date: edit.start_date,
-              weekday: weekdayOf(edit.start_date),
-              start_time: edit.start_time,
-              end_time: edit.end_time,
-              recurrence: edit.recurrence,
-              end_date: edit.recurrence === "once" ? edit.start_date : edit.end_date || null,
-              tutor_id: edit.tutor_id || null,
-              room: edit.room || null,
-              active: edit.active === "active",
-              notes: edit.notes || null,
-              goprogress_course_url: edit.goprogress_course_url || null,
-            },
-          });
-          toast.success("Lesson updated");
-          setEditOpen(false);
+          try {
+            await updateClass.mutateAsync({
+              id: c.id,
+              values: {
+                name: edit.name.trim(),
+                start_date: edit.start_date,
+                weekday: weekdayOf(edit.start_date),
+                start_time: edit.start_time,
+                end_time: edit.end_time,
+                recurrence: edit.recurrence,
+                end_date: edit.recurrence === "once" ? edit.start_date : edit.end_date || null,
+                delivery_mode: edit.delivery_mode,
+                site_id: edit.delivery_mode === "online" ? null : edit.site_id || null,
+                venue_name: edit.delivery_mode === "online" ? null : edit.venue_name.trim() || null,
+                online_url: edit.delivery_mode === "online" ? edit.online_url.trim() || null : null,
+                tutor_id: edit.tutor_id || null,
+                subject: edit.subject.trim() || null,
+                level: edit.level.trim() || null,
+                room: edit.room.trim() || null,
+                capacity: Number(edit.capacity) || 0,
+                session_rate: edit.session_rate ? Number(edit.session_rate) : null,
+                price_per_session: edit.price_per_session ? Number(edit.price_per_session) : null,
+                card_colour: edit.card_colour,
+                active: edit.active === "active",
+                notes: edit.notes.trim() || null,
+                goprogress_course_url: edit.goprogress_course_url.trim() || null,
+              },
+            });
+
+            const selected = new Set(editStudentIds);
+            const existingByStudent = new Map(roster.map((item) => [item.student_id, item]));
+            const toReactivate = roster.filter(
+              (item) => selected.has(item.student_id) && item.status !== "active",
+            );
+            const toRemove = roster.filter(
+              (item) => item.status === "active" && !selected.has(item.student_id),
+            );
+            const toAdd = editStudentIds.filter((studentId) => !existingByStudent.has(studentId));
+
+            await Promise.all([
+              ...toReactivate.map((item) =>
+                updateEnrolment.mutateAsync({
+                  id: item.id,
+                  values: { status: "active", end_date: null },
+                }),
+              ),
+              ...toRemove.map((item) =>
+                updateEnrolment.mutateAsync({
+                  id: item.id,
+                  values: { status: "inactive", end_date: edit.start_date },
+                }),
+              ),
+            ]);
+            if (toAdd.length > 0) {
+              await addEnrolment.mutateAsync(
+                toAdd.map((studentId) => ({
+                  class_id: c.id,
+                  student_id: studentId,
+                  status: "active",
+                })),
+              );
+            }
+
+            toast.success("Lesson and students updated");
+            setEditOpen(false);
+          } catch (error) {
+            toast.error(error instanceof Error ? error.message : "Could not update the lesson");
+          }
         }}
       >
         <TextField
@@ -940,17 +1025,10 @@ function ClassProfile() {
             { value: "weekly", label: "Every week" },
           ]}
         />
-        <TextField
-          label="Start time"
-          type="time"
-          value={edit.start_time}
-          onChange={(start_time) => setEdit({ ...edit, start_time })}
-        />
-        <TextField
-          label="End time"
-          type="time"
-          value={edit.end_time}
-          onChange={(end_time) => setEdit({ ...edit, end_time })}
+        <LessonTimeRangePicker
+          start={edit.start_time}
+          end={edit.end_time}
+          onChange={(start_time, end_time) => setEdit({ ...edit, start_time, end_time })}
         />
         {edit.recurrence === "weekly" ? (
           <TextField
@@ -961,6 +1039,38 @@ function ClassProfile() {
           />
         ) : null}
         <SelectField
+          label="Delivery"
+          value={edit.delivery_mode}
+          onChange={(delivery_mode) => setEdit({ ...edit, delivery_mode })}
+          options={[
+            { value: "in_person", label: "Face-to-face" },
+            { value: "online", label: "Online" },
+            { value: "hybrid", label: "Hybrid" },
+          ]}
+        />
+        {edit.delivery_mode === "online" ? (
+          <TextField
+            label="Online meeting link"
+            value={edit.online_url}
+            onChange={(online_url) => setEdit({ ...edit, online_url })}
+          />
+        ) : (
+          <SelectField
+            label="Location"
+            value={edit.site_id}
+            onChange={(site_id) => setEdit({ ...edit, site_id })}
+            options={[
+              { value: "", label: "Venue to confirm" },
+              ...(sites.data ?? []).map((item) => ({ value: item.id, label: item.name })),
+            ]}
+          />
+        )}
+        <TextField
+          label="Venue name"
+          value={edit.venue_name}
+          onChange={(venue_name) => setEdit({ ...edit, venue_name })}
+        />
+        <SelectField
           label="Tutor"
           value={edit.tutor_id}
           onChange={(tutor_id) => setEdit({ ...edit, tutor_id })}
@@ -969,7 +1079,48 @@ function ClassProfile() {
             ...(tutors.data ?? []).map((item) => ({ value: item.id, label: fullName(item) })),
           ]}
         />
+        <TextField
+          label="Subject"
+          value={edit.subject}
+          onChange={(subject) => setEdit({ ...edit, subject })}
+        />
+        <TextField
+          label="Level"
+          value={edit.level}
+          onChange={(level) => setEdit({ ...edit, level })}
+        />
         <TextField label="Room" value={edit.room} onChange={(room) => setEdit({ ...edit, room })} />
+        <TextField
+          label="Capacity"
+          type="number"
+          value={edit.capacity}
+          onChange={(capacity) => setEdit({ ...edit, capacity })}
+        />
+        <TextField
+          label="Client price per lesson (£)"
+          type="number"
+          value={edit.price_per_session}
+          onChange={(price_per_session) => setEdit({ ...edit, price_per_session })}
+        />
+        <TextField
+          label="Tutor pay per lesson (£)"
+          type="number"
+          value={edit.session_rate}
+          onChange={(session_rate) => setEdit({ ...edit, session_rate })}
+        />
+        <SelectField
+          label="Card colour"
+          value={edit.card_colour}
+          onChange={(card_colour) => setEdit({ ...edit, card_colour })}
+          options={[
+            { value: "pink", label: "Pink" },
+            { value: "blue", label: "Blue" },
+            { value: "green", label: "Green" },
+            { value: "amber", label: "Amber" },
+            { value: "violet", label: "Violet" },
+            { value: "teal", label: "Teal" },
+          ]}
+        />
         <SelectField
           label="Status"
           value={edit.active}
@@ -989,6 +1140,50 @@ function ClassProfile() {
           value={edit.notes}
           onChange={(notes) => setEdit({ ...edit, notes })}
         />
+        <div className="space-y-2 border-t border-border pt-4 sm:col-span-2">
+          <p className="text-xs font-semibold text-muted-foreground">
+            Students ({editStudentIds.length} selected)
+          </p>
+          <Input
+            value={editStudentSearch}
+            onChange={(event) => setEditStudentSearch(event.target.value)}
+            placeholder="Search students by name, school or year"
+            className="h-10 rounded-xl"
+          />
+          <div className="max-h-52 divide-y divide-border overflow-y-auto rounded-xl border border-border">
+            {editableStudents.map((student) => (
+              <label
+                key={student.id}
+                className="flex cursor-pointer items-center gap-3 px-3 py-2 hover:bg-muted"
+              >
+                <input
+                  type="checkbox"
+                  checked={editStudentIds.includes(student.id)}
+                  onChange={() =>
+                    setEditStudentIds((current) =>
+                      current.includes(student.id)
+                        ? current.filter((studentId) => studentId !== student.id)
+                        : [...current, student.id],
+                    )
+                  }
+                  className="h-4 w-4 accent-[var(--color-primary)]"
+                />
+                <Avatar
+                  initials={initialsOf(fullName(student))}
+                  size="sm"
+                  tone={avatarTone(fullName(student))}
+                />
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-bold">{fullName(student)}</span>
+                  <span className="block truncate text-xs text-muted-foreground">
+                    {[student.year_group, student.school].filter(Boolean).join(" · ") ||
+                      "No extra details"}
+                  </span>
+                </span>
+              </label>
+            ))}
+          </div>
+        </div>
       </FormDialog>
       <ConfirmDeleteDialog
         open={deleteOpen}
