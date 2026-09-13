@@ -8,6 +8,247 @@ export type Database = {
   };
   public: {
     Tables: {
+      billing_invoice_items: {
+        Row: {
+          billing_plan_id: string | null;
+          created_at: string;
+          description: string;
+          discount_amount: number;
+          id: string;
+          invoice_id: string;
+          line_subtotal: number | null;
+          line_total: number | null;
+          quantity: number;
+          service_end: string | null;
+          service_start: string | null;
+          sort_order: number;
+          student_id: string | null;
+          subscription_id: string | null;
+          tax_amount: number | null;
+          tax_rate: number;
+          unit_price: number;
+          updated_at: string;
+        };
+        Insert: {
+          billing_plan_id?: string | null;
+          created_at?: string;
+          description: string;
+          discount_amount?: number;
+          id?: string;
+          invoice_id: string;
+          line_subtotal?: number | null;
+          line_total?: number | null;
+          quantity?: number;
+          service_end?: string | null;
+          service_start?: string | null;
+          sort_order?: number;
+          student_id?: string | null;
+          subscription_id?: string | null;
+          tax_amount?: number | null;
+          tax_rate?: number;
+          unit_price?: number;
+          updated_at?: string;
+        };
+        Update: {
+          billing_plan_id?: string | null;
+          created_at?: string;
+          description?: string;
+          discount_amount?: number;
+          id?: string;
+          invoice_id?: string;
+          line_subtotal?: number | null;
+          line_total?: number | null;
+          quantity?: number;
+          service_end?: string | null;
+          service_start?: string | null;
+          sort_order?: number;
+          student_id?: string | null;
+          subscription_id?: string | null;
+          tax_amount?: number | null;
+          tax_rate?: number;
+          unit_price?: number;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "billing_invoice_items_billing_plan_id_fkey";
+            columns: ["billing_plan_id"];
+            isOneToOne: false;
+            referencedRelation: "billing_plans";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "billing_invoice_items_invoice_id_fkey";
+            columns: ["invoice_id"];
+            isOneToOne: false;
+            referencedRelation: "billing_invoices";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "billing_invoice_items_student_id_fkey";
+            columns: ["student_id"];
+            isOneToOne: false;
+            referencedRelation: "students";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "billing_invoice_items_subscription_id_fkey";
+            columns: ["subscription_id"];
+            isOneToOne: false;
+            referencedRelation: "client_subscriptions";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      billing_invoices: {
+        Row: {
+          amount_paid: number;
+          approved_at: string | null;
+          approved_by: string | null;
+          balance_due: number;
+          created_at: string;
+          created_by: string | null;
+          currency: string;
+          discount_total: number;
+          due_date: string | null;
+          external_customer_id: string | null;
+          external_invoice_id: string | null;
+          external_provider: string | null;
+          id: string;
+          invoice_number: string;
+          issue_date: string | null;
+          issued_at: string | null;
+          notes: string | null;
+          parent_id: string;
+          period_end: string | null;
+          period_start: string | null;
+          source: string;
+          status: string;
+          subtotal: number;
+          tax_total: number;
+          total: number;
+          updated_at: string;
+        };
+        Insert: {
+          amount_paid?: number;
+          approved_at?: string | null;
+          approved_by?: string | null;
+          balance_due?: number;
+          created_at?: string;
+          created_by?: string | null;
+          currency?: string;
+          discount_total?: number;
+          due_date?: string | null;
+          external_customer_id?: string | null;
+          external_invoice_id?: string | null;
+          external_provider?: string | null;
+          id?: string;
+          invoice_number?: string;
+          issue_date?: string | null;
+          issued_at?: string | null;
+          notes?: string | null;
+          parent_id: string;
+          period_end?: string | null;
+          period_start?: string | null;
+          source?: string;
+          status?: string;
+          subtotal?: number;
+          tax_total?: number;
+          total?: number;
+          updated_at?: string;
+        };
+        Update: {
+          amount_paid?: number;
+          approved_at?: string | null;
+          approved_by?: string | null;
+          balance_due?: number;
+          created_at?: string;
+          created_by?: string | null;
+          currency?: string;
+          discount_total?: number;
+          due_date?: string | null;
+          external_customer_id?: string | null;
+          external_invoice_id?: string | null;
+          external_provider?: string | null;
+          id?: string;
+          invoice_number?: string;
+          issue_date?: string | null;
+          issued_at?: string | null;
+          notes?: string | null;
+          parent_id?: string;
+          period_end?: string | null;
+          period_start?: string | null;
+          source?: string;
+          status?: string;
+          subtotal?: number;
+          tax_total?: number;
+          total?: number;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "billing_invoices_parent_id_fkey";
+            columns: ["parent_id"];
+            isOneToOne: false;
+            referencedRelation: "parents";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      billing_plans: {
+        Row: {
+          active: boolean;
+          billing_frequency: string;
+          children_included: number;
+          created_at: string;
+          currency: string;
+          description: string | null;
+          id: string;
+          name: string;
+          needs_review: boolean;
+          pricing_plan_id: string | null;
+          programme_id: string | null;
+          source: string;
+          unit_amount: number;
+          updated_at: string;
+          zoho_plan_code: string | null;
+        };
+        Insert: {
+          active?: boolean;
+          billing_frequency?: string;
+          children_included?: number;
+          created_at?: string;
+          currency?: string;
+          description?: string | null;
+          id?: string;
+          name: string;
+          needs_review?: boolean;
+          pricing_plan_id?: string | null;
+          programme_id?: string | null;
+          source?: string;
+          unit_amount?: number;
+          updated_at?: string;
+          zoho_plan_code?: string | null;
+        };
+        Update: {
+          active?: boolean;
+          billing_frequency?: string;
+          children_included?: number;
+          created_at?: string;
+          currency?: string;
+          description?: string | null;
+          id?: string;
+          name?: string;
+          needs_review?: boolean;
+          pricing_plan_id?: string | null;
+          programme_id?: string | null;
+          source?: string;
+          unit_amount?: number;
+          updated_at?: string;
+          zoho_plan_code?: string | null;
+        };
+        Relationships: [];
+      };
       class_enrolments: {
         Row: {
           class_id: string;
@@ -188,8 +429,12 @@ export type Database = {
         Row: {
           amount: number;
           created_at: string;
+          currency: string;
           due_date: string | null;
+          external_payment_id: string | null;
+          external_provider: string | null;
           id: string;
+          invoice_id: string | null;
           method: string | null;
           note: string | null;
           parent_id: string | null;
@@ -205,8 +450,12 @@ export type Database = {
         Insert: {
           amount: number;
           created_at?: string;
+          currency?: string;
           due_date?: string | null;
+          external_payment_id?: string | null;
+          external_provider?: string | null;
           id?: string;
+          invoice_id?: string | null;
           method?: string | null;
           note?: string | null;
           parent_id?: string | null;
@@ -222,8 +471,12 @@ export type Database = {
         Update: {
           amount?: number;
           created_at?: string;
+          currency?: string;
           due_date?: string | null;
+          external_payment_id?: string | null;
+          external_provider?: string | null;
           id?: string;
+          invoice_id?: string | null;
           method?: string | null;
           note?: string | null;
           parent_id?: string | null;
@@ -237,6 +490,13 @@ export type Database = {
           updated_at?: string;
         };
         Relationships: [
+          {
+            foreignKeyName: "client_payments_invoice_id_fkey";
+            columns: ["invoice_id"];
+            isOneToOne: false;
+            referencedRelation: "billing_invoices";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "client_payments_parent_id_fkey";
             columns: ["parent_id"];
@@ -506,38 +766,53 @@ export type Database = {
       parents: {
         Row: {
           billing_status: string;
+          contact_type: string;
           created_at: string;
+          data_review_status: string;
           email: string | null;
           first_name: string;
           id: string;
+          import_batch_id: string | null;
           last_name: string | null;
           notes: string | null;
           phone: string | null;
           status: string;
+          source_data: Json;
+          staging_parent_id: string | null;
           updated_at: string;
         };
         Insert: {
           billing_status?: string;
+          contact_type?: string;
           created_at?: string;
+          data_review_status?: string;
           email?: string | null;
           first_name: string;
           id?: string;
+          import_batch_id?: string | null;
           last_name?: string | null;
           notes?: string | null;
           phone?: string | null;
           status?: string;
+          source_data?: Json;
+          staging_parent_id?: string | null;
           updated_at?: string;
         };
         Update: {
           billing_status?: string;
+          contact_type?: string;
           created_at?: string;
+          data_review_status?: string;
           email?: string | null;
           first_name?: string;
           id?: string;
+          import_batch_id?: string | null;
           last_name?: string | null;
           notes?: string | null;
           phone?: string | null;
           status?: string;
+          source_data?: Json;
+          staging_parent_id?: string | null;
           updated_at?: string;
         };
         Relationships: [];
@@ -1033,8 +1308,10 @@ export type Database = {
       students: {
         Row: {
           allergy_notes: string | null;
+          contact_type: string;
           courses_note: string | null;
           created_at: string;
+          data_review_status: string;
           date_of_birth: string | null;
           ehcp_flag: boolean;
           email: string | null;
@@ -1042,20 +1319,25 @@ export type Database = {
           emergency_contact_phone: string | null;
           first_name: string;
           id: string;
+          import_batch_id: string | null;
           last_name: string | null;
           medical_notes: string | null;
           notes: string | null;
           phone: string | null;
           school: string | null;
           send_flag: boolean;
+          source_data: Json;
+          staging_student_id: string | null;
           status: string;
           updated_at: string;
           year_group: string | null;
         };
         Insert: {
           allergy_notes?: string | null;
+          contact_type?: string;
           courses_note?: string | null;
           created_at?: string;
+          data_review_status?: string;
           date_of_birth?: string | null;
           ehcp_flag?: boolean;
           email?: string | null;
@@ -1063,20 +1345,25 @@ export type Database = {
           emergency_contact_phone?: string | null;
           first_name: string;
           id?: string;
+          import_batch_id?: string | null;
           last_name?: string | null;
           medical_notes?: string | null;
           notes?: string | null;
           phone?: string | null;
           school?: string | null;
           send_flag?: boolean;
+          source_data?: Json;
+          staging_student_id?: string | null;
           status?: string;
           updated_at?: string;
           year_group?: string | null;
         };
         Update: {
           allergy_notes?: string | null;
+          contact_type?: string;
           courses_note?: string | null;
           created_at?: string;
+          data_review_status?: string;
           date_of_birth?: string | null;
           ehcp_flag?: boolean;
           email?: string | null;
@@ -1084,12 +1371,15 @@ export type Database = {
           emergency_contact_phone?: string | null;
           first_name?: string;
           id?: string;
+          import_batch_id?: string | null;
           last_name?: string | null;
           medical_notes?: string | null;
           notes?: string | null;
           phone?: string | null;
           school?: string | null;
           send_flag?: boolean;
+          source_data?: Json;
+          staging_student_id?: string | null;
           status?: string;
           updated_at?: string;
           year_group?: string | null;
@@ -1332,7 +1622,17 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
-      [_ in never]: never;
+      create_draft_invoice: {
+        Args: {
+          p_due_date: string;
+          p_items: Json;
+          p_notes: string;
+          p_parent_id: string;
+          p_period_end: string;
+          p_period_start: string;
+        };
+        Returns: Database["public"]["Tables"]["billing_invoices"]["Row"];
+      };
     };
     Enums: {
       [_ in never]: never;
