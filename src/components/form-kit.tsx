@@ -61,7 +61,7 @@ export function FormDialog({
           {description ? <DialogDescription>{description}</DialogDescription> : null}
         </DialogHeader>
         <form
-          className="grid min-h-0 flex-1 gap-3 overflow-y-auto overscroll-contain px-6 pt-4 sm:grid-cols-2"
+          className="grid min-h-0 flex-1 auto-rows-max content-start gap-3 overflow-y-auto overscroll-contain px-6 pt-4 sm:grid-cols-2"
           onSubmit={(e) => {
             e.preventDefault();
             onSubmit();
