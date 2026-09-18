@@ -29,6 +29,7 @@ import {
   Search,
   Trash2,
   Video,
+  X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -53,7 +54,6 @@ import {
 } from "@/components/ui/dialog";
 import {
   capacityTone,
-  DEMO_DATE,
   fullName,
   hhmm,
   initialsOf,
@@ -84,9 +84,13 @@ export const Route = createFileRoute("/_authenticated/admin/classes/")({
 
 type CalendarView = "day" | "week" | "month" | "list";
 
+function currentDateIso() {
+  return format(new Date(), "yyyy-MM-dd");
+}
+
 const BLANK = {
   name: "",
-  date: DEMO_DATE,
+  date: currentDateIso(),
   start_time: "10:00",
   end_time: "11:00",
   recurrence: "weekly",
@@ -183,8 +187,8 @@ function SchedulePage() {
   const addEnrolments = useUpsert("class_enrolments", ["classes"]);
   const updateEnrolment = useUpdateRow("class_enrolments", ["classes"]);
 
-  const [view, setView] = useState<CalendarView>("week");
-  const [selectedDate, setSelectedDate] = useState(DEMO_DATE);
+  const [view, setView] = useState<CalendarView>("day");
+  const [selectedDate, setSelectedDate] = useState(currentDateIso);
   const [search, setSearch] = useState("");
   const [tutorId, setTutorId] = useState("all");
   const [siteId, setSiteId] = useState("all");
@@ -213,10 +217,6 @@ function SchedulePage() {
   const [studentSearch, setStudentSearch] = useState("");
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
   const [form, setForm] = useState(BLANK);
-
-  useEffect(() => {
-    if (window.matchMedia("(max-width: 767px)").matches) setView("day");
-  }, []);
 
   useEffect(() => {
     if (!add) return;
@@ -311,7 +311,7 @@ function SchedulePage() {
   }
 
   function cloneLesson(lesson: ClassRow) {
-    const cloneDate = selectedDate || lesson.start_date || DEMO_DATE;
+    const cloneDate = selectedDate || lesson.start_date || currentDateIso();
     const repeatDurationDays =
       lesson.start_date && lesson.end_date
         ? Math.max(
@@ -877,7 +877,7 @@ function SchedulePage() {
 
       <section className="space-y-3 rounded-2xl border border-border bg-card p-3 sm:p-4">
         <div className="flex flex-wrap items-center gap-2">
-          <Button size="sm" variant="secondary" onClick={() => setSelectedDate(DEMO_DATE)}>
+          <Button size="sm" variant="secondary" onClick={() => setSelectedDate(currentDateIso())}>
             Today
           </Button>
           <Button size="icon" variant="ghost" onClick={() => move(-1)} aria-label="Previous">
@@ -1153,7 +1153,7 @@ function SchedulePage() {
                     {studentsFor(detail).map((student) => (
                       <span
                         key={student.id}
-                        className="inline-flex max-w-full items-center gap-2 rounded-full border border-border bg-muted/50 py-1 pl-1 pr-2.5"
+                        className="inline-flex max-w-full items-center gap-1 rounded-full border border-border bg-muted/50 py-1 pl-1 pr-1"
                       >
                         <Avatar
                           initials={initialsOf(fullName(student))}
@@ -1161,9 +1161,51 @@ function SchedulePage() {
                           size="sm"
                         />
                         <span className="truncate text-xs font-bold">{fullName(student)}</span>
+                        <button
+                          type="button"
+                          className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                          aria-label={`Remove ${fullName(student)} from this lesson`}
+                          disabled={updateEnrolment.isPending}
+                          onClick={async () => {
+                            const enrolment = (enrolments.data ?? []).find(
+                              (item) =>
+                                item.class_id === detail.id &&
+                                item.student_id === student.id &&
+                                item.status === "active",
+                            );
+                            if (!enrolment) return;
+                            try {
+                              await updateEnrolment.mutateAsync({
+                                id: enrolment.id,
+                                values: {
+                                  status: "inactive",
+                                  end_date: format(new Date(), "yyyy-MM-dd"),
+                                },
+                              });
+                              toast.success(`${fullName(student)} removed from the lesson`);
+                            } catch (error) {
+                              toast.error(
+                                error instanceof Error
+                                  ? error.message
+                                  : "Could not remove the student",
+                              );
+                            }
+                          }}
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
                       </span>
                     ))}
                   </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="mt-3"
+                    onClick={() => editLesson(detail)}
+                  >
+                    <Plus className="h-4 w-4" /> Manage students
+                  </Button>
                 </div>
               </div>
               <div className="sticky bottom-0 z-10 -mx-2 grid grid-cols-4 gap-2 border-t border-border bg-background px-2 py-3">
@@ -1377,6 +1419,9 @@ function SchedulePage() {
         <div className="space-y-2 border-t border-border pt-4 sm:col-span-2">
           <p className="text-xs font-semibold text-muted-foreground">
             Students ({selectedStudentIds.length} selected)
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Tick students to add them. Untick enrolled students to remove them from this lesson.
           </p>
           <Input
             value={studentSearch}

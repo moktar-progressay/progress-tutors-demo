@@ -80,6 +80,10 @@ function ClassProfile() {
   const [editOpen, setEditOpen] = useState(false);
   const [editStudentIds, setEditStudentIds] = useState<string[]>([]);
   const [editStudentSearch, setEditStudentSearch] = useState("");
+  const [studentPendingRemoval, setStudentPendingRemoval] = useState<{
+    enrolmentId: string;
+    studentName: string;
+  } | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [attendanceDate, setAttendanceDate] = useState(DEMO_DATE);
   const [attendanceSearch, setAttendanceSearch] = useState("");
@@ -143,25 +147,25 @@ function ClassProfile() {
   const received = classPayments
     .filter((item) => item.status === "received")
     .reduce((total, item) => total + Number(item.amount), 0);
-  const notEnrolled = (students.data ?? []).filter(
+  const manageableStudents = (students.data ?? []).filter(
     (student) =>
-      student.status === "active" && !activeRoster.some((item) => item.student_id === student.id),
+      student.status === "active" || activeRoster.some((item) => item.student_id === student.id),
   );
   const studentSchools = Array.from(
     new Set(
-      notEnrolled
+      manageableStudents
         .map((student) => student.school)
         .filter((value): value is string => Boolean(value)),
     ),
   ).sort();
   const studentYears = Array.from(
     new Set(
-      notEnrolled
+      manageableStudents
         .map((student) => student.year_group)
         .filter((value): value is string => Boolean(value)),
     ),
   ).sort();
-  const filteredStudents = notEnrolled.filter((student) => {
+  const filteredStudents = manageableStudents.filter((student) => {
     const query = studentSearch.trim().toLowerCase();
     const haystack = [fullName(student), student.email, student.school, student.year_group]
       .filter(Boolean)
@@ -430,14 +434,14 @@ function ClassProfile() {
               </label>
               <Button
                 onClick={() => {
-                  setSelectedStudentIds([]);
+                  setSelectedStudentIds(activeRoster.map((item) => item.student_id));
                   setStudentSearch("");
                   setStudentSchool("all");
                   setStudentYear("all");
                   setEnrolOpen(true);
                 }}
               >
-                <Plus className="h-4 w-4" /> Add students
+                <Plus className="h-4 w-4" /> Manage students
               </Button>
             </div>
           </div>
@@ -479,20 +483,37 @@ function ClassProfile() {
                     return (
                       <tr key={item.id}>
                         <td className="px-2 py-3 sm:px-3">
-                          <Link
-                            to="/admin/students/$id"
-                            params={{ id: item.student_id }}
-                            className="flex min-w-0 items-center gap-2 font-bold hover:text-primary"
-                          >
-                            <Avatar
-                              initials={initialsOf(fullName(student))}
-                              tone={avatarTone(fullName(student))}
-                              size="sm"
-                            />
-                            <span className="min-w-0 break-words leading-tight">
-                              {fullName(student)}
-                            </span>
-                          </Link>
+                          <div className="flex min-w-0 items-center gap-1">
+                            <Link
+                              to="/admin/students/$id"
+                              params={{ id: item.student_id }}
+                              className="flex min-w-0 flex-1 items-center gap-2 font-bold hover:text-primary"
+                            >
+                              <Avatar
+                                initials={initialsOf(fullName(student))}
+                                tone={avatarTone(fullName(student))}
+                                size="sm"
+                              />
+                              <span className="min-w-0 break-words leading-tight">
+                                {fullName(student)}
+                              </span>
+                            </Link>
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="ghost"
+                              className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
+                              aria-label={`Remove ${fullName(student)} from this lesson`}
+                              onClick={() =>
+                                setStudentPendingRemoval({
+                                  enrolmentId: item.id,
+                                  studentName: fullName(student),
+                                })
+                              }
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </td>
                         <td className="px-1 py-3 text-center">
                           <AttendanceChoiceButton
@@ -677,9 +698,9 @@ function ClassProfile() {
       <Dialog open={enrolOpen} onOpenChange={setEnrolOpen}>
         <DialogContent className="flex max-h-[88vh] flex-col p-0 sm:max-w-2xl">
           <DialogHeader className="px-5 pt-5 text-left">
-            <DialogTitle>Add students</DialogTitle>
+            <DialogTitle>Manage students</DialogTitle>
             <DialogDescription>
-              Search, filter and select several students for this lesson.
+              Tick students to add them. Untick enrolled students to remove them from this lesson.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-2 px-5 sm:grid-cols-2">
@@ -781,27 +802,36 @@ function ClassProfile() {
             </Button>
             <Button
               type="button"
-              disabled={
-                selectedStudentIds.length === 0 ||
-                addEnrolment.isPending ||
-                updateEnrolment.isPending
-              }
+              disabled={addEnrolment.isPending || updateEnrolment.isPending}
               onClick={async () => {
                 try {
-                  const previous = roster.filter((item) =>
-                    selectedStudentIds.includes(item.student_id),
+                  const selected = new Set(selectedStudentIds);
+                  const existingByStudent = new Map(roster.map((item) => [item.student_id, item]));
+                  const toReactivate = roster.filter(
+                    (item) => selected.has(item.student_id) && item.status !== "active",
                   );
-                  const previousIds = new Set(previous.map((item) => item.student_id));
-                  await Promise.all(
-                    previous.map((item) =>
+                  const toRemove = roster.filter(
+                    (item) => item.status === "active" && !selected.has(item.student_id),
+                  );
+                  await Promise.all([
+                    ...toReactivate.map((item) =>
                       updateEnrolment.mutateAsync({
                         id: item.id,
                         values: { status: "active", end_date: null },
                       }),
                     ),
-                  );
+                    ...toRemove.map((item) =>
+                      updateEnrolment.mutateAsync({
+                        id: item.id,
+                        values: {
+                          status: "inactive",
+                          end_date: new Date().toISOString().slice(0, 10),
+                        },
+                      }),
+                    ),
+                  ]);
                   const fresh = selectedStudentIds.filter(
-                    (studentId) => !previousIds.has(studentId),
+                    (studentId) => !existingByStudent.has(studentId),
                   );
                   if (fresh.length > 0)
                     await addEnrolment.mutateAsync(
@@ -811,9 +841,7 @@ function ClassProfile() {
                         status: "active",
                       })),
                     );
-                  toast.success(
-                    `${selectedStudentIds.length} student${selectedStudentIds.length === 1 ? "" : "s"} added`,
-                  );
+                  toast.success("Class students updated");
                   setSelectedStudentIds([]);
                   setEnrolOpen(false);
                 } catch (error) {
@@ -821,9 +849,7 @@ function ClassProfile() {
                 }
               }}
             >
-              {addEnrolment.isPending || updateEnrolment.isPending
-                ? "Adding…"
-                : `Add ${selectedStudentIds.length || ""} student${selectedStudentIds.length === 1 ? "" : "s"}`}
+              {addEnrolment.isPending || updateEnrolment.isPending ? "Saving…" : "Save students"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1090,6 +1116,32 @@ function ClassProfile() {
           </div>
         </div>
       </FormDialog>
+      <ConfirmDeleteDialog
+        open={Boolean(studentPendingRemoval)}
+        onOpenChange={(open) => {
+          if (!open && !updateEnrolment.isPending) setStudentPendingRemoval(null);
+        }}
+        title="Remove this student from the lesson?"
+        description={`${studentPendingRemoval?.studentName ?? "This student"} will be removed from this class. Their student record will remain available.`}
+        confirmLabel="Remove student"
+        busy={updateEnrolment.isPending}
+        onConfirm={async () => {
+          if (!studentPendingRemoval) return;
+          try {
+            await updateEnrolment.mutateAsync({
+              id: studentPendingRemoval.enrolmentId,
+              values: {
+                status: "inactive",
+                end_date: new Date().toISOString().slice(0, 10),
+              },
+            });
+            toast.success(`${studentPendingRemoval.studentName} removed from the lesson`);
+            setStudentPendingRemoval(null);
+          } catch (error) {
+            toast.error(error instanceof Error ? error.message : "Could not remove the student");
+          }
+        }}
+      />
       <ConfirmDeleteDialog
         open={deleteOpen}
         onOpenChange={(nextOpen) => {

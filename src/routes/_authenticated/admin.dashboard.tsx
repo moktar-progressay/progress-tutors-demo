@@ -6,7 +6,7 @@ import { Avatar, avatarTone, Empty, PageHeader, Pill, Section, StatCard } from "
 import { SelectField } from "@/components/form-kit";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { DEMO_DATE, fullName, hhmm, initialsOf, money, num, useTable, weekdayOf } from "@/lib/db";
+import { fullName, hhmm, initialsOf, money, num, useTable } from "@/lib/db";
 
 export const Route = createFileRoute("/_authenticated/admin/dashboard")({
   head: () => ({
@@ -35,7 +35,13 @@ function AdminDashboard() {
   const requests = useTable("payment_requests");
   const sites = useTable("sites", "name");
 
-  const today = weekdayOf(DEMO_DATE);
+  const currentDate = new Date();
+  const today = currentDate.toLocaleDateString("en-GB", { weekday: "long" });
+  const todayLabel = currentDate.toLocaleDateString("en-GB", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
   const todayLessons = (lessons.data ?? [])
     .filter((lesson) => lesson.active && lesson.weekday === today)
     .sort((a, b) => (a.start_time ?? "").localeCompare(b.start_time ?? ""));
@@ -106,7 +112,7 @@ function AdminDashboard() {
         <Section
           id="today-lessons"
           title="Today's lessons"
-          subtitle={`${today} · One calendar for all online and face-to-face tuition`}
+          subtitle={`${todayLabel} · One calendar for all online and face-to-face tuition`}
           action={
             <Link to="/admin/classes" className="text-xs font-bold text-primary">
               Open schedule
