@@ -37,6 +37,7 @@ import { Route as AuthenticatedAdminClassesIdRouteImport } from './routes/_authe
 import { Route as AuthenticatedAdminStudentsIndexRouteImport } from './routes/_authenticated/admin.students.index'
 import { Route as AuthenticatedAdminStudentsIdRouteImport } from './routes/_authenticated/admin.students.$id'
 import { Route as AuthenticatedAdminStudentsImportRouteImport } from './routes/_authenticated/admin.students.import'
+import { Route as AuthenticatedAdminTutorsIdRouteImport } from './routes/_authenticated/admin.tutors.$id'
 import { Route as AuthenticatedParentChildrenIdRouteImport } from './routes/_authenticated/parent.children.$id'
 import { Route as AuthenticatedParentClassesIndexRouteImport } from './routes/_authenticated/parent.classes.index'
 import { Route as AuthenticatedParentClassesIdRouteImport } from './routes/_authenticated/parent.classes.$id'
@@ -210,6 +211,12 @@ const AuthenticatedAdminStudentsImportRoute =
     path: '/admin/students/import',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedAdminTutorsIdRoute =
+  AuthenticatedAdminTutorsIdRouteImport.update({
+    id: '/$id',
+    path: '/$id',
+    getParentRoute: () => AuthenticatedAdminTutorsRoute,
+  } as any)
 const AuthenticatedParentChildrenIdRoute =
   AuthenticatedParentChildrenIdRouteImport.update({
     id: '/parent/children/$id',
@@ -269,7 +276,7 @@ export interface FileRoutesByFullPath {
   '/admin/payment-requests': typeof AuthenticatedAdminPaymentRequestsRoute
   '/admin/payments': typeof AuthenticatedAdminPaymentsRoute
   '/admin/reports': typeof AuthenticatedAdminReportsRoute
-  '/admin/tutors': typeof AuthenticatedAdminTutorsRoute
+  '/admin/tutors': typeof AuthenticatedAdminTutorsRouteWithChildren
   '/parent/dashboard': typeof AuthenticatedParentDashboardRoute
   '/parent/payments': typeof AuthenticatedParentPaymentsRoute
   '/student/dashboard': typeof AuthenticatedStudentDashboardRoute
@@ -285,6 +292,7 @@ export interface FileRoutesByFullPath {
   '/admin/classes/$id': typeof AuthenticatedAdminClassesIdRoute
   '/admin/students/$id': typeof AuthenticatedAdminStudentsIdRoute
   '/admin/students/import': typeof AuthenticatedAdminStudentsImportRoute
+  '/admin/tutors/$id': typeof AuthenticatedAdminTutorsIdRoute
   '/parent/children/$id': typeof AuthenticatedParentChildrenIdRoute
   '/parent/classes/$id': typeof AuthenticatedParentClassesIdRoute
   '/tutor/classes/$id': typeof AuthenticatedTutorClassesIdRoute
@@ -306,7 +314,7 @@ export interface FileRoutesByTo {
   '/admin/payment-requests': typeof AuthenticatedAdminPaymentRequestsRoute
   '/admin/payments': typeof AuthenticatedAdminPaymentsRoute
   '/admin/reports': typeof AuthenticatedAdminReportsRoute
-  '/admin/tutors': typeof AuthenticatedAdminTutorsRoute
+  '/admin/tutors': typeof AuthenticatedAdminTutorsRouteWithChildren
   '/parent/dashboard': typeof AuthenticatedParentDashboardRoute
   '/parent/payments': typeof AuthenticatedParentPaymentsRoute
   '/student/dashboard': typeof AuthenticatedStudentDashboardRoute
@@ -322,6 +330,7 @@ export interface FileRoutesByTo {
   '/admin/classes/$id': typeof AuthenticatedAdminClassesIdRoute
   '/admin/students/$id': typeof AuthenticatedAdminStudentsIdRoute
   '/admin/students/import': typeof AuthenticatedAdminStudentsImportRoute
+  '/admin/tutors/$id': typeof AuthenticatedAdminTutorsIdRoute
   '/parent/children/$id': typeof AuthenticatedParentChildrenIdRoute
   '/parent/classes/$id': typeof AuthenticatedParentClassesIdRoute
   '/tutor/classes/$id': typeof AuthenticatedTutorClassesIdRoute
@@ -345,7 +354,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/payment-requests': typeof AuthenticatedAdminPaymentRequestsRoute
   '/_authenticated/admin/payments': typeof AuthenticatedAdminPaymentsRoute
   '/_authenticated/admin/reports': typeof AuthenticatedAdminReportsRoute
-  '/_authenticated/admin/tutors': typeof AuthenticatedAdminTutorsRoute
+  '/_authenticated/admin/tutors': typeof AuthenticatedAdminTutorsRouteWithChildren
   '/_authenticated/parent/dashboard': typeof AuthenticatedParentDashboardRoute
   '/_authenticated/parent/payments': typeof AuthenticatedParentPaymentsRoute
   '/_authenticated/student/dashboard': typeof AuthenticatedStudentDashboardRoute
@@ -361,6 +370,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/classes/$id': typeof AuthenticatedAdminClassesIdRoute
   '/_authenticated/admin/students/$id': typeof AuthenticatedAdminStudentsIdRoute
   '/_authenticated/admin/students/import': typeof AuthenticatedAdminStudentsImportRoute
+  '/_authenticated/admin/tutors/$id': typeof AuthenticatedAdminTutorsIdRoute
   '/_authenticated/parent/children/$id': typeof AuthenticatedParentChildrenIdRoute
   '/_authenticated/parent/classes/$id': typeof AuthenticatedParentClassesIdRoute
   '/_authenticated/tutor/classes/$id': typeof AuthenticatedTutorClassesIdRoute
@@ -400,6 +410,7 @@ export interface FileRouteTypes {
     | '/admin/classes/$id'
     | '/admin/students/$id'
     | '/admin/students/import'
+    | '/admin/tutors/$id'
     | '/parent/children/$id'
     | '/parent/classes/$id'
     | '/tutor/classes/$id'
@@ -437,6 +448,7 @@ export interface FileRouteTypes {
     | '/admin/classes/$id'
     | '/admin/students/$id'
     | '/admin/students/import'
+    | '/admin/tutors/$id'
     | '/parent/children/$id'
     | '/parent/classes/$id'
     | '/tutor/classes/$id'
@@ -475,6 +487,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/classes/$id'
     | '/_authenticated/admin/students/$id'
     | '/_authenticated/admin/students/import'
+    | '/_authenticated/admin/tutors/$id'
     | '/_authenticated/parent/children/$id'
     | '/_authenticated/parent/classes/$id'
     | '/_authenticated/tutor/classes/$id'
@@ -691,6 +704,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminStudentsImportRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/admin/tutors/$id': {
+      id: '/_authenticated/admin/tutors/$id'
+      path: '/$id'
+      fullPath: '/admin/tutors/$id'
+      preLoaderRoute: typeof AuthenticatedAdminTutorsIdRouteImport
+      parentRoute: typeof AuthenticatedAdminTutorsRoute
+    }
     '/_authenticated/parent/children/$id': {
       id: '/_authenticated/parent/children/$id'
       path: '/parent/children/$id'
@@ -750,6 +770,20 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AuthenticatedAdminTutorsRouteChildren {
+  AuthenticatedAdminTutorsIdRoute: typeof AuthenticatedAdminTutorsIdRoute
+}
+
+const AuthenticatedAdminTutorsRouteChildren: AuthenticatedAdminTutorsRouteChildren =
+  {
+    AuthenticatedAdminTutorsIdRoute: AuthenticatedAdminTutorsIdRoute,
+  }
+
+const AuthenticatedAdminTutorsRouteWithChildren =
+  AuthenticatedAdminTutorsRoute._addFileChildren(
+    AuthenticatedAdminTutorsRouteChildren,
+  )
+
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminContactsRoute: typeof AuthenticatedAdminContactsRoute
   AuthenticatedAdminDashboardRoute: typeof AuthenticatedAdminDashboardRoute
@@ -758,7 +792,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminPaymentRequestsRoute: typeof AuthenticatedAdminPaymentRequestsRoute
   AuthenticatedAdminPaymentsRoute: typeof AuthenticatedAdminPaymentsRoute
   AuthenticatedAdminReportsRoute: typeof AuthenticatedAdminReportsRoute
-  AuthenticatedAdminTutorsRoute: typeof AuthenticatedAdminTutorsRoute
+  AuthenticatedAdminTutorsRoute: typeof AuthenticatedAdminTutorsRouteWithChildren
   AuthenticatedParentDashboardRoute: typeof AuthenticatedParentDashboardRoute
   AuthenticatedParentPaymentsRoute: typeof AuthenticatedParentPaymentsRoute
   AuthenticatedStudentDashboardRoute: typeof AuthenticatedStudentDashboardRoute
@@ -795,7 +829,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
     AuthenticatedAdminPaymentRequestsRoute,
   AuthenticatedAdminPaymentsRoute: AuthenticatedAdminPaymentsRoute,
   AuthenticatedAdminReportsRoute: AuthenticatedAdminReportsRoute,
-  AuthenticatedAdminTutorsRoute: AuthenticatedAdminTutorsRoute,
+  AuthenticatedAdminTutorsRoute: AuthenticatedAdminTutorsRouteWithChildren,
   AuthenticatedParentDashboardRoute: AuthenticatedParentDashboardRoute,
   AuthenticatedParentPaymentsRoute: AuthenticatedParentPaymentsRoute,
   AuthenticatedStudentDashboardRoute: AuthenticatedStudentDashboardRoute,

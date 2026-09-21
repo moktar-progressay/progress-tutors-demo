@@ -1,5 +1,5 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Page } from "@/components/AppShell";
 import { Avatar, Empty, PageHeader, Pill, Section, StatCard } from "@/components/kit";
@@ -25,6 +25,9 @@ import {
 } from "@/lib/db";
 
 export const Route = createFileRoute("/_authenticated/admin/tutors")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    add: search["add"] === true || search["add"] === "true",
+  }),
   head: () => ({
     meta: [
       { title: "Tutors & Coaches — ProgressTutors" },
@@ -54,6 +57,7 @@ const BLANK = {
 };
 
 function TutorsPage() {
+  const { add } = Route.useSearch();
   const tutors = useTable("tutors", "first_name");
   const classes = useTable("classes", "name");
   const create = useUpsert("tutors");
@@ -65,6 +69,13 @@ function TutorsPage() {
   const [editing, setEditing] = useState<TutorRow | null>(null);
   const [tutorPendingDelete, setTutorPendingDelete] = useState<TutorRow | null>(null);
   const [form, setForm] = useState(BLANK);
+
+  useEffect(() => {
+    if (!add) return;
+    setEditing(null);
+    setForm(BLANK);
+    setOpen(true);
+  }, [add]);
 
   const rows = (tutors.data ?? []).filter(
     (t) =>
@@ -172,7 +183,13 @@ function TutorsPage() {
                   <div className="flex items-center gap-3">
                     <Avatar initials={initialsOf(name)} tone="pink" />
                     <div className="min-w-0">
-                      <p className="truncate font-extrabold">{name}</p>
+                      <Link
+                        to="/admin/tutors/$id"
+                        params={{ id: t.id }}
+                        className="block truncate font-extrabold hover:text-primary"
+                      >
+                        {name}
+                      </Link>
                       <p className="truncate text-xs text-muted-foreground">
                         {t.email ?? "No email"}
                       </p>

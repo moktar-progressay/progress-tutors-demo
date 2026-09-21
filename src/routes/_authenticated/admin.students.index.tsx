@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Page } from "@/components/AppShell";
 import { Avatar, Empty, PageHeader, Pill, Section, StatCard } from "@/components/kit";
@@ -25,6 +25,9 @@ import {
 } from "@/lib/db";
 
 export const Route = createFileRoute("/_authenticated/admin/students/")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    add: search["add"] === true || search["add"] === "true",
+  }),
   head: () => ({
     meta: [
       { title: "Students — ProgressTutors" },
@@ -44,6 +47,7 @@ const BLANK = {
   first_name: "",
   last_name: "",
   date_of_birth: "",
+  gender: "",
   year_group: "",
   school: "",
   email: "",
@@ -62,6 +66,7 @@ const BLANK = {
 type FormState = typeof BLANK;
 
 function StudentsPage() {
+  const { add } = Route.useSearch();
   const students = useTable("students", "first_name");
   const parents = useTable("parents", "first_name");
   const classes = useTable("classes", "name");
@@ -84,6 +89,13 @@ function StudentsPage() {
   const [editing, setEditing] = useState<StudentRow | null>(null);
   const [studentPendingDelete, setStudentPendingDelete] = useState<StudentRow | null>(null);
   const [form, setForm] = useState<FormState>(BLANK);
+
+  useEffect(() => {
+    if (!add) return;
+    setEditing(null);
+    setForm(BLANK);
+    setOpen(true);
+  }, [add]);
 
   const rows = students.data ?? [];
   const classList = classes.data ?? [];
@@ -135,6 +147,7 @@ function StudentsPage() {
       first_name: s.first_name,
       last_name: s.last_name ?? "",
       date_of_birth: s.date_of_birth ?? "",
+      gender: s.gender ?? "",
       year_group: s.year_group ?? "",
       school: s.school ?? "",
       email: s.email ?? "",
@@ -158,6 +171,7 @@ function StudentsPage() {
       ...rest,
       last_name: rest.last_name || null,
       date_of_birth: rest.date_of_birth || null,
+      gender: rest.gender || null,
       year_group: rest.year_group || null,
       school: rest.school || null,
       email: rest.email || null,
@@ -377,6 +391,18 @@ function StudentsPage() {
           type="date"
           value={form.date_of_birth}
           onChange={(v) => setForm({ ...form, date_of_birth: v })}
+        />
+        <SelectField
+          label="Gender"
+          value={form.gender}
+          onChange={(v) => setForm({ ...form, gender: v })}
+          options={[
+            { value: "", label: "Not recorded" },
+            { value: "Boy", label: "Boy" },
+            { value: "Girl", label: "Girl" },
+            { value: "Non-binary", label: "Non-binary" },
+            { value: "Prefer not to say", label: "Prefer not to say" },
+          ]}
         />
         <TextField
           label="Year group"

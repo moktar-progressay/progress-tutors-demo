@@ -1318,6 +1318,7 @@ export type Database = {
           emergency_contact_name: string | null;
           emergency_contact_phone: string | null;
           first_name: string;
+          gender: string | null;
           id: string;
           import_batch_id: string | null;
           last_name: string | null;
@@ -1344,6 +1345,7 @@ export type Database = {
           emergency_contact_name?: string | null;
           emergency_contact_phone?: string | null;
           first_name: string;
+          gender?: string | null;
           id?: string;
           import_batch_id?: string | null;
           last_name?: string | null;
@@ -1370,6 +1372,7 @@ export type Database = {
           emergency_contact_name?: string | null;
           emergency_contact_phone?: string | null;
           first_name?: string;
+          gender?: string | null;
           id?: string;
           import_batch_id?: string | null;
           last_name?: string | null;
