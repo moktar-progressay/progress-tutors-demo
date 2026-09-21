@@ -21,7 +21,6 @@ import {
   ChevronLeft,
   ChevronRight,
   GraduationCap,
-  MapPin,
   Plus,
   RotateCcw,
   UserPlus,
@@ -42,7 +41,7 @@ import {
 } from "recharts";
 import { Page } from "@/components/AppShell";
 import { SelectField } from "@/components/form-kit";
-import { Avatar, avatarTone, Empty, PageHeader, Pill, StatCard } from "@/components/kit";
+import { Avatar, avatarTone, Empty, PageHeader, StatCard } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { fullName, hhmm, initialsOf, useTable, type ClassRow } from "@/lib/db";
 import { cn } from "@/lib/utils";
@@ -70,6 +69,38 @@ const RANGE_OPTIONS = [
   { value: "365", label: "Last 12 months" },
 ];
 
+const SCHEDULE_COLOURS = {
+  pink: "border-pink-800 bg-pink-600 text-white",
+  blue: "border-blue-800 bg-blue-600 text-white",
+  green: "border-emerald-800 bg-emerald-600 text-white",
+  amber: "border-amber-600 bg-amber-400 text-amber-950",
+  violet: "border-violet-800 bg-violet-600 text-white",
+  teal: "border-teal-800 bg-teal-600 text-white",
+} as const;
+
+type ScheduleColour = keyof typeof SCHEDULE_COLOURS;
+const SCHEDULE_COLOUR_NAMES = Object.keys(SCHEDULE_COLOURS) as ScheduleColour[];
+const SCHEDULE_HOURS = Array.from({ length: 13 }, (_, index) => index + 8);
+const SCHEDULE_HOUR_HEIGHT = 56;
+const SCHEDULE_MINUTE_SCALE = SCHEDULE_HOUR_HEIGHT / 60;
+const SCHEDULE_HEIGHT = SCHEDULE_HOURS.length * SCHEDULE_HOUR_HEIGHT;
+
+function stableHash(value: string) {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
+  }
+  return hash;
+}
+
+function scheduleColour(lesson: ClassRow) {
+  if (lesson.card_colour && lesson.card_colour in SCHEDULE_COLOURS) {
+    return SCHEDULE_COLOURS[lesson.card_colour as ScheduleColour];
+  }
+  const index = stableHash(lesson.tutor_id ?? lesson.id) % SCHEDULE_COLOUR_NAMES.length;
+  return SCHEDULE_COLOURS[SCHEDULE_COLOUR_NAMES[index] ?? "pink"];
+}
+
 function minutes(time: string | null | undefined) {
   if (!time) return 0;
   const [hour, minute] = time.split(":").map(Number);
@@ -93,17 +124,6 @@ function genderGroup(value: string | null | undefined) {
   if (["boy", "boys", "male", "m"].includes(gender)) return "Boys";
   if (["girl", "girls", "female", "f"].includes(gender)) return "Girls";
   return "Not recorded";
-}
-
-function analyticsBucket(date: Date, rangeDays: string) {
-  const days = Number(rangeDays);
-  if (days <= 7) return { key: format(date, "yyyy-MM-dd"), label: format(date, "EEE") };
-  if (days <= 30) {
-    const start = startOfWeek(date, { weekStartsOn: 1 });
-    return { key: format(start, "yyyy-MM-dd"), label: format(start, "d MMM") };
-  }
-  const start = startOfMonth(date);
-  return { key: format(start, "yyyy-MM-dd"), label: format(start, "MMM") };
 }
 
 function ChartCard({
@@ -200,12 +220,18 @@ function AdminDashboard() {
   const filteredStudentIds = new Set(activeEnrolments.map((item) => item.student_id));
 
   const attendanceTimeline = useMemo(() => {
-    const points = new Map<string, { key: string; name: string; present: number; total: number }>();
+    const points = new Map<
+      string,
+      { date: string; dateLabel: string; fullDate: string; studentsAttended: number }
+    >();
     analyticsDates.forEach((date) => {
-      const item = analyticsBucket(date, rangeDays);
-      if (!points.has(item.key)) {
-        points.set(item.key, { key: item.key, name: item.label, present: 0, total: 0 });
-      }
+      const dateKey = format(date, "yyyy-MM-dd");
+      points.set(dateKey, {
+        date: dateKey,
+        dateLabel: format(date, "d MMM"),
+        fullDate: format(date, "EEEE d MMMM yyyy"),
+        studentsAttended: 0,
+      });
     });
     const sessionDates = new Map(
       filteredSessions.map((session) => [session.id, session.session_date]),
@@ -213,19 +239,12 @@ function AdminDashboard() {
     filteredAttendance.forEach((mark) => {
       const sessionDate = sessionDates.get(mark.session_id);
       if (!sessionDate) return;
-      const item = analyticsBucket(parseISO(sessionDate), rangeDays);
-      const point = points.get(item.key);
+      const point = points.get(sessionDate);
       if (!point) return;
-      point.total += 1;
-      if (["present", "late"].includes(mark.status)) point.present += 1;
+      if (["present", "late"].includes(mark.status)) point.studentsAttended += 1;
     });
-    return Array.from(points.values())
-      .sort((a, b) => a.key.localeCompare(b.key))
-      .map((point) => ({
-        name: point.name,
-        attendance: point.total ? Math.round((point.present / point.total) * 100) : 0,
-      }));
-  }, [analyticsDates, filteredAttendance, filteredSessions, rangeDays]);
+    return Array.from(points.values()).sort((a, b) => a.date.localeCompare(b.date));
+  }, [analyticsDates, filteredAttendance, filteredSessions]);
 
   const genderAttendance = useMemo(() => {
     const studentMap = new Map((students.data ?? []).map((student) => [student.id, student]));
@@ -252,10 +271,27 @@ function AdminDashboard() {
       ),
     [analyticsDates, filteredLessons],
   );
-  const studentsVsLessons = [
-    { name: "Students", total: filteredStudentIds.size },
-    { name: "Lessons", total: lessonOccurrences },
-  ];
+  const lessonAttendance = useMemo(() => {
+    const sessionClasses = new Map(
+      filteredSessions.map((session) => [session.id, session.class_id]),
+    );
+    const totals = new Map(filteredLessons.map((lesson) => [lesson.id, 0]));
+    filteredAttendance.forEach((mark) => {
+      if (!["present", "late"].includes(mark.status)) return;
+      const classId = sessionClasses.get(mark.session_id);
+      if (!classId || !totals.has(classId)) return;
+      totals.set(classId, (totals.get(classId) ?? 0) + 1);
+    });
+    return filteredLessons
+      .map((lesson) => ({
+        lesson: lesson.name,
+        studentsAttended: totals.get(lesson.id) ?? 0,
+      }))
+      .sort(
+        (a, b) =>
+          b.studentsAttended - a.studentsAttended || a.lesson.localeCompare(b.lesson, "en-GB"),
+      );
+  }, [filteredAttendance, filteredLessons, filteredSessions]);
 
   const tutorLeaderboard = useMemo(() => {
     const totals = new Map<string, { hours: number; lessons: number }>();
@@ -308,6 +344,146 @@ function AdminDashboard() {
       : calendarView === "week"
         ? `${format(weekStart, "d MMM")} to ${format(addDays(weekStart, 6), "d MMM yyyy")}`
         : format(anchor, "MMMM yyyy");
+
+  const enrolmentCount = (lesson: ClassRow) =>
+    activeEnrolments.filter((item) => item.class_id === lesson.id).length;
+
+  const scheduleCard = (lesson: ClassRow, compact = false) => {
+    const tutor = (tutors.data ?? []).find((item) => item.id === lesson.tutor_id);
+    const enrolled = enrolmentCount(lesson);
+    const filled = lesson.capacity > 0 ? Math.min(100, (enrolled / lesson.capacity) * 100) : 0;
+    const tutorName = tutor ? fullName(tutor) : "Teacher needed";
+    return (
+      <Link
+        key={lesson.id}
+        to="/admin/classes/$id"
+        params={{ id: lesson.id }}
+        title={`${lesson.name}. ${enrolled} of ${lesson.capacity} seats filled. ${tutorName}.`}
+        className={cn(
+          "flex h-full w-full flex-col overflow-hidden rounded-xl border border-l-4 border-white/30 p-1.5 text-left shadow-sm ring-1 ring-black/5 transition hover:brightness-95",
+          scheduleColour(lesson),
+          compact ? "text-[9px]" : "text-[10px] sm:text-xs",
+        )}
+      >
+        <p className="line-clamp-2 font-extrabold leading-tight">{lesson.name}</p>
+        <p className="mt-0.5 whitespace-nowrap text-[9px] font-semibold leading-none opacity-85">
+          {hhmm(lesson.start_time)}-{hhmm(lesson.end_time)}
+        </p>
+        {!compact ? (
+          <div className="mt-auto min-w-0 pt-1">
+            <div className="mb-1 h-1 overflow-hidden rounded-full bg-black/20">
+              <div className="h-full rounded-full bg-white/90" style={{ width: `${filled}%` }} />
+            </div>
+            <div className="flex min-w-0 items-end justify-between gap-1">
+              <span title={tutorName}>
+                <Avatar initials={initialsOf(tutorName)} tone={avatarTone(tutorName)} size="sm" />
+              </span>
+              <span className="shrink-0 whitespace-nowrap rounded-full bg-black/20 px-1.5 py-0.5 text-[9px] font-extrabold leading-none">
+                {enrolled}/{lesson.capacity} seats
+              </span>
+            </div>
+          </div>
+        ) : null}
+      </Link>
+    );
+  };
+
+  const compactTimeline = (days: Date[]) => (
+    <div className="mt-3 max-h-[430px] overflow-auto rounded-xl border border-border bg-card">
+      <div className={cn("min-w-[760px]", days.length === 1 && "min-w-0")}>
+        <div
+          className="sticky top-0 z-20 grid border-b border-border bg-card"
+          style={{ gridTemplateColumns: `3.5rem repeat(${days.length}, minmax(0, 1fr))` }}
+        >
+          <div className="p-1.5" />
+          {days.map((day) => (
+            <button
+              key={day.toISOString()}
+              type="button"
+              onClick={() => setSelectedDate(format(day, "yyyy-MM-dd"))}
+              className="border-l border-border p-1.5 text-center hover:bg-muted"
+            >
+              <span className="block text-[9px] font-bold uppercase text-muted-foreground">
+                {format(day, "EEE")}
+              </span>
+              <span
+                className={cn(
+                  "mt-0.5 inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-extrabold",
+                  format(day, "yyyy-MM-dd") === selectedDate &&
+                    "bg-primary text-primary-foreground",
+                )}
+              >
+                {format(day, "d")}
+              </span>
+            </button>
+          ))}
+        </div>
+        <div
+          className="grid"
+          style={{ gridTemplateColumns: `3.5rem repeat(${days.length}, minmax(0, 1fr))` }}
+        >
+          <div className="relative" style={{ height: SCHEDULE_HEIGHT }}>
+            {SCHEDULE_HOURS.map((hour) => (
+              <span
+                key={hour}
+                className="absolute right-1.5 -translate-y-2 text-[9px] text-muted-foreground"
+                style={{ top: `${(hour - 8) * SCHEDULE_HOUR_HEIGHT}px` }}
+              >
+                {hour}:00
+              </span>
+            ))}
+          </div>
+          {days.map((day) => {
+            const dayLessons = filteredLessons
+              .filter((lesson) => lessonRunsOn(lesson, day))
+              .sort((a, b) => (a.start_time ?? "").localeCompare(b.start_time ?? ""));
+            return (
+              <div
+                key={day.toISOString()}
+                className="relative border-l border-border"
+                style={{
+                  height: SCHEDULE_HEIGHT,
+                  backgroundImage: `repeating-linear-gradient(to bottom, transparent 0, transparent ${SCHEDULE_HOUR_HEIGHT - 1}px, var(--border) ${SCHEDULE_HOUR_HEIGHT}px)`,
+                }}
+              >
+                {dayLessons.map((lesson) => {
+                  const top =
+                    Math.max(0, minutes(lesson.start_time) - 8 * 60) * SCHEDULE_MINUTE_SCALE;
+                  const height = Math.max(
+                    38,
+                    (minutes(lesson.end_time) - minutes(lesson.start_time)) * SCHEDULE_MINUTE_SCALE,
+                  );
+                  const overlappingLessons = dayLessons.filter(
+                    (candidate) =>
+                      minutes(candidate.start_time) < minutes(lesson.end_time) &&
+                      minutes(candidate.end_time) > minutes(lesson.start_time),
+                  );
+                  const overlapIndex = overlappingLessons.findIndex(
+                    (candidate) => candidate.id === lesson.id,
+                  );
+                  const width = overlappingLessons.length > 1 ? 94 / overlappingLessons.length : 94;
+                  return (
+                    <div
+                      key={lesson.id}
+                      className="absolute px-0.5"
+                      style={{
+                        top,
+                        height,
+                        left: `${3 + Math.max(0, overlapIndex) * width}%`,
+                        width: `${width}%`,
+                      }}
+                    >
+                      {scheduleCard(lesson, days.length > 3)}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
 
   function resetFilters() {
     setRangeDays("30");
@@ -437,9 +613,7 @@ function AdminDashboard() {
         <div className="flex flex-wrap items-center gap-2">
           <div>
             <h2 className="font-bold">Schedule</h2>
-            <p className="text-xs text-muted-foreground">
-              Open a lesson or student record directly.
-            </p>
+            <p className="text-xs text-muted-foreground">A compact view of the main timetable.</p>
           </div>
           <div className="ml-auto flex flex-wrap items-center gap-1">
             <Button
@@ -459,6 +633,9 @@ function AdminDashboard() {
             </Button>
             <Button size="icon" variant="ghost" onClick={() => moveCalendar(1)} aria-label="Next">
               <ChevronRight className="h-4 w-4" />
+            </Button>
+            <Button size="sm" variant="secondary" asChild>
+              <Link to="/admin/classes">Open schedule</Link>
             </Button>
           </div>
         </div>
@@ -482,121 +659,63 @@ function AdminDashboard() {
             ))}
           </div>
         </div>
-
-        <div
-          className={cn(
-            "mt-4 grid gap-2",
-            calendarView === "week" && "lg:grid-cols-7",
-            calendarView === "month" && "grid-cols-2 sm:grid-cols-4 xl:grid-cols-7",
-          )}
-        >
-          {calendarDays.map((day) => {
-            const dayLessons = filteredLessons
-              .filter((lesson) => lessonRunsOn(lesson, day))
-              .sort((a, b) => (a.start_time ?? "").localeCompare(b.start_time ?? ""));
-            return (
-              <article
-                key={day.toISOString()}
-                className={cn(
-                  "min-w-0 rounded-xl border border-border bg-background p-2",
-                  calendarView === "day" && "p-4",
-                  calendarView === "month" && !isSameMonth(day, anchor) && "opacity-45",
-                )}
+        {calendarView === "day" ? compactTimeline([anchor]) : null}
+        {calendarView === "week" ? compactTimeline(calendarDays) : null}
+        {calendarView === "month" ? (
+          <div className="mt-3 grid max-h-[430px] grid-cols-7 overflow-auto rounded-xl border border-border bg-card">
+            {Array.from({ length: 7 }, (_, index) => addDays(weekStart, index)).map((day) => (
+              <div
+                key={format(day, "EEEE")}
+                className="sticky top-0 z-10 border-b border-r border-border bg-card p-1.5 text-center text-[9px] font-bold uppercase text-muted-foreground"
               >
+                {format(day, "EEE")}
+              </div>
+            ))}
+            {calendarDays.map((day) => {
+              const dayLessons = filteredLessons.filter((lesson) => lessonRunsOn(lesson, day));
+              return (
                 <button
+                  key={day.toISOString()}
                   type="button"
                   onClick={() => {
                     setSelectedDate(format(day, "yyyy-MM-dd"));
-                    if (calendarView === "month") setCalendarView("day");
+                    setCalendarView("day");
                   }}
-                  className="mb-2 text-left"
+                  className={cn(
+                    "min-h-20 border-b border-r border-border p-1 text-left hover:bg-muted/40",
+                    !isSameMonth(day, anchor) && "bg-muted/30 text-muted-foreground",
+                  )}
                 >
-                  <span className="block text-[10px] font-bold uppercase text-muted-foreground">
-                    {format(day, "EEE")}
-                  </span>
-                  <span className="text-sm font-extrabold">{format(day, "d MMM")}</span>
-                </button>
-                <div className="space-y-2">
-                  {dayLessons.map((lesson) => {
-                    const tutor = (tutors.data ?? []).find((item) => item.id === lesson.tutor_id);
-                    const site = (sites.data ?? []).find((item) => item.id === lesson.site_id);
-                    const lessonStudentIds = activeEnrolments
-                      .filter((item) => item.class_id === lesson.id)
-                      .map((item) => item.student_id);
-                    const lessonStudents = (students.data ?? []).filter((student) =>
-                      lessonStudentIds.includes(student.id),
-                    );
-                    return (
-                      <div
+                  <span className="text-[10px] font-bold">{format(day, "d")}</span>
+                  <span className="mt-1 block space-y-1">
+                    {dayLessons.slice(0, 2).map((lesson) => (
+                      <span
                         key={lesson.id}
-                        className="rounded-xl border border-primary/20 bg-secondary p-3 text-secondary-foreground"
+                        className={cn(
+                          "block truncate rounded px-1 py-0.5 text-[8px] font-bold",
+                          scheduleColour(lesson),
+                        )}
                       >
-                        <Link
-                          to="/admin/classes/$id"
-                          params={{ id: lesson.id }}
-                          className="block hover:text-primary"
-                        >
-                          <p className="text-xs font-extrabold text-primary">
-                            {hhmm(lesson.start_time)}-{hhmm(lesson.end_time)}
-                          </p>
-                          <p className="mt-1 line-clamp-2 text-sm font-bold">{lesson.name}</p>
-                          <p className="mt-1 line-clamp-2 text-xs">
-                            {[lesson.subject, lesson.level].filter(Boolean).join(" · ") ||
-                              "Subject to confirm"}
-                          </p>
-                          <p className="mt-2 flex items-center gap-1 text-[11px]">
-                            <MapPin className="h-3 w-3" />
-                            <span className="truncate">
-                              {site?.name ?? lesson.venue_name ?? "Venue to confirm"}
-                            </span>
-                          </p>
-                        </Link>
-                        <div className="mt-2 flex flex-wrap items-center gap-1">
-                          <Link
-                            to={tutor ? "/admin/tutors/$id" : "/admin/tutors"}
-                            params={tutor ? { id: tutor.id } : {}}
-                            className="text-[11px] font-semibold hover:text-primary"
-                          >
-                            {tutor ? fullName(tutor) : "Teacher needed"}
-                          </Link>
-                          <Pill tone="blue">{lessonStudents.length} students</Pill>
-                        </div>
-                        {calendarView === "day" && lessonStudents.length ? (
-                          <div className="mt-2 flex flex-wrap gap-1">
-                            {lessonStudents.slice(0, 8).map((student) => (
-                              <Link
-                                key={student.id}
-                                to="/admin/students/$id"
-                                params={{ id: student.id }}
-                                className="rounded-full bg-card px-2 py-1 text-[11px] font-semibold hover:text-primary"
-                              >
-                                {fullName(student)}
-                              </Link>
-                            ))}
-                            {lessonStudents.length > 8 ? (
-                              <span className="px-2 py-1 text-[11px] text-muted-foreground">
-                                +{lessonStudents.length - 8} more
-                              </span>
-                            ) : null}
-                          </div>
-                        ) : null}
-                      </div>
-                    );
-                  })}
-                  {dayLessons.length === 0 && calendarView !== "month" ? (
-                    <Empty>No lessons</Empty>
-                  ) : null}
-                </div>
-              </article>
-            );
-          })}
-        </div>
+                        {hhmm(lesson.start_time)} {lesson.name}
+                      </span>
+                    ))}
+                    {dayLessons.length > 2 ? (
+                      <span className="block text-[8px] font-bold text-primary">
+                        +{dayLessons.length - 2} more
+                      </span>
+                    ) : null}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
       </section>
 
       <div className="grid min-w-0 gap-5 xl:grid-cols-2">
         <ChartCard
           title="Attendance over time"
-          subtitle="Present and late marks as a percentage of all recorded attendance"
+          subtitle="Total students marked present or late across all lessons on each day"
         >
           <ResponsiveContainer width="100%" height="100%">
             <LineChart
@@ -604,15 +723,17 @@ function AdminDashboard() {
               margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
             >
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-              <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} unit="%" />
+              <XAxis dataKey="dateLabel" tick={{ fontSize: 11 }} minTickGap={24} />
+              <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
               <Tooltip
                 contentStyle={tooltipStyle}
-                formatter={(value) => [`${value}%`, "Attendance"]}
+                formatter={(value) => [Number(value), "Students attended"]}
+                labelFormatter={(label, payload) => String(payload[0]?.payload?.fullDate ?? label)}
               />
               <Line
                 type="monotone"
-                dataKey="attendance"
+                dataKey="studentsAttended"
+                name="Students attended"
                 stroke="#ec2d70"
                 strokeWidth={3}
                 dot={{ r: 3 }}
@@ -640,22 +761,43 @@ function AdminDashboard() {
         </ChartCard>
 
         <ChartCard
-          title="Students versus lessons"
-          subtitle="Unique enrolled students compared with scheduled lesson occurrences"
+          title="Students attending each lesson"
+          subtitle="Present and late attendance marks by lesson in the selected reporting period"
         >
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              data={studentsVsLessons}
-              layout="vertical"
-              margin={{ top: 10, right: 20, left: 10, bottom: 0 }}
+          <div className="h-full overflow-x-auto">
+            <div
+              className="h-full"
+              style={{ minWidth: `${Math.max(560, lessonAttendance.length * 105)}px` }}
             >
-              <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-              <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} />
-              <YAxis type="category" dataKey="name" width={70} tick={{ fontSize: 11 }} />
-              <Tooltip contentStyle={tooltipStyle} />
-              <Bar dataKey="total" fill="#6c49b8" radius={[0, 8, 8, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={lessonAttendance}
+                  margin={{ top: 10, right: 10, left: -20, bottom: 78 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis
+                    dataKey="lesson"
+                    interval={0}
+                    angle={-28}
+                    textAnchor="end"
+                    height={82}
+                    tick={{ fontSize: 10 }}
+                  />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                  <Tooltip
+                    contentStyle={tooltipStyle}
+                    formatter={(value) => [Number(value), "Students attended"]}
+                  />
+                  <Bar
+                    dataKey="studentsAttended"
+                    name="Students attended"
+                    fill="#6c49b8"
+                    radius={[8, 8, 0, 0]}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
         </ChartCard>
 
         <section className="surface min-w-0 p-4 sm:p-5">
