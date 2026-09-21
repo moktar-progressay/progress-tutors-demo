@@ -12,8 +12,8 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthRouteImport } from './routes/auth'
-import { Route as AuthenticatedAdminDashboardRouteImport } from './routes/_authenticated/admin.dashboard'
 import { Route as AuthenticatedAdminContactsRouteImport } from './routes/_authenticated/admin.contacts'
+import { Route as AuthenticatedAdminDashboardRouteImport } from './routes/_authenticated/admin.dashboard'
 import { Route as AuthenticatedAdminOperationsRouteImport } from './routes/_authenticated/admin.operations'
 import { Route as AuthenticatedAdminParentsRouteImport } from './routes/_authenticated/admin.parents'
 import { Route as AuthenticatedAdminPaymentRequestsRouteImport } from './routes/_authenticated/admin.payment-requests'
@@ -29,6 +29,7 @@ import { Route as AuthenticatedStudentProgressRouteImport } from './routes/_auth
 import { Route as AuthenticatedStudentRewardsRouteImport } from './routes/_authenticated/student.rewards'
 import { Route as AuthenticatedTutorDashboardRouteImport } from './routes/_authenticated/tutor.dashboard'
 import { Route as AuthenticatedTutorEarningsRouteImport } from './routes/_authenticated/tutor.earnings'
+import { Route as AuthenticatedTutorHomeworkRouteImport } from './routes/_authenticated/tutor.homework'
 import { Route as AuthenticatedTutorLessonsRouteImport } from './routes/_authenticated/tutor.lessons'
 import { Route as AuthenticatedTutorPaymentRequestsRouteImport } from './routes/_authenticated/tutor.payment-requests'
 import { Route as AuthenticatedAdminClassesIndexRouteImport } from './routes/_authenticated/admin.classes.index'
@@ -39,6 +40,9 @@ import { Route as AuthenticatedAdminStudentsImportRouteImport } from './routes/_
 import { Route as AuthenticatedParentChildrenIdRouteImport } from './routes/_authenticated/parent.children.$id'
 import { Route as AuthenticatedParentClassesIndexRouteImport } from './routes/_authenticated/parent.classes.index'
 import { Route as AuthenticatedParentClassesIdRouteImport } from './routes/_authenticated/parent.classes.$id'
+import { Route as AuthenticatedTutorClassesIdRouteImport } from './routes/_authenticated/tutor.classes.$id'
+import { Route as AuthenticatedTutorStudentsIndexRouteImport } from './routes/_authenticated/tutor.students.index'
+import { Route as AuthenticatedTutorStudentsIdRouteImport } from './routes/_authenticated/tutor.students.$id'
 import { Route as AuthenticatedTutorLessonIdIndexRouteImport } from './routes/_authenticated/tutor.lesson.$id.index'
 import { Route as AuthenticatedTutorLessonIdReviewRouteImport } from './routes/_authenticated/tutor.lesson.$id.review'
 
@@ -56,17 +60,18 @@ const AuthRoute = AuthRouteImport.update({
   path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedAdminContactsRoute =
+  AuthenticatedAdminContactsRouteImport.update({
+    id: '/admin/contacts',
+    path: '/admin/contacts',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedAdminDashboardRoute =
   AuthenticatedAdminDashboardRouteImport.update({
     id: '/admin/dashboard',
     path: '/admin/dashboard',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
-const AuthenticatedAdminContactsRoute = AuthenticatedAdminContactsRouteImport.update({
-  id: '/admin/contacts',
-  path: '/admin/contacts',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
 const AuthenticatedAdminOperationsRoute =
   AuthenticatedAdminOperationsRouteImport.update({
     id: '/admin/operations',
@@ -157,6 +162,12 @@ const AuthenticatedTutorEarningsRoute =
     path: '/tutor/earnings',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedTutorHomeworkRoute =
+  AuthenticatedTutorHomeworkRouteImport.update({
+    id: '/tutor/homework',
+    path: '/tutor/homework',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedTutorLessonsRoute =
   AuthenticatedTutorLessonsRouteImport.update({
     id: '/tutor/lessons',
@@ -217,6 +228,24 @@ const AuthenticatedParentClassesIdRoute =
     path: '/parent/classes/$id',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedTutorClassesIdRoute =
+  AuthenticatedTutorClassesIdRouteImport.update({
+    id: '/tutor/classes/$id',
+    path: '/tutor/classes/$id',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedTutorStudentsIndexRoute =
+  AuthenticatedTutorStudentsIndexRouteImport.update({
+    id: '/tutor/students/',
+    path: '/tutor/students/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedTutorStudentsIdRoute =
+  AuthenticatedTutorStudentsIdRouteImport.update({
+    id: '/tutor/students/$id',
+    path: '/tutor/students/$id',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedTutorLessonIdIndexRoute =
   AuthenticatedTutorLessonIdIndexRouteImport.update({
     id: '/tutor/lesson/$id/',
@@ -233,8 +262,8 @@ const AuthenticatedTutorLessonIdReviewRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
-  '/admin/dashboard': typeof AuthenticatedAdminDashboardRoute
   '/admin/contacts': typeof AuthenticatedAdminContactsRoute
+  '/admin/dashboard': typeof AuthenticatedAdminDashboardRoute
   '/admin/operations': typeof AuthenticatedAdminOperationsRoute
   '/admin/parents': typeof AuthenticatedAdminParentsRoute
   '/admin/payment-requests': typeof AuthenticatedAdminPaymentRequestsRoute
@@ -250,6 +279,7 @@ export interface FileRoutesByFullPath {
   '/student/rewards': typeof AuthenticatedStudentRewardsRoute
   '/tutor/dashboard': typeof AuthenticatedTutorDashboardRoute
   '/tutor/earnings': typeof AuthenticatedTutorEarningsRoute
+  '/tutor/homework': typeof AuthenticatedTutorHomeworkRoute
   '/tutor/lessons': typeof AuthenticatedTutorLessonsRoute
   '/tutor/payment-requests': typeof AuthenticatedTutorPaymentRequestsRoute
   '/admin/classes/$id': typeof AuthenticatedAdminClassesIdRoute
@@ -257,17 +287,20 @@ export interface FileRoutesByFullPath {
   '/admin/students/import': typeof AuthenticatedAdminStudentsImportRoute
   '/parent/children/$id': typeof AuthenticatedParentChildrenIdRoute
   '/parent/classes/$id': typeof AuthenticatedParentClassesIdRoute
+  '/tutor/classes/$id': typeof AuthenticatedTutorClassesIdRoute
+  '/tutor/students/$id': typeof AuthenticatedTutorStudentsIdRoute
   '/admin/classes/': typeof AuthenticatedAdminClassesIndexRoute
   '/admin/students/': typeof AuthenticatedAdminStudentsIndexRoute
   '/parent/classes/': typeof AuthenticatedParentClassesIndexRoute
+  '/tutor/students/': typeof AuthenticatedTutorStudentsIndexRoute
   '/tutor/lesson/$id/review': typeof AuthenticatedTutorLessonIdReviewRoute
   '/tutor/lesson/$id/': typeof AuthenticatedTutorLessonIdIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
-  '/admin/dashboard': typeof AuthenticatedAdminDashboardRoute
   '/admin/contacts': typeof AuthenticatedAdminContactsRoute
+  '/admin/dashboard': typeof AuthenticatedAdminDashboardRoute
   '/admin/operations': typeof AuthenticatedAdminOperationsRoute
   '/admin/parents': typeof AuthenticatedAdminParentsRoute
   '/admin/payment-requests': typeof AuthenticatedAdminPaymentRequestsRoute
@@ -283,6 +316,7 @@ export interface FileRoutesByTo {
   '/student/rewards': typeof AuthenticatedStudentRewardsRoute
   '/tutor/dashboard': typeof AuthenticatedTutorDashboardRoute
   '/tutor/earnings': typeof AuthenticatedTutorEarningsRoute
+  '/tutor/homework': typeof AuthenticatedTutorHomeworkRoute
   '/tutor/lessons': typeof AuthenticatedTutorLessonsRoute
   '/tutor/payment-requests': typeof AuthenticatedTutorPaymentRequestsRoute
   '/admin/classes/$id': typeof AuthenticatedAdminClassesIdRoute
@@ -290,9 +324,12 @@ export interface FileRoutesByTo {
   '/admin/students/import': typeof AuthenticatedAdminStudentsImportRoute
   '/parent/children/$id': typeof AuthenticatedParentChildrenIdRoute
   '/parent/classes/$id': typeof AuthenticatedParentClassesIdRoute
+  '/tutor/classes/$id': typeof AuthenticatedTutorClassesIdRoute
+  '/tutor/students/$id': typeof AuthenticatedTutorStudentsIdRoute
   '/admin/classes': typeof AuthenticatedAdminClassesIndexRoute
   '/admin/students': typeof AuthenticatedAdminStudentsIndexRoute
   '/parent/classes': typeof AuthenticatedParentClassesIndexRoute
+  '/tutor/students': typeof AuthenticatedTutorStudentsIndexRoute
   '/tutor/lesson/$id/review': typeof AuthenticatedTutorLessonIdReviewRoute
   '/tutor/lesson/$id': typeof AuthenticatedTutorLessonIdIndexRoute
 }
@@ -301,8 +338,8 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
-  '/_authenticated/admin/dashboard': typeof AuthenticatedAdminDashboardRoute
   '/_authenticated/admin/contacts': typeof AuthenticatedAdminContactsRoute
+  '/_authenticated/admin/dashboard': typeof AuthenticatedAdminDashboardRoute
   '/_authenticated/admin/operations': typeof AuthenticatedAdminOperationsRoute
   '/_authenticated/admin/parents': typeof AuthenticatedAdminParentsRoute
   '/_authenticated/admin/payment-requests': typeof AuthenticatedAdminPaymentRequestsRoute
@@ -318,6 +355,7 @@ export interface FileRoutesById {
   '/_authenticated/student/rewards': typeof AuthenticatedStudentRewardsRoute
   '/_authenticated/tutor/dashboard': typeof AuthenticatedTutorDashboardRoute
   '/_authenticated/tutor/earnings': typeof AuthenticatedTutorEarningsRoute
+  '/_authenticated/tutor/homework': typeof AuthenticatedTutorHomeworkRoute
   '/_authenticated/tutor/lessons': typeof AuthenticatedTutorLessonsRoute
   '/_authenticated/tutor/payment-requests': typeof AuthenticatedTutorPaymentRequestsRoute
   '/_authenticated/admin/classes/$id': typeof AuthenticatedAdminClassesIdRoute
@@ -325,9 +363,12 @@ export interface FileRoutesById {
   '/_authenticated/admin/students/import': typeof AuthenticatedAdminStudentsImportRoute
   '/_authenticated/parent/children/$id': typeof AuthenticatedParentChildrenIdRoute
   '/_authenticated/parent/classes/$id': typeof AuthenticatedParentClassesIdRoute
+  '/_authenticated/tutor/classes/$id': typeof AuthenticatedTutorClassesIdRoute
+  '/_authenticated/tutor/students/$id': typeof AuthenticatedTutorStudentsIdRoute
   '/_authenticated/admin/classes/': typeof AuthenticatedAdminClassesIndexRoute
   '/_authenticated/admin/students/': typeof AuthenticatedAdminStudentsIndexRoute
   '/_authenticated/parent/classes/': typeof AuthenticatedParentClassesIndexRoute
+  '/_authenticated/tutor/students/': typeof AuthenticatedTutorStudentsIndexRoute
   '/_authenticated/tutor/lesson/$id/review': typeof AuthenticatedTutorLessonIdReviewRoute
   '/_authenticated/tutor/lesson/$id/': typeof AuthenticatedTutorLessonIdIndexRoute
 }
@@ -336,8 +377,8 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/auth'
-    | '/admin/dashboard'
     | '/admin/contacts'
+    | '/admin/dashboard'
     | '/admin/operations'
     | '/admin/parents'
     | '/admin/payment-requests'
@@ -353,6 +394,7 @@ export interface FileRouteTypes {
     | '/student/rewards'
     | '/tutor/dashboard'
     | '/tutor/earnings'
+    | '/tutor/homework'
     | '/tutor/lessons'
     | '/tutor/payment-requests'
     | '/admin/classes/$id'
@@ -360,17 +402,20 @@ export interface FileRouteTypes {
     | '/admin/students/import'
     | '/parent/children/$id'
     | '/parent/classes/$id'
+    | '/tutor/classes/$id'
+    | '/tutor/students/$id'
     | '/admin/classes/'
     | '/admin/students/'
     | '/parent/classes/'
+    | '/tutor/students/'
     | '/tutor/lesson/$id/review'
     | '/tutor/lesson/$id/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/auth'
-    | '/admin/dashboard'
     | '/admin/contacts'
+    | '/admin/dashboard'
     | '/admin/operations'
     | '/admin/parents'
     | '/admin/payment-requests'
@@ -386,6 +431,7 @@ export interface FileRouteTypes {
     | '/student/rewards'
     | '/tutor/dashboard'
     | '/tutor/earnings'
+    | '/tutor/homework'
     | '/tutor/lessons'
     | '/tutor/payment-requests'
     | '/admin/classes/$id'
@@ -393,9 +439,12 @@ export interface FileRouteTypes {
     | '/admin/students/import'
     | '/parent/children/$id'
     | '/parent/classes/$id'
+    | '/tutor/classes/$id'
+    | '/tutor/students/$id'
     | '/admin/classes'
     | '/admin/students'
     | '/parent/classes'
+    | '/tutor/students'
     | '/tutor/lesson/$id/review'
     | '/tutor/lesson/$id'
   id:
@@ -403,8 +452,8 @@ export interface FileRouteTypes {
     | '/'
     | '/_authenticated'
     | '/auth'
-    | '/_authenticated/admin/dashboard'
     | '/_authenticated/admin/contacts'
+    | '/_authenticated/admin/dashboard'
     | '/_authenticated/admin/operations'
     | '/_authenticated/admin/parents'
     | '/_authenticated/admin/payment-requests'
@@ -420,6 +469,7 @@ export interface FileRouteTypes {
     | '/_authenticated/student/rewards'
     | '/_authenticated/tutor/dashboard'
     | '/_authenticated/tutor/earnings'
+    | '/_authenticated/tutor/homework'
     | '/_authenticated/tutor/lessons'
     | '/_authenticated/tutor/payment-requests'
     | '/_authenticated/admin/classes/$id'
@@ -427,9 +477,12 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/students/import'
     | '/_authenticated/parent/children/$id'
     | '/_authenticated/parent/classes/$id'
+    | '/_authenticated/tutor/classes/$id'
+    | '/_authenticated/tutor/students/$id'
     | '/_authenticated/admin/classes/'
     | '/_authenticated/admin/students/'
     | '/_authenticated/parent/classes/'
+    | '/_authenticated/tutor/students/'
     | '/_authenticated/tutor/lesson/$id/review'
     | '/_authenticated/tutor/lesson/$id/'
   fileRoutesById: FileRoutesById
@@ -463,18 +516,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/admin/dashboard': {
-      id: '/_authenticated/admin/dashboard'
-      path: '/admin/dashboard'
-      fullPath: '/admin/dashboard'
-      preLoaderRoute: typeof AuthenticatedAdminDashboardRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
     '/_authenticated/admin/contacts': {
       id: '/_authenticated/admin/contacts'
       path: '/admin/contacts'
       fullPath: '/admin/contacts'
       preLoaderRoute: typeof AuthenticatedAdminContactsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/admin/dashboard': {
+      id: '/_authenticated/admin/dashboard'
+      path: '/admin/dashboard'
+      fullPath: '/admin/dashboard'
+      preLoaderRoute: typeof AuthenticatedAdminDashboardRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/admin/operations': {
@@ -582,6 +635,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedTutorEarningsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/tutor/homework': {
+      id: '/_authenticated/tutor/homework'
+      path: '/tutor/homework'
+      fullPath: '/tutor/homework'
+      preLoaderRoute: typeof AuthenticatedTutorHomeworkRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/tutor/lessons': {
       id: '/_authenticated/tutor/lessons'
       path: '/tutor/lessons'
@@ -652,6 +712,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedParentClassesIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/tutor/classes/$id': {
+      id: '/_authenticated/tutor/classes/$id'
+      path: '/tutor/classes/$id'
+      fullPath: '/tutor/classes/$id'
+      preLoaderRoute: typeof AuthenticatedTutorClassesIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/tutor/students/': {
+      id: '/_authenticated/tutor/students/'
+      path: '/tutor/students'
+      fullPath: '/tutor/students/'
+      preLoaderRoute: typeof AuthenticatedTutorStudentsIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/tutor/students/$id': {
+      id: '/_authenticated/tutor/students/$id'
+      path: '/tutor/students/$id'
+      fullPath: '/tutor/students/$id'
+      preLoaderRoute: typeof AuthenticatedTutorStudentsIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/tutor/lesson/$id/': {
       id: '/_authenticated/tutor/lesson/$id/'
       path: '/tutor/lesson/$id'
@@ -670,8 +751,8 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthenticatedRouteRouteChildren {
-  AuthenticatedAdminDashboardRoute: typeof AuthenticatedAdminDashboardRoute
   AuthenticatedAdminContactsRoute: typeof AuthenticatedAdminContactsRoute
+  AuthenticatedAdminDashboardRoute: typeof AuthenticatedAdminDashboardRoute
   AuthenticatedAdminOperationsRoute: typeof AuthenticatedAdminOperationsRoute
   AuthenticatedAdminParentsRoute: typeof AuthenticatedAdminParentsRoute
   AuthenticatedAdminPaymentRequestsRoute: typeof AuthenticatedAdminPaymentRequestsRoute
@@ -687,6 +768,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedStudentRewardsRoute: typeof AuthenticatedStudentRewardsRoute
   AuthenticatedTutorDashboardRoute: typeof AuthenticatedTutorDashboardRoute
   AuthenticatedTutorEarningsRoute: typeof AuthenticatedTutorEarningsRoute
+  AuthenticatedTutorHomeworkRoute: typeof AuthenticatedTutorHomeworkRoute
   AuthenticatedTutorLessonsRoute: typeof AuthenticatedTutorLessonsRoute
   AuthenticatedTutorPaymentRequestsRoute: typeof AuthenticatedTutorPaymentRequestsRoute
   AuthenticatedAdminClassesIdRoute: typeof AuthenticatedAdminClassesIdRoute
@@ -694,16 +776,19 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminStudentsImportRoute: typeof AuthenticatedAdminStudentsImportRoute
   AuthenticatedParentChildrenIdRoute: typeof AuthenticatedParentChildrenIdRoute
   AuthenticatedParentClassesIdRoute: typeof AuthenticatedParentClassesIdRoute
+  AuthenticatedTutorClassesIdRoute: typeof AuthenticatedTutorClassesIdRoute
+  AuthenticatedTutorStudentsIdRoute: typeof AuthenticatedTutorStudentsIdRoute
   AuthenticatedAdminClassesIndexRoute: typeof AuthenticatedAdminClassesIndexRoute
   AuthenticatedAdminStudentsIndexRoute: typeof AuthenticatedAdminStudentsIndexRoute
   AuthenticatedParentClassesIndexRoute: typeof AuthenticatedParentClassesIndexRoute
+  AuthenticatedTutorStudentsIndexRoute: typeof AuthenticatedTutorStudentsIndexRoute
   AuthenticatedTutorLessonIdReviewRoute: typeof AuthenticatedTutorLessonIdReviewRoute
   AuthenticatedTutorLessonIdIndexRoute: typeof AuthenticatedTutorLessonIdIndexRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
-  AuthenticatedAdminDashboardRoute: AuthenticatedAdminDashboardRoute,
   AuthenticatedAdminContactsRoute: AuthenticatedAdminContactsRoute,
+  AuthenticatedAdminDashboardRoute: AuthenticatedAdminDashboardRoute,
   AuthenticatedAdminOperationsRoute: AuthenticatedAdminOperationsRoute,
   AuthenticatedAdminParentsRoute: AuthenticatedAdminParentsRoute,
   AuthenticatedAdminPaymentRequestsRoute:
@@ -720,6 +805,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedStudentRewardsRoute: AuthenticatedStudentRewardsRoute,
   AuthenticatedTutorDashboardRoute: AuthenticatedTutorDashboardRoute,
   AuthenticatedTutorEarningsRoute: AuthenticatedTutorEarningsRoute,
+  AuthenticatedTutorHomeworkRoute: AuthenticatedTutorHomeworkRoute,
   AuthenticatedTutorLessonsRoute: AuthenticatedTutorLessonsRoute,
   AuthenticatedTutorPaymentRequestsRoute:
     AuthenticatedTutorPaymentRequestsRoute,
@@ -728,9 +814,12 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminStudentsImportRoute: AuthenticatedAdminStudentsImportRoute,
   AuthenticatedParentChildrenIdRoute: AuthenticatedParentChildrenIdRoute,
   AuthenticatedParentClassesIdRoute: AuthenticatedParentClassesIdRoute,
+  AuthenticatedTutorClassesIdRoute: AuthenticatedTutorClassesIdRoute,
+  AuthenticatedTutorStudentsIdRoute: AuthenticatedTutorStudentsIdRoute,
   AuthenticatedAdminClassesIndexRoute: AuthenticatedAdminClassesIndexRoute,
   AuthenticatedAdminStudentsIndexRoute: AuthenticatedAdminStudentsIndexRoute,
   AuthenticatedParentClassesIndexRoute: AuthenticatedParentClassesIndexRoute,
+  AuthenticatedTutorStudentsIndexRoute: AuthenticatedTutorStudentsIndexRoute,
   AuthenticatedTutorLessonIdReviewRoute: AuthenticatedTutorLessonIdReviewRoute,
   AuthenticatedTutorLessonIdIndexRoute: AuthenticatedTutorLessonIdIndexRoute,
 }

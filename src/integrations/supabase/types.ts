@@ -1569,6 +1569,24 @@ export type Database = {
           },
         ];
       };
+      user_roles: {
+        Row: {
+          created_at: string;
+          role: string;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          role: string;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          role?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       tutors: {
         Row: {
           created_at: string;
@@ -1584,6 +1602,7 @@ export type Database = {
           status: string;
           subjects: string[];
           updated_at: string;
+          user_id: string | null;
         };
         Insert: {
           created_at?: string;
@@ -1599,6 +1618,7 @@ export type Database = {
           status?: string;
           subjects?: string[];
           updated_at?: string;
+          user_id?: string | null;
         };
         Update: {
           created_at?: string;
@@ -1614,6 +1634,7 @@ export type Database = {
           status?: string;
           subjects?: string[];
           updated_at?: string;
+          user_id?: string | null;
         };
         Relationships: [];
       };
@@ -1622,6 +1643,18 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      add_student_to_tutor_class: {
+        Args: {
+          p_class_id: string;
+          p_date_of_birth?: string | null;
+          p_first_name: string;
+          p_last_name?: string | null;
+          p_notes?: string | null;
+          p_school?: string | null;
+          p_year_group?: string | null;
+        };
+        Returns: string;
+      };
       create_draft_invoice: {
         Args: {
           p_due_date: string;

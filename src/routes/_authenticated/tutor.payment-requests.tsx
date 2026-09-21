@@ -1,11 +1,10 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { Page } from "@/components/AppShell";
-import { ActingPicker } from "@/components/acting-picker";
 import { Empty, PageHeader, Pill, Section, StatCard } from "@/components/kit";
 import { Button } from "@/components/ui/button";
-import { useActingId } from "@/lib/acting";
-import { fullName, money, num, prettyDate, useTable, useUpdateRow, useUpsert } from "@/lib/db";
+import { useTutorScope } from "@/lib/auth-scope";
+import { money, num, prettyDate, useTable, useUpdateRow, useUpsert } from "@/lib/db";
 
 export const Route = createFileRoute("/_authenticated/tutor/payment-requests")({
   head: () => ({
@@ -35,8 +34,7 @@ const tone = (s: string) =>
           : "purple";
 
 function TutorPaymentRequests() {
-  const [tutorId, setTutorId] = useActingId("tutor");
-  const tutors = useTable("tutors", "first_name");
+  const { tutorId } = useTutorScope();
   const earnings = useTable("tutor_earnings", "earning_date");
   const classes = useTable("classes");
   const requests = useTable("payment_requests", "submitted_at");
@@ -52,7 +50,7 @@ function TutorPaymentRequests() {
   const myRequests = (requests.data ?? []).filter((r) => r.tutor_id === tutorId);
 
   async function submit() {
-    if (eligible.length === 0) return;
+    if (!tutorId || eligible.length === 0) return;
     try {
       const [request] = await createRequest.mutateAsync({
         tutor_id: tutorId,
@@ -91,13 +89,11 @@ function TutorPaymentRequests() {
       <PageHeader
         title="Request payment"
         subtitle="Send one clear request for your completed lessons."
-      />
-
-      <ActingPicker
-        label="I am"
-        value={tutorId}
-        onChange={setTutorId}
-        options={(tutors.data ?? []).map((t) => ({ value: t.id, label: fullName(t) }))}
+        actions={
+          <Button asChild variant="secondary">
+            <Link to="/tutor/earnings">View private earnings</Link>
+          </Button>
+        }
       />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">

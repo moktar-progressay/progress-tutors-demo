@@ -1,10 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Page } from "@/components/AppShell";
-import { ActingPicker } from "@/components/acting-picker";
 import { Empty, PageHeader, Pill, Section, StatCard } from "@/components/kit";
 import { Button } from "@/components/ui/button";
-import { useActingId } from "@/lib/acting";
-import { fullName, money, num, prettyDate, useTable } from "@/lib/db";
+import { useTutorScope } from "@/lib/auth-scope";
+import { money, num, prettyDate, useTable } from "@/lib/db";
 
 export const Route = createFileRoute("/_authenticated/tutor/earnings")({
   head: () => ({
@@ -26,8 +25,7 @@ const tone = (s: string) =>
   s === "paid" ? "blue" : s === "approved" ? "green" : s === "claimed" ? "purple" : "amber";
 
 function TutorEarnings() {
-  const [tutorId, setTutorId] = useActingId("tutor");
-  const tutors = useTable("tutors", "first_name");
+  const { tutorId } = useTutorScope();
   const earnings = useTable("tutor_earnings", "earning_date");
   const classes = useTable("classes");
 
@@ -45,13 +43,6 @@ function TutorEarnings() {
             <Link to="/tutor/payment-requests">Request payment</Link>
           </Button>
         }
-      />
-
-      <ActingPicker
-        label="I am"
-        value={tutorId}
-        onChange={setTutorId}
-        options={(tutors.data ?? []).map((t) => ({ value: t.id, label: fullName(t) }))}
       />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">

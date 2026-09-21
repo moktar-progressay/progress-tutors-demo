@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { Page } from "@/components/AppShell";
 import { GoProgressLink, PageHeader, Pill, Section } from "@/components/kit";
 import { SessionRegister } from "@/components/session-register";
+import { useTutorScope } from "@/lib/auth-scope";
 import { hhmm, money, prettyDate, useTable } from "@/lib/db";
 
 export const Route = createFileRoute("/_authenticated/tutor/lesson/$id/")({
@@ -19,13 +20,14 @@ export const Route = createFileRoute("/_authenticated/tutor/lesson/$id/")({
 
 function TutorLesson() {
   const { id } = Route.useParams();
+  const scope = useTutorScope();
   const sessions = useTable("sessions");
   const classes = useTable("classes");
   const sites = useTable("sites");
   const reviews = useTable("lesson_reviews");
 
   const s = (sessions.data ?? []).find((x) => x.id === id);
-  if (!s) {
+  if (!s || s.tutor_id !== scope.tutorId) {
     return (
       <Page>
         <PageHeader title="Lesson not found" subtitle="It may not have been opened yet." />
@@ -64,12 +66,20 @@ function TutorLesson() {
       />
 
       <div className="flex flex-wrap items-center gap-2">
+        <Pill tone="blue">{c?.subject ?? "Subject TBC"}</Pill>
+        {c?.level ? <Pill>{c.level}</Pill> : null}
         <Pill tone="purple">Agreed pay {money(s.agreed_amount ?? c?.session_rate)}</Pill>
-        <Pill tone={review ? "green" : "amber"}>{review ? "Review submitted" : "Review outstanding"}</Pill>
+        <Pill tone={review ? "green" : "amber"}>
+          {review ? "Review submitted" : "Review outstanding"}
+        </Pill>
         <GoProgressLink label="GoProgress course" />
       </div>
 
-      <Section id="lesson-register" title="Register" subtitle="Saved instantly to the shared database">
+      <Section
+        id="lesson-register"
+        title="Register"
+        subtitle="Saved instantly to the shared database"
+      >
         <SessionRegister session={s} />
       </Section>
     </Page>

@@ -1,6 +1,7 @@
 import { Link, useNavigate, useRouterState, type LinkProps } from "@tanstack/react-router";
 import {
   CalendarDays,
+  BookOpenCheck,
   ClipboardCheck,
   CreditCard,
   Flame,
@@ -15,6 +16,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useDemo } from "@/lib/demo-store";
+import { useCurrentAccess } from "@/lib/auth-scope";
 import { ORG, type Role } from "@/lib/demo-data";
 
 type ToPath = NonNullable<LinkProps["to"]>;
@@ -37,8 +39,13 @@ export const NAV: Record<Role, NavItem[]> = {
   tutor: [
     { to: "/tutor/dashboard", label: "Dashboard", icon: <Home className={iconCls} /> },
     { to: "/tutor/lessons", label: "My schedule", icon: <CalendarDays className={iconCls} /> },
-    { to: "/admin/students", label: "Students", icon: <GraduationCap className={iconCls} /> },
-    { to: "/tutor/earnings", label: "Earnings", icon: <Wallet className={iconCls} /> },
+    { to: "/tutor/students", label: "Students", icon: <GraduationCap className={iconCls} /> },
+    { to: "/tutor/homework", label: "Homework", icon: <BookOpenCheck className={iconCls} /> },
+    {
+      to: "/tutor/payment-requests",
+      label: "Payment requests",
+      icon: <Wallet className={iconCls} />,
+    },
   ],
   parent: [
     { to: "/parent/dashboard", label: "Dashboard", icon: <Home className={iconCls} /> },
@@ -115,13 +122,18 @@ function RoleSwitcher() {
 }
 
 export function AppShell({ children }: { children: ReactNode }) {
-  const { role } = useDemo();
+  const { role, setRole } = useDemo();
+  const access = useCurrentAccess();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const items = NAV[role];
   const email = useSignedInUser();
   const initials = (email.slice(0, 2) || "PT").toUpperCase();
   const isPublic = pathname === "/" || pathname === "/auth";
+
+  useEffect(() => {
+    if (access.data?.role === "tutor" && role !== "tutor") setRole("tutor");
+  }, [access.data?.role, role, setRole]);
 
   if (isPublic) return <>{children}</>;
 
@@ -158,8 +170,16 @@ export function AppShell({ children }: { children: ReactNode }) {
               Private workspace. You only see records available to your signed-in role.
             </p>
             <div className="flex items-center gap-2">
-              <span className="hidden text-[11px] font-semibold opacity-80 sm:inline">View as</span>
-              <RoleSwitcher />
+              {access.data?.role === "admin" ? (
+                <>
+                  <span className="hidden text-[11px] font-semibold opacity-80 sm:inline">
+                    View as
+                  </span>
+                  <RoleSwitcher />
+                </>
+              ) : (
+                <span className="text-xs font-bold capitalize">{access.data?.role ?? role}</span>
+              )}
             </div>
           </div>
         </div>
