@@ -286,6 +286,42 @@ function AdminDashboard() {
       .sort((a, b) => a.date.localeCompare(b.date));
   }, [analyticsDates, filteredAttendance, filteredSessions]);
 
+  const attendanceAudit = useMemo(() => {
+    const sessionsByDate = new Map<string, typeof filteredSessions>();
+    filteredSessions.forEach((session) => {
+      const existing = sessionsByDate.get(session.session_date) ?? [];
+      existing.push(session);
+      sessionsByDate.set(session.session_date, existing);
+    });
+    const attendanceBySession = new Map<string, number>();
+    filteredAttendance.forEach((mark) => {
+      attendanceBySession.set(mark.session_id, (attendanceBySession.get(mark.session_id) ?? 0) + 1);
+    });
+
+    return analyticsDates
+      .map((date) => {
+        const dateKey = format(date, "yyyy-MM-dd");
+        const daySessions = sessionsByDate.get(dateKey) ?? [];
+        const scheduledLessons = filteredLessons.filter((lesson) =>
+          lessonRunsOn(lesson, date),
+        ).length;
+        const attendanceMarks = daySessions.reduce(
+          (total, session) => total + (attendanceBySession.get(session.id) ?? 0),
+          0,
+        );
+        return {
+          date: dateKey,
+          dateLabel: format(date, "EEE d MMM"),
+          scheduledLessons,
+          sessionRecords: daySessions.length,
+          attendanceMarks,
+        };
+      })
+      .filter(
+        (row) => row.scheduledLessons > 0 || row.sessionRecords > 0 || row.attendanceMarks > 0,
+      );
+  }, [analyticsDates, filteredAttendance, filteredLessons, filteredSessions]);
+
   const genderAttendance = useMemo(() => {
     const studentMap = new Map((students.data ?? []).map((student) => [student.id, student]));
     const groups = new Map([
@@ -714,6 +750,66 @@ function AdminDashboard() {
           </div>
         </div>
       </ChartCard>
+
+      <section className="surface overflow-hidden">
+        <div className="border-b border-border px-3 py-3 sm:px-5">
+          <h2 className="font-bold">Attendance records</h2>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Scheduled lessons, opened registers and saved attendance marks · {reportingPeriod}
+          </p>
+        </div>
+        {attendanceAudit.length ? (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[620px] text-left text-sm">
+              <thead className="bg-muted/50 text-xs text-muted-foreground">
+                <tr>
+                  <th className="px-3 py-3 sm:px-5">Date</th>
+                  <th className="px-3 py-3 text-center">Scheduled lessons</th>
+                  <th className="px-3 py-3 text-center">Session records</th>
+                  <th className="px-3 py-3 text-center">Attendance marks</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {attendanceAudit.map((row) => (
+                  <tr key={row.date} className="hover:bg-muted/30">
+                    <td className="px-3 py-3 sm:px-5">
+                      <Link
+                        to="/admin/classes"
+                        search={{ date: row.date, view: "day" }}
+                        className="inline-flex items-center gap-1 font-bold text-primary hover:underline"
+                      >
+                        {row.dateLabel}
+                        <ChevronRight className="h-4 w-4" />
+                      </Link>
+                    </td>
+                    <td className="px-3 py-3 text-center font-bold">{row.scheduledLessons}</td>
+                    <td
+                      className={cn(
+                        "px-3 py-3 text-center font-bold",
+                        row.scheduledLessons > 0 && row.sessionRecords === 0 && "text-amber-700",
+                      )}
+                    >
+                      {row.sessionRecords}
+                    </td>
+                    <td
+                      className={cn(
+                        "px-3 py-3 text-center font-bold",
+                        row.scheduledLessons > 0 && row.attendanceMarks === 0 && "text-amber-700",
+                      )}
+                    >
+                      {row.attendanceMarks}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="p-4 sm:p-5">
+            <Empty>No scheduled lessons or attendance records match these filters.</Empty>
+          </div>
+        )}
+      </section>
 
       <section className="surface p-3 sm:p-5">
         <div className="flex flex-wrap items-center gap-2">

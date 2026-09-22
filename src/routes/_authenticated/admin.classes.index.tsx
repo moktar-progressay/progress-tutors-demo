@@ -73,9 +73,17 @@ import {
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/admin/classes/")({
-  validateSearch: (search: Record<string, unknown>) => ({
-    add: search["add"] === true || search["add"] === "true",
-  }),
+  validateSearch: (search: Record<string, unknown>) => {
+    const requestedDate = typeof search["date"] === "string" ? search["date"] : undefined;
+    const requestedView = typeof search["view"] === "string" ? search["view"] : undefined;
+    return {
+      add: search["add"] === true || search["add"] === "true",
+      date: requestedDate?.match(/^\d{4}-\d{2}-\d{2}$/) ? requestedDate : undefined,
+      view: (["day", "week", "month", "list"] as string[]).includes(requestedView ?? "")
+        ? (requestedView as CalendarView)
+        : undefined,
+    };
+  },
   head: () => ({
     meta: [
       { title: "Schedule | ProgressTutors" },
@@ -182,7 +190,7 @@ function lessonRunsOn(lesson: ClassRow, date: Date) {
 }
 
 function SchedulePage() {
-  const { add } = Route.useSearch();
+  const { add, date: requestedDate, view: requestedView } = Route.useSearch();
   const lessons = useTable("classes", "start_time");
   const sites = useTable("sites", "name");
   const tutors = useTable("tutors", "first_name");
@@ -199,9 +207,9 @@ function SchedulePage() {
   const addAttendance = useUpsert("student_attendance");
   const updateAttendance = useUpdateRow("student_attendance");
 
-  const [view, setView] = useState<CalendarView>("day");
+  const [view, setView] = useState<CalendarView>(requestedView ?? "day");
   const [calendarZoom, setCalendarZoom] = useState(1);
-  const [selectedDate, setSelectedDate] = useState(currentDateIso);
+  const [selectedDate, setSelectedDate] = useState(requestedDate ?? currentDateIso);
   const [search, setSearch] = useState("");
   const [tutorId, setTutorId] = useState("all");
   const [siteId, setSiteId] = useState("all");
@@ -214,6 +222,7 @@ function SchedulePage() {
   const [detail, setDetail] = useState<ClassRow | null>(null);
   const [detailDate, setDetailDate] = useState(currentDateIso);
   const [attendanceSearch, setAttendanceSearch] = useState("");
+  const [quickAttendanceOpen, setQuickAttendanceOpen] = useState(false);
   const [lessonPendingDelete, setLessonPendingDelete] = useState<ClassRow | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const dragRef = useRef<{
@@ -228,6 +237,11 @@ function SchedulePage() {
   const dragHoldTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pageOverflowRef = useRef("");
   const suppressClickRef = useRef(false);
+
+  useEffect(() => {
+    if (requestedDate) setSelectedDate(requestedDate);
+    if (requestedView) setView(requestedView);
+  }, [requestedDate, requestedView]);
   const [showMore, setShowMore] = useState(false);
   const [studentSearch, setStudentSearch] = useState("");
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
@@ -808,6 +822,7 @@ function SchedulePage() {
             format(occurrenceDate ?? parseISO(lesson.start_date ?? selectedDate), "yyyy-MM-dd"),
           );
           setAttendanceSearch("");
+          setQuickAttendanceOpen(false);
           setDetail(lesson);
         }}
         className={cn(
@@ -1171,6 +1186,7 @@ function SchedulePage() {
                     onClick={() => {
                       setDetailDate(lesson.start_date ?? selectedDate);
                       setAttendanceSearch("");
+                      setQuickAttendanceOpen(false);
                       setDetail(lesson);
                     }}
                     className="grid w-full grid-cols-[4.5rem_minmax(0,1fr)_auto] items-center gap-3 px-4 py-4 text-left hover:bg-muted/50"
@@ -1297,6 +1313,7 @@ function SchedulePage() {
           if (!open) {
             setDetail(null);
             setEditingId(null);
+            setQuickAttendanceOpen(false);
           }
         }}
       >
@@ -1427,85 +1444,109 @@ function SchedulePage() {
                     <Plus className="h-4 w-4" /> Manage students
                   </Button>
                 </div>
-                <div className="space-y-3 border-t border-border pt-3">
-                  <div className="flex flex-wrap items-end justify-between gap-2">
-                    <div>
-                      <p className="font-bold">Quick attendance</p>
-                      <p className="text-xs text-muted-foreground">
-                        Mark students without leaving this lesson.
-                      </p>
-                    </div>
-                    <label className="grid gap-1 text-xs font-semibold text-muted-foreground">
-                      Lesson date
+                <div className="border-t border-border pt-3">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="w-full justify-between"
+                    aria-expanded={quickAttendanceOpen}
+                    onClick={() => setQuickAttendanceOpen((open) => !open)}
+                  >
+                    <span className="inline-flex items-center gap-2">
+                      <Check className="h-4 w-4" /> Take attendance
+                    </span>
+                    <ChevronRight
+                      className={cn(
+                        "h-4 w-4 transition-transform",
+                        quickAttendanceOpen && "rotate-90",
+                      )}
+                    />
+                  </Button>
+
+                  {quickAttendanceOpen ? (
+                    <div className="mt-3 space-y-3">
+                      <div className="flex flex-wrap items-end justify-between gap-2">
+                        <div>
+                          <p className="font-bold">Attendance register</p>
+                          <p className="text-xs text-muted-foreground">
+                            Mark students without leaving this lesson.
+                          </p>
+                        </div>
+                        <label className="grid gap-1 text-xs font-semibold text-muted-foreground">
+                          Lesson date
+                          <Input
+                            type="date"
+                            value={detailDate}
+                            onChange={(event) => setDetailDate(event.target.value)}
+                            className="h-9 w-40 rounded-xl"
+                          />
+                        </label>
+                      </div>
                       <Input
-                        type="date"
-                        value={detailDate}
-                        onChange={(event) => setDetailDate(event.target.value)}
-                        className="h-9 w-40 rounded-xl"
+                        value={attendanceSearch}
+                        onChange={(event) => setAttendanceSearch(event.target.value)}
+                        placeholder="Search students"
+                        className="h-9 rounded-xl"
                       />
-                    </label>
-                  </div>
-                  <Input
-                    value={attendanceSearch}
-                    onChange={(event) => setAttendanceSearch(event.target.value)}
-                    placeholder="Search students"
-                    className="h-9 rounded-xl"
-                  />
-                  {attendanceStudents.length ? (
-                    <div className="overflow-hidden rounded-xl border border-border">
-                      <table className="w-full table-fixed text-left text-xs">
-                        <thead className="bg-muted/50 text-muted-foreground">
-                          <tr>
-                            <th className="w-[48%] px-2 py-2">Student</th>
-                            <th className="w-[26%] px-1 py-2 text-center">Present</th>
-                            <th className="w-[26%] px-1 py-2 text-center">Absent</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-border">
-                          {attendanceStudents.map((student) => {
-                            const mark = detailAttendance.find(
-                              (item) => item.student_id === student.id,
-                            );
-                            const saving =
-                              addSession.isPending ||
-                              addAttendance.isPending ||
-                              updateAttendance.isPending;
-                            return (
-                              <tr key={student.id}>
-                                <td className="px-2 py-2 font-bold">{fullName(student)}</td>
-                                <td className="px-1 py-2 text-center">
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    variant={mark?.status === "present" ? "default" : "outline"}
-                                    className="h-8 w-full px-1 text-[10px]"
-                                    disabled={saving}
-                                    onClick={() => markQuickAttendance(student.id, "present")}
-                                  >
-                                    <Check className="h-3.5 w-3.5" /> Present
-                                  </Button>
-                                </td>
-                                <td className="px-1 py-2 text-center">
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    variant={mark?.status === "absent" ? "destructive" : "outline"}
-                                    className="h-8 w-full px-1 text-[10px]"
-                                    disabled={saving}
-                                    onClick={() => markQuickAttendance(student.id, "absent")}
-                                  >
-                                    <X className="h-3.5 w-3.5" /> Absent
-                                  </Button>
-                                </td>
+                      {attendanceStudents.length ? (
+                        <div className="overflow-hidden rounded-xl border border-border">
+                          <table className="w-full table-fixed text-left text-xs">
+                            <thead className="bg-muted/50 text-muted-foreground">
+                              <tr>
+                                <th className="w-[48%] px-2 py-2">Student</th>
+                                <th className="w-[26%] px-1 py-2 text-center">Present</th>
+                                <th className="w-[26%] px-1 py-2 text-center">Absent</th>
                               </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
+                            </thead>
+                            <tbody className="divide-y divide-border">
+                              {attendanceStudents.map((student) => {
+                                const mark = detailAttendance.find(
+                                  (item) => item.student_id === student.id,
+                                );
+                                const saving =
+                                  addSession.isPending ||
+                                  addAttendance.isPending ||
+                                  updateAttendance.isPending;
+                                return (
+                                  <tr key={student.id}>
+                                    <td className="px-2 py-2 font-bold">{fullName(student)}</td>
+                                    <td className="px-1 py-2 text-center">
+                                      <Button
+                                        type="button"
+                                        size="sm"
+                                        variant={mark?.status === "present" ? "default" : "outline"}
+                                        className="h-8 w-full px-1 text-[10px]"
+                                        disabled={saving}
+                                        onClick={() => markQuickAttendance(student.id, "present")}
+                                      >
+                                        <Check className="h-3.5 w-3.5" /> Present
+                                      </Button>
+                                    </td>
+                                    <td className="px-1 py-2 text-center">
+                                      <Button
+                                        type="button"
+                                        size="sm"
+                                        variant={
+                                          mark?.status === "absent" ? "destructive" : "outline"
+                                        }
+                                        className="h-8 w-full px-1 text-[10px]"
+                                        disabled={saving}
+                                        onClick={() => markQuickAttendance(student.id, "absent")}
+                                      >
+                                        <X className="h-3.5 w-3.5" /> Absent
+                                      </Button>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : (
+                        <Empty>No enrolled students match this search.</Empty>
+                      )}
                     </div>
-                  ) : (
-                    <Empty>No enrolled students match this search.</Empty>
-                  )}
+                  ) : null}
                 </div>
               </div>
               <div className="sticky bottom-0 z-10 -mx-2 grid grid-cols-4 gap-2 border-t border-border bg-background px-2 py-3">
