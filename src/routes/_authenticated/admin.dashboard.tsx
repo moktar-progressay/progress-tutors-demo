@@ -20,6 +20,7 @@ import {
   CalendarDays,
   ChevronLeft,
   ChevronRight,
+  Filter,
   GraduationCap,
   Plus,
   RotateCcw,
@@ -31,6 +32,7 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  LabelList,
   Legend,
   Line,
   LineChart,
@@ -150,6 +152,30 @@ const tooltipStyle = {
   fontSize: 12,
 };
 
+function AttendanceDateTick({
+  x = 0,
+  y = 0,
+  payload,
+}: {
+  x?: number;
+  y?: number;
+  payload?: { value?: string };
+}) {
+  const [day = "", ...dateParts] = String(payload?.value ?? "").split(" ");
+  return (
+    <g transform={`translate(${x},${y})`}>
+      <text textAnchor="middle" fill="currentColor" className="text-[10px] text-muted-foreground">
+        <tspan x="0" dy="12" className="font-bold">
+          {day}
+        </tspan>
+        <tspan x="0" dy="13">
+          {dateParts.join(" ")}
+        </tspan>
+      </text>
+    </g>
+  );
+}
+
 function AdminDashboard() {
   const lessons = useTable("classes", "start_time");
   const students = useTable("students", "first_name");
@@ -162,6 +188,7 @@ function AdminDashboard() {
   const [selectedDate, setSelectedDate] = useState(() => format(new Date(), "yyyy-MM-dd"));
   const [calendarView, setCalendarView] = useState<CalendarView>("day");
   const [rangeDays, setRangeDays] = useState("30");
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [siteFilter, setSiteFilter] = useState("all");
   const [tutorFilter, setTutorFilter] = useState("all");
   const [subjectFilter, setSubjectFilter] = useState("all");
@@ -178,6 +205,9 @@ function AdminDashboard() {
       ).sort((a, b) => a.localeCompare(b, "en-GB")),
     [activeLessons],
   );
+  const activeFilterCount = [siteFilter, tutorFilter, subjectFilter, deliveryFilter].filter(
+    (value) => value !== "all",
+  ).length;
   const filteredLessons = useMemo(
     () =>
       activeLessons.filter(
@@ -224,23 +254,23 @@ function AdminDashboard() {
       string,
       { date: string; dateLabel: string; fullDate: string; studentIds: Set<string> }
     >();
-    analyticsDates.forEach((date) => {
-      const dateKey = format(date, "yyyy-MM-dd");
-      points.set(dateKey, {
-        date: dateKey,
-        dateLabel: format(date, "d MMM"),
-        fullDate: format(date, "EEEE d MMMM yyyy"),
-        studentIds: new Set<string>(),
-      });
-    });
     const sessionDates = new Map(
       filteredSessions.map((session) => [session.id, session.session_date]),
     );
     filteredAttendance.forEach((mark) => {
       const sessionDate = sessionDates.get(mark.session_id);
       if (!sessionDate) return;
-      const point = points.get(sessionDate);
-      if (!point) return;
+      let point = points.get(sessionDate);
+      if (!point) {
+        const date = parseISO(sessionDate);
+        point = {
+          date: sessionDate,
+          dateLabel: format(date, "EEE d MMM"),
+          fullDate: format(date, "EEEE d MMMM yyyy"),
+          studentIds: new Set<string>(),
+        };
+        points.set(sessionDate, point);
+      }
       if (["present", "late"].includes(mark.status)) point.studentIds.add(mark.student_id);
     });
     return Array.from(points.values())
@@ -251,7 +281,7 @@ function AdminDashboard() {
         studentsAttended: point.studentIds.size,
       }))
       .sort((a, b) => a.date.localeCompare(b.date));
-  }, [analyticsDates, filteredAttendance, filteredSessions]);
+  }, [filteredAttendance, filteredSessions]);
 
   const genderAttendance = useMemo(() => {
     const studentMap = new Map((students.data ?? []).map((student) => [student.id, student]));
@@ -528,61 +558,114 @@ function AdminDashboard() {
         }
       />
 
-      <section className="surface p-4 sm:p-5">
-        <div className="flex flex-wrap items-end gap-3">
-          <SelectField
-            label="Reporting period"
-            value={rangeDays}
-            onChange={setRangeDays}
-            options={RANGE_OPTIONS}
-          />
-          <SelectField
-            label="Site"
-            value={siteFilter}
-            onChange={setSiteFilter}
-            options={[
-              { value: "all", label: "All sites" },
-              ...(sites.data ?? []).map((site) => ({ value: site.id, label: site.name })),
-            ]}
-          />
-          <SelectField
-            label="Teacher"
-            value={tutorFilter}
-            onChange={setTutorFilter}
-            options={[
-              { value: "all", label: "All teachers" },
-              { value: "unassigned", label: "Unassigned" },
-              ...(tutors.data ?? []).map((tutor) => ({
-                value: tutor.id,
-                label: fullName(tutor),
-              })),
-            ]}
-          />
-          <SelectField
-            label="Subject"
-            value={subjectFilter}
-            onChange={setSubjectFilter}
-            options={[
-              { value: "all", label: "All subjects" },
-              ...subjects.map((subject) => ({ value: subject, label: subject })),
-            ]}
-          />
-          <SelectField
-            label="Delivery"
-            value={deliveryFilter}
-            onChange={setDeliveryFilter}
-            options={[
-              { value: "all", label: "All delivery" },
-              { value: "in_person", label: "Face-to-face" },
-              { value: "online", label: "Online" },
-              { value: "hybrid", label: "Hybrid" },
-            ]}
-          />
-          <Button variant="ghost" onClick={resetFilters}>
-            <RotateCcw className="h-4 w-4" /> Reset
-          </Button>
-        </div>
-      </section>
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-xs text-muted-foreground">
+          {activeFilterCount
+            ? `${activeFilterCount} active filter${activeFilterCount === 1 ? "" : "s"}`
+            : "Showing all activity"}
+        </p>
+        <Button variant="secondary" onClick={() => setFiltersOpen((open) => !open)}>
+          <Filter className="h-4 w-4" /> Filters{activeFilterCount ? ` ${activeFilterCount}` : ""}
+        </Button>
+      </div>
+
+      {filtersOpen ? (
+        <section className="surface p-4 sm:p-5">
+          <div className="flex flex-wrap items-end gap-3">
+            <SelectField
+              label="Reporting period"
+              value={rangeDays}
+              onChange={setRangeDays}
+              options={RANGE_OPTIONS}
+            />
+            <SelectField
+              label="Site"
+              value={siteFilter}
+              onChange={setSiteFilter}
+              options={[
+                { value: "all", label: "All sites" },
+                ...(sites.data ?? []).map((site) => ({ value: site.id, label: site.name })),
+              ]}
+            />
+            <SelectField
+              label="Teacher"
+              value={tutorFilter}
+              onChange={setTutorFilter}
+              options={[
+                { value: "all", label: "All teachers" },
+                { value: "unassigned", label: "Unassigned" },
+                ...(tutors.data ?? []).map((tutor) => ({
+                  value: tutor.id,
+                  label: fullName(tutor),
+                })),
+              ]}
+            />
+            <SelectField
+              label="Subject"
+              value={subjectFilter}
+              onChange={setSubjectFilter}
+              options={[
+                { value: "all", label: "All subjects" },
+                ...subjects.map((subject) => ({ value: subject, label: subject })),
+              ]}
+            />
+            <SelectField
+              label="Delivery"
+              value={deliveryFilter}
+              onChange={setDeliveryFilter}
+              options={[
+                { value: "all", label: "All delivery" },
+                { value: "in_person", label: "Face-to-face" },
+                { value: "online", label: "Online" },
+                { value: "hybrid", label: "Hybrid" },
+              ]}
+            />
+            <Button variant="ghost" onClick={resetFilters}>
+              <RotateCcw className="h-4 w-4" /> Reset
+            </Button>
+          </div>
+        </section>
+      ) : null}
+
+      <ChartCard
+        title="Attendance over time"
+        subtitle="Unique students marked present or late. Only dates with saved register marks are shown."
+      >
+        {attendanceTimeline.length === 0 ? (
+          <Empty>No attendance registers have been saved for this reporting period.</Empty>
+        ) : (
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart
+              data={attendanceTimeline}
+              margin={{ top: 24, right: 18, left: -16, bottom: 8 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="dateLabel" tick={<AttendanceDateTick />} interval={0} height={42} />
+              <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+              <Tooltip
+                contentStyle={tooltipStyle}
+                formatter={(value) => [Number(value), "Unique students attended"]}
+                labelFormatter={(label, payload) => String(payload[0]?.payload?.fullDate ?? label)}
+              />
+              <Line
+                type="monotone"
+                dataKey="studentsAttended"
+                name="Unique students attended"
+                stroke="#ec2d70"
+                strokeWidth={3}
+                dot={{ r: 4 }}
+                activeDot={{ r: 6 }}
+              >
+                <LabelList
+                  dataKey="studentsAttended"
+                  position="top"
+                  className="fill-foreground text-xs font-bold"
+                />
+              </Line>
+            </LineChart>
+          </ResponsiveContainer>
+        )}
+      </ChartCard>
 
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <Link to="/admin/classes" className="block rounded-2xl focus:outline-none focus:ring-2">
@@ -591,6 +674,7 @@ function AdminDashboard() {
             value={String(lessonOccurrences)}
             tone="pink"
             icon={<CalendarDays className="h-5 w-5" />}
+            compact
           />
         </Link>
         <Link to="/admin/students" className="block rounded-2xl focus:outline-none focus:ring-2">
@@ -599,6 +683,7 @@ function AdminDashboard() {
             value={String(filteredStudentIds.size)}
             tone="green"
             icon={<GraduationCap className="h-5 w-5" />}
+            compact
           />
         </Link>
         <Link to="/admin/tutors" className="block rounded-2xl focus:outline-none focus:ring-2">
@@ -607,6 +692,7 @@ function AdminDashboard() {
             value={String(tutorLeaderboard.length)}
             tone="purple"
             icon={<Users className="h-5 w-5" />}
+            compact
           />
         </Link>
         <StatCard
@@ -615,6 +701,7 @@ function AdminDashboard() {
           hint={`${filteredAttendance.length} register marks`}
           tone="blue"
           icon={<BarChart3 className="h-5 w-5" />}
+          compact
         />
       </div>
 
@@ -723,36 +810,6 @@ function AdminDashboard() {
 
       <div className="grid min-w-0 gap-5 xl:grid-cols-2">
         <ChartCard
-          title="Attendance over time"
-          subtitle="Unique students marked present or late across all lessons on each day"
-        >
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart
-              data={attendanceTimeline}
-              margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="dateLabel" tick={{ fontSize: 11 }} minTickGap={24} />
-              <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
-              <Tooltip
-                contentStyle={tooltipStyle}
-                formatter={(value) => [Number(value), "Unique students attended"]}
-                labelFormatter={(label, payload) => String(payload[0]?.payload?.fullDate ?? label)}
-              />
-              <Line
-                type="monotone"
-                dataKey="studentsAttended"
-                name="Unique students attended"
-                stroke="#ec2d70"
-                strokeWidth={3}
-                dot={{ r: 3 }}
-                activeDot={{ r: 5 }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </ChartCard>
-
-        <ChartCard
           title="Attendance by gender"
           subtitle="Recorded attendance only. Missing gender remains visible rather than inferred."
         >
@@ -773,26 +830,26 @@ function AdminDashboard() {
           title="Students attending each lesson"
           subtitle="Unique students marked present or late for each lesson in the selected reporting period"
         >
-          <div className="h-full overflow-x-auto">
+          <div className="h-full overflow-y-auto">
             <div
-              className="h-full"
-              style={{ minWidth: `${Math.max(560, lessonAttendance.length * 105)}px` }}
+              className="w-full"
+              style={{ height: `${Math.max(256, lessonAttendance.length * 42)}px` }}
             >
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
+                  layout="vertical"
                   data={lessonAttendance}
-                  margin={{ top: 10, right: 10, left: -20, bottom: 78 }}
+                  margin={{ top: 4, right: 28, left: 4, bottom: 4 }}
                 >
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                  <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} />
+                  <YAxis
+                    type="category"
                     dataKey="lesson"
                     interval={0}
-                    angle={-28}
-                    textAnchor="end"
-                    height={82}
+                    width={138}
                     tick={{ fontSize: 10 }}
                   />
-                  <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
                   <Tooltip
                     contentStyle={tooltipStyle}
                     formatter={(value) => [Number(value), "Unique students attended"]}
@@ -801,7 +858,7 @@ function AdminDashboard() {
                     dataKey="studentsAttended"
                     name="Unique students attended"
                     fill="#6c49b8"
-                    radius={[8, 8, 0, 0]}
+                    radius={[0, 8, 8, 0]}
                   />
                 </BarChart>
               </ResponsiveContainer>

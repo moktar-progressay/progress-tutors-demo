@@ -17,25 +17,28 @@ import {
 } from "date-fns";
 import {
   CalendarDays,
+  Check,
   ChevronLeft,
   ChevronRight,
   Clock3,
   Copy,
   Download,
   Filter,
+  GraduationCap,
   MapPin,
   Minus,
   Pencil,
   Plus,
   Search,
   Trash2,
+  Users,
   Video,
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Page } from "@/components/AppShell";
-import { Avatar, avatarTone, Empty, PageHeader, Pill } from "@/components/kit";
+import { Avatar, avatarTone, Empty, PageHeader, Pill, StatCard } from "@/components/kit";
 import {
   ConfirmDeleteDialog,
   FormDialog,
@@ -131,6 +134,8 @@ const CALENDAR_ZOOM_MIN = 0.6;
 const CALENDAR_ZOOM_MAX = 1.6;
 const CALENDAR_ZOOM_STEP = 0.2;
 
+const LEVEL_OPTIONS = ["KS1", "KS2", "KS3", "GCSE", "A Level", "Degree", "Masters", "Other"];
+
 function minutes(time: string | null) {
   if (!time) return 0;
   const [hour, minute] = time.split(":").map(Number);
@@ -183,11 +188,16 @@ function SchedulePage() {
   const tutors = useTable("tutors", "first_name");
   const students = useTable("students", "first_name");
   const enrolments = useTable("class_enrolments");
+  const sessions = useTable("sessions", "session_date");
+  const attendance = useTable("student_attendance", "recorded_at");
   const createLesson = useUpsert("classes");
   const updateLesson = useUpdateRow("classes");
   const deleteLesson = useDeleteRow("classes");
   const addEnrolments = useUpsert("class_enrolments", ["classes"]);
   const updateEnrolment = useUpdateRow("class_enrolments", ["classes"]);
+  const addSession = useUpsert("sessions", ["student_attendance"]);
+  const addAttendance = useUpsert("student_attendance");
+  const updateAttendance = useUpdateRow("student_attendance");
 
   const [view, setView] = useState<CalendarView>("day");
   const [calendarZoom, setCalendarZoom] = useState(1);
@@ -202,6 +212,8 @@ function SchedulePage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [cloningId, setCloningId] = useState<string | null>(null);
   const [detail, setDetail] = useState<ClassRow | null>(null);
+  const [detailDate, setDetailDate] = useState(currentDateIso);
+  const [attendanceSearch, setAttendanceSearch] = useState("");
   const [lessonPendingDelete, setLessonPendingDelete] = useState<ClassRow | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const dragRef = useRef<{
@@ -299,6 +311,78 @@ function SchedulePage() {
     );
     return (students.data ?? []).filter((student) => ids.has(student.id));
   };
+  const summaryDates =
+    view === "day" ? [anchor] : view === "week" ? weekDays : view === "month" ? monthDays : [];
+  const summaryLessons =
+    view === "list"
+      ? filtered
+      : filtered.filter((lesson) => summaryDates.some((date) => lessonRunsOn(lesson, date)));
+  const summaryLessonIds = new Set(summaryLessons.map((lesson) => lesson.id));
+  const summaryEnrolments = (enrolments.data ?? []).filter(
+    (item) => item.status === "active" && summaryLessonIds.has(item.class_id),
+  );
+  const summaryStudents = new Set(summaryEnrolments.map((item) => item.student_id)).size;
+  const summaryTutors = new Set(summaryLessons.map((lesson) => lesson.tutor_id).filter(Boolean))
+    .size;
+  const summaryOccurrences =
+    view === "list"
+      ? filtered.length
+      : summaryDates.reduce(
+          (total, date) => total + filtered.filter((lesson) => lessonRunsOn(lesson, date)).length,
+          0,
+        );
+  const summaryCapacity = summaryLessons.reduce((total, lesson) => total + lesson.capacity, 0);
+  const detailSession = detail
+    ? (sessions.data ?? []).find(
+        (session) => session.class_id === detail.id && session.session_date === detailDate,
+      )
+    : undefined;
+  const detailAttendance = detailSession
+    ? (attendance.data ?? []).filter((mark) => mark.session_id === detailSession.id)
+    : [];
+  const attendanceStudents = detail
+    ? studentsFor(detail).filter((student) => {
+        const query = attendanceSearch.trim().toLowerCase();
+        return !query || fullName(student).toLowerCase().includes(query);
+      })
+    : [];
+
+  async function markQuickAttendance(studentId: string, status: "present" | "absent") {
+    if (!detail) return;
+    try {
+      let session = detailSession;
+      if (!session) {
+        const created = await addSession.mutateAsync({
+          class_id: detail.id,
+          schedule_block_id: detail.schedule_block_id,
+          site_id: detail.site_id,
+          tutor_id: detail.tutor_id,
+          session_date: detailDate,
+          start_time: detail.start_time,
+          end_time: detail.end_time,
+          status: "scheduled",
+          agreed_amount: detail.session_rate,
+        });
+        session = created[0];
+      }
+      if (!session) throw new Error("Could not open this attendance register");
+      const existing = (attendance.data ?? []).find(
+        (mark) => mark.session_id === session.id && mark.student_id === studentId,
+      );
+      if (existing) {
+        await updateAttendance.mutateAsync({ id: existing.id, values: { status } });
+      } else {
+        await addAttendance.mutateAsync({
+          session_id: session.id,
+          student_id: studentId,
+          status,
+        });
+      }
+      toast.success(`Attendance marked ${status}`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not save attendance");
+    }
+  }
   const colourFor = (lesson: ClassRow) => {
     if (lesson.card_colour && lesson.card_colour in CARD_COLOURS)
       return CARD_COLOURS[lesson.card_colour as CardColour];
@@ -706,7 +790,7 @@ function SchedulePage() {
         ? format(anchor, "MMMM yyyy")
         : `${format(weekStart, "d MMM")} – ${format(addDays(weekStart, 6), "d MMM yyyy")}`;
 
-  const renderCard = (lesson: ClassRow, compact = false) => {
+  const renderCard = (lesson: ClassRow, compact = false, occurrenceDate?: Date) => {
     const tutor = tutorFor(lesson);
     const enrolled = countFor(lesson);
     const filled = lesson.capacity > 0 ? Math.min(100, (enrolled / lesson.capacity) * 100) : 0;
@@ -720,6 +804,10 @@ function SchedulePage() {
             event.preventDefault();
             return;
           }
+          setDetailDate(
+            format(occurrenceDate ?? parseISO(lesson.start_date ?? selectedDate), "yyyy-MM-dd"),
+          );
+          setAttendanceSearch("");
           setDetail(lesson);
         }}
         className={cn(
@@ -732,6 +820,23 @@ function SchedulePage() {
         <p className="mt-0.5 whitespace-nowrap text-[9px] font-semibold leading-none opacity-85">
           {hhmm(lesson.start_time)}–{hhmm(lesson.end_time)}
         </p>
+        <div className="mt-1 flex min-w-0 flex-wrap gap-1 text-[8px] font-bold leading-none">
+          {lesson.subject ? (
+            <span className="truncate rounded-full bg-black/20 px-1.5 py-1">
+              {subjectLabel(lesson.subject)}
+            </span>
+          ) : null}
+          {lesson.level ? (
+            <span className="truncate rounded-full bg-black/20 px-1.5 py-1">{lesson.level}</span>
+          ) : null}
+          <span className="truncate rounded-full bg-black/20 px-1.5 py-1">
+            {lesson.delivery_mode === "online"
+              ? "Online"
+              : lesson.delivery_mode === "hybrid"
+                ? "Hybrid"
+                : "Face-to-face"}
+          </span>
+        </div>
         {!compact ? (
           <div className="mt-auto min-w-0 pt-1">
             <div className="mb-1 h-1 overflow-hidden rounded-full bg-black/20">
@@ -859,7 +964,7 @@ function SchedulePage() {
                         document.body.style.overflow = pageOverflowRef.current;
                       }}
                     >
-                      {renderCard(lesson, days.length > 3)}
+                      {renderCard(lesson, days.length > 3, day)}
                     </div>
                   );
                 })}
@@ -975,6 +1080,36 @@ function SchedulePage() {
         </div>
       </section>
 
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <StatCard
+          label="Lessons"
+          value={String(summaryOccurrences)}
+          tone="pink"
+          icon={<CalendarDays className="h-4 w-4" />}
+          compact
+        />
+        <StatCard
+          label="Students"
+          value={String(summaryStudents)}
+          tone="green"
+          icon={<GraduationCap className="h-4 w-4" />}
+          compact
+        />
+        <StatCard
+          label="Teachers"
+          value={String(summaryTutors)}
+          tone="purple"
+          icon={<Users className="h-4 w-4" />}
+          compact
+        />
+        <StatCard
+          label="Seats available"
+          value={String(Math.max(0, summaryCapacity - summaryEnrolments.length))}
+          tone="blue"
+          compact
+        />
+      </div>
+
       {view === "day" ? timeline([anchor]) : null}
       {view === "week" ? timeline(weekDays) : null}
       {view === "month" ? (
@@ -1011,7 +1146,7 @@ function SchedulePage() {
               >
                 <span className="text-xs font-bold">{format(day, "d")}</span>
                 <div className="mt-1 space-y-1">
-                  {dayLessons.slice(0, 3).map((lesson) => renderCard(lesson, true))}
+                  {dayLessons.slice(0, 3).map((lesson) => renderCard(lesson, true, day))}
                 </div>
                 {dayLessons.length > 3 ? (
                   <span className="text-[10px] font-bold text-primary">
@@ -1033,7 +1168,11 @@ function SchedulePage() {
                 <li key={lesson.id}>
                   <button
                     type="button"
-                    onClick={() => setDetail(lesson)}
+                    onClick={() => {
+                      setDetailDate(lesson.start_date ?? selectedDate);
+                      setAttendanceSearch("");
+                      setDetail(lesson);
+                    }}
                     className="grid w-full grid-cols-[4.5rem_minmax(0,1fr)_auto] items-center gap-3 px-4 py-4 text-left hover:bg-muted/50"
                   >
                     <div>
@@ -1049,6 +1188,21 @@ function SchedulePage() {
                         {lesson.delivery_mode === "online"
                           ? "Online"
                           : (siteFor(lesson)?.name ?? lesson.venue_name ?? "Venue TBC")}
+                      </p>
+                      <p className="mt-1 flex flex-wrap gap-1 text-[10px] font-semibold">
+                        <span className="rounded-full bg-muted px-2 py-0.5">
+                          {subjectLabel(lesson.subject) || "Subject TBC"}
+                        </span>
+                        <span className="rounded-full bg-muted px-2 py-0.5">
+                          {lesson.level || "Level TBC"}
+                        </span>
+                        <span className="rounded-full bg-muted px-2 py-0.5">
+                          {lesson.delivery_mode === "online"
+                            ? "Online"
+                            : lesson.delivery_mode === "hybrid"
+                              ? "Hybrid"
+                              : "Face-to-face"}
+                        </span>
                       </p>
                     </div>
                     <Pill tone={capacityTone(countFor(lesson), lesson.capacity)}>
@@ -1178,6 +1332,17 @@ function SchedulePage() {
                   <Clock3 className="h-4 w-4 text-primary" />
                   {detail.recurrence === "once" ? "One-off lesson" : "Repeats weekly"}
                 </p>
+                <div className="flex flex-wrap gap-1.5">
+                  <Pill tone="blue">{subjectLabel(detail.subject) || "Subject TBC"}</Pill>
+                  <Pill tone="purple">{detail.level || "Level TBC"}</Pill>
+                  <Pill tone="green">
+                    {detail.delivery_mode === "online"
+                      ? "Online"
+                      : detail.delivery_mode === "hybrid"
+                        ? "Hybrid"
+                        : "Face-to-face"}
+                  </Pill>
+                </div>
                 <Pill tone={capacityTone(countFor(detail), detail.capacity)}>
                   {countFor(detail)}/{detail.capacity} students
                 </Pill>
@@ -1261,6 +1426,86 @@ function SchedulePage() {
                   >
                     <Plus className="h-4 w-4" /> Manage students
                   </Button>
+                </div>
+                <div className="space-y-3 border-t border-border pt-3">
+                  <div className="flex flex-wrap items-end justify-between gap-2">
+                    <div>
+                      <p className="font-bold">Quick attendance</p>
+                      <p className="text-xs text-muted-foreground">
+                        Mark students without leaving this lesson.
+                      </p>
+                    </div>
+                    <label className="grid gap-1 text-xs font-semibold text-muted-foreground">
+                      Lesson date
+                      <Input
+                        type="date"
+                        value={detailDate}
+                        onChange={(event) => setDetailDate(event.target.value)}
+                        className="h-9 w-40 rounded-xl"
+                      />
+                    </label>
+                  </div>
+                  <Input
+                    value={attendanceSearch}
+                    onChange={(event) => setAttendanceSearch(event.target.value)}
+                    placeholder="Search students"
+                    className="h-9 rounded-xl"
+                  />
+                  {attendanceStudents.length ? (
+                    <div className="overflow-hidden rounded-xl border border-border">
+                      <table className="w-full table-fixed text-left text-xs">
+                        <thead className="bg-muted/50 text-muted-foreground">
+                          <tr>
+                            <th className="w-[48%] px-2 py-2">Student</th>
+                            <th className="w-[26%] px-1 py-2 text-center">Present</th>
+                            <th className="w-[26%] px-1 py-2 text-center">Absent</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border">
+                          {attendanceStudents.map((student) => {
+                            const mark = detailAttendance.find(
+                              (item) => item.student_id === student.id,
+                            );
+                            const saving =
+                              addSession.isPending ||
+                              addAttendance.isPending ||
+                              updateAttendance.isPending;
+                            return (
+                              <tr key={student.id}>
+                                <td className="px-2 py-2 font-bold">{fullName(student)}</td>
+                                <td className="px-1 py-2 text-center">
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant={mark?.status === "present" ? "default" : "outline"}
+                                    className="h-8 w-full px-1 text-[10px]"
+                                    disabled={saving}
+                                    onClick={() => markQuickAttendance(student.id, "present")}
+                                  >
+                                    <Check className="h-3.5 w-3.5" /> Present
+                                  </Button>
+                                </td>
+                                <td className="px-1 py-2 text-center">
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant={mark?.status === "absent" ? "destructive" : "outline"}
+                                    className="h-8 w-full px-1 text-[10px]"
+                                    disabled={saving}
+                                    onClick={() => markQuickAttendance(student.id, "absent")}
+                                  >
+                                    <X className="h-3.5 w-3.5" /> Absent
+                                  </Button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <Empty>No enrolled students match this search.</Empty>
+                  )}
                 </div>
               </div>
               <div className="sticky bottom-0 z-10 -mx-2 grid grid-cols-4 gap-2 border-t border-border bg-background px-2 py-3">
@@ -1385,6 +1630,15 @@ function SchedulePage() {
             new Set(["English", "Maths", "Science", ...subjects, subjectLabel(form.subject)]),
           ).filter(Boolean)}
         />
+        <SelectField
+          label="Level"
+          value={form.level}
+          onChange={(level) => setForm({ ...form, level })}
+          options={[
+            { value: "", label: "Select level" },
+            ...LEVEL_OPTIONS.map((level) => ({ value: level, label: level })),
+          ]}
+        />
         {form.delivery_mode !== "online" ? (
           <LocationPicker
             value={form.site_id}
@@ -1416,11 +1670,6 @@ function SchedulePage() {
               type="date"
               value={form.end_date}
               onChange={(end_date) => setForm({ ...form, end_date })}
-            />
-            <TextField
-              label="Level"
-              value={form.level}
-              onChange={(level) => setForm({ ...form, level })}
             />
             <TextField
               label="Venue name"

@@ -28,21 +28,42 @@ export function StatCard({
   hint,
   tone = "pink",
   icon,
+  compact = false,
 }: {
   label: string;
   value: ReactNode;
   hint?: string;
   tone?: Tone;
   icon?: ReactNode;
+  compact?: boolean;
 }) {
   return (
-    <div className={cn("rounded-2xl px-4 py-4 sm:px-5", toneTile[tone])}>
+    <div
+      className={cn(
+        "rounded-2xl",
+        compact ? "px-3 py-2.5 sm:px-4 sm:py-3" : "px-4 py-4 sm:px-5",
+        toneTile[tone],
+      )}
+    >
       <div className="flex items-start justify-between gap-2">
-        <p className="text-2xl font-extrabold sm:text-3xl">{value}</p>
+        <p
+          className={cn("font-extrabold", compact ? "text-xl sm:text-2xl" : "text-2xl sm:text-3xl")}
+        >
+          {value}
+        </p>
         {icon ? <span className="opacity-70">{icon}</span> : null}
       </div>
-      <p className="mt-1 text-xs font-semibold tracking-wide uppercase opacity-80">{label}</p>
-      {hint ? <p className="mt-1 text-xs opacity-70">{hint}</p> : null}
+      <p
+        className={cn(
+          "font-semibold tracking-wide uppercase opacity-80",
+          compact ? "mt-0.5 text-[10px] sm:text-xs" : "mt-1 text-xs",
+        )}
+      >
+        {label}
+      </p>
+      {hint ? (
+        <p className={cn("opacity-70", compact ? "mt-0.5 text-[10px]" : "mt-1 text-xs")}>{hint}</p>
+      ) : null}
     </div>
   );
 }
