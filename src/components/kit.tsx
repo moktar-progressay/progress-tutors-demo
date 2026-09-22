@@ -231,7 +231,7 @@ export function PageHeader({
   breadcrumb?: ReactNode;
 }) {
   return (
-    <div className="flex flex-wrap items-end justify-between gap-3">
+    <div className="sticky top-[var(--app-header-height)] z-30 -mx-4 flex flex-wrap items-end justify-between gap-3 border-b border-border/70 bg-background/95 px-4 py-2 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/90 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
       <div>
         {breadcrumb ? <div className="mb-1 text-xs text-muted-foreground">{breadcrumb}</div> : null}
         <h1 className="text-2xl font-extrabold sm:text-3xl">{title}</h1>
