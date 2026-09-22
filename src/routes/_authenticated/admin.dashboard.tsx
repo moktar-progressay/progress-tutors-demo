@@ -32,10 +32,13 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  Cell,
   LabelList,
   Legend,
   Line,
   LineChart,
+  Pie,
+  PieChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -254,23 +257,23 @@ function AdminDashboard() {
       string,
       { date: string; dateLabel: string; fullDate: string; studentIds: Set<string> }
     >();
+    analyticsDates.forEach((date) => {
+      const key = format(date, "yyyy-MM-dd");
+      points.set(key, {
+        date: key,
+        dateLabel: format(date, "EEE d MMM"),
+        fullDate: format(date, "EEEE d MMMM yyyy"),
+        studentIds: new Set<string>(),
+      });
+    });
     const sessionDates = new Map(
       filteredSessions.map((session) => [session.id, session.session_date]),
     );
     filteredAttendance.forEach((mark) => {
       const sessionDate = sessionDates.get(mark.session_id);
       if (!sessionDate) return;
-      let point = points.get(sessionDate);
-      if (!point) {
-        const date = parseISO(sessionDate);
-        point = {
-          date: sessionDate,
-          dateLabel: format(date, "EEE d MMM"),
-          fullDate: format(date, "EEEE d MMMM yyyy"),
-          studentIds: new Set<string>(),
-        };
-        points.set(sessionDate, point);
-      }
+      const point = points.get(sessionDate);
+      if (!point) return;
       if (["present", "late"].includes(mark.status)) point.studentIds.add(mark.student_id);
     });
     return Array.from(points.values())
@@ -281,23 +284,24 @@ function AdminDashboard() {
         studentsAttended: point.studentIds.size,
       }))
       .sort((a, b) => a.date.localeCompare(b.date));
-  }, [filteredAttendance, filteredSessions]);
+  }, [analyticsDates, filteredAttendance, filteredSessions]);
 
   const genderAttendance = useMemo(() => {
     const studentMap = new Map((students.data ?? []).map((student) => [student.id, student]));
     const groups = new Map([
-      ["Boys", { name: "Boys", Present: 0, Absent: 0 }],
-      ["Girls", { name: "Girls", Present: 0, Absent: 0 }],
-      ["Not recorded", { name: "Not recorded", Present: 0, Absent: 0 }],
+      ["Boys", { name: "Boys", value: 0, colour: "#2563eb" }],
+      ["Girls", { name: "Girls", value: 0, colour: "#db2777" }],
     ]);
     filteredAttendance.forEach((mark) => {
+      if (!["present", "late"].includes(mark.status)) return;
       const group = groups.get(genderGroup(studentMap.get(mark.student_id)?.gender));
       if (!group) return;
-      if (["present", "late"].includes(mark.status)) group.Present += 1;
-      else if (mark.status === "absent") group.Absent += 1;
+      group.value += 1;
     });
     return Array.from(groups.values());
   }, [filteredAttendance, students.data]);
+
+  const reportingPeriod = `${format(analyticsStart, "d MMM")}–${format(analyticsEnd, "d MMM yyyy")}`;
 
   const lessonOccurrences = useMemo(
     () =>
@@ -627,46 +631,6 @@ function AdminDashboard() {
         </section>
       ) : null}
 
-      <ChartCard
-        title="Attendance over time"
-        subtitle="Unique students marked present or late. Only dates with saved register marks are shown."
-      >
-        {attendanceTimeline.length === 0 ? (
-          <Empty>No attendance registers have been saved for this reporting period.</Empty>
-        ) : (
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart
-              data={attendanceTimeline}
-              margin={{ top: 24, right: 18, left: -16, bottom: 8 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="dateLabel" tick={<AttendanceDateTick />} interval={0} height={42} />
-              <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
-              <Tooltip
-                contentStyle={tooltipStyle}
-                formatter={(value) => [Number(value), "Unique students attended"]}
-                labelFormatter={(label, payload) => String(payload[0]?.payload?.fullDate ?? label)}
-              />
-              <Line
-                type="monotone"
-                dataKey="studentsAttended"
-                name="Unique students attended"
-                stroke="#ec2d70"
-                strokeWidth={3}
-                dot={{ r: 4 }}
-                activeDot={{ r: 6 }}
-              >
-                <LabelList
-                  dataKey="studentsAttended"
-                  position="top"
-                  className="fill-foreground text-xs font-bold"
-                />
-              </Line>
-            </LineChart>
-          </ResponsiveContainer>
-        )}
-      </ChartCard>
-
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <Link to="/admin/classes" className="block rounded-2xl focus:outline-none focus:ring-2">
           <StatCard
@@ -704,6 +668,52 @@ function AdminDashboard() {
           compact
         />
       </div>
+
+      <ChartCard
+        title="Attendance over time"
+        subtitle={`Unique students marked present or late each day · ${reportingPeriod}`}
+      >
+        <div className="h-full overflow-x-auto">
+          <div
+            className="h-full"
+            style={{ minWidth: `${Math.max(640, attendanceTimeline.length * 64)}px` }}
+          >
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart
+                data={attendanceTimeline}
+                margin={{ top: 24, right: 18, left: -16, bottom: 8 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="dateLabel" tick={<AttendanceDateTick />} interval={0} height={42} />
+                <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                <Tooltip
+                  contentStyle={tooltipStyle}
+                  formatter={(value) => [Number(value), "Unique students attended"]}
+                  labelFormatter={(label, payload) =>
+                    String(payload[0]?.payload?.fullDate ?? label)
+                  }
+                />
+                <Line
+                  type="monotone"
+                  dataKey="studentsAttended"
+                  name="Unique students attended"
+                  stroke="#ec2d70"
+                  strokeWidth={3}
+                  dot={{ r: 4 }}
+                  activeDot={{ r: 6 }}
+                >
+                  <LabelList
+                    dataKey="studentsAttended"
+                    position="top"
+                    className="fill-foreground text-xs font-bold"
+                    formatter={(value: unknown) => (Number(value) > 0 ? Number(value) : "")}
+                  />
+                </Line>
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </ChartCard>
 
       <section className="surface p-3 sm:p-5">
         <div className="flex flex-wrap items-center gap-2">
@@ -811,24 +821,37 @@ function AdminDashboard() {
       <div className="grid min-w-0 gap-5 xl:grid-cols-2">
         <ChartCard
           title="Attendance by gender"
-          subtitle="Recorded attendance only. Missing gender remains visible rather than inferred."
+          subtitle={`Present students only · ${reportingPeriod}`}
         >
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={genderAttendance} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-              <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
-              <Tooltip contentStyle={tooltipStyle} />
+            <PieChart>
+              <Pie
+                data={genderAttendance}
+                dataKey="value"
+                nameKey="name"
+                cx="50%"
+                cy="48%"
+                innerRadius={48}
+                outerRadius={88}
+                paddingAngle={2}
+                label={({ name, value }) => `${name}: ${value}`}
+              >
+                {genderAttendance.map((entry) => (
+                  <Cell key={entry.name} fill={entry.colour} />
+                ))}
+              </Pie>
+              <Tooltip
+                contentStyle={tooltipStyle}
+                formatter={(value) => [Number(value), "Present"]}
+              />
               <Legend wrapperStyle={{ fontSize: 12 }} />
-              <Bar dataKey="Present" stackId="attendance" fill="#19a974" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="Absent" stackId="attendance" fill="#ec2d70" radius={[4, 4, 0, 0]} />
-            </BarChart>
+            </PieChart>
           </ResponsiveContainer>
         </ChartCard>
 
         <ChartCard
-          title="Students attending each lesson"
-          subtitle="Unique students marked present or late for each lesson in the selected reporting period"
+          title={`Attendance by lesson · ${reportingPeriod}`}
+          subtitle="Unique students marked present or late for each lesson"
         >
           <div className="h-full overflow-y-auto">
             <div
@@ -857,9 +880,15 @@ function AdminDashboard() {
                   <Bar
                     dataKey="studentsAttended"
                     name="Unique students attended"
-                    fill="#6c49b8"
+                    fill="#7c3aed"
                     radius={[0, 8, 8, 0]}
-                  />
+                  >
+                    <LabelList
+                      dataKey="studentsAttended"
+                      position="right"
+                      className="fill-foreground text-xs font-bold"
+                    />
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
