@@ -321,6 +321,14 @@ function AdminDashboard() {
         (row) => row.scheduledLessons > 0 || row.sessionRecords > 0 || row.attendanceMarks > 0,
       );
   }, [analyticsDates, filteredAttendance, filteredLessons, filteredSessions]);
+  const attendanceAuditTotals = attendanceAudit.reduce(
+    (totals, row) => ({
+      scheduledLessons: totals.scheduledLessons + row.scheduledLessons,
+      sessionRecords: totals.sessionRecords + row.sessionRecords,
+      attendanceMarks: totals.attendanceMarks + row.attendanceMarks,
+    }),
+    { scheduledLessons: 0, sessionRecords: 0, attendanceMarks: 0 },
+  );
 
   const genderAttendance = useMemo(() => {
     const studentMap = new Map((students.data ?? []).map((student) => [student.id, student]));
@@ -765,7 +773,7 @@ function AdminDashboard() {
                 <tr>
                   <th className="px-3 py-3 sm:px-5">Date</th>
                   <th className="px-3 py-3 text-center">Scheduled lessons</th>
-                  <th className="px-3 py-3 text-center">Session records</th>
+                  <th className="px-3 py-3 text-center">Registers opened</th>
                   <th className="px-3 py-3 text-center">Attendance marks</th>
                 </tr>
               </thead>
@@ -802,6 +810,20 @@ function AdminDashboard() {
                   </tr>
                 ))}
               </tbody>
+              <tfoot className="border-t-2 border-border bg-muted/60">
+                <tr>
+                  <th className="px-3 py-3 font-extrabold sm:px-5">Total</th>
+                  <td className="px-3 py-3 text-center font-extrabold">
+                    {attendanceAuditTotals.scheduledLessons}
+                  </td>
+                  <td className="px-3 py-3 text-center font-extrabold">
+                    {attendanceAuditTotals.sessionRecords}
+                  </td>
+                  <td className="px-3 py-3 text-center font-extrabold">
+                    {attendanceAuditTotals.attendanceMarks}
+                  </td>
+                </tr>
+              </tfoot>
             </table>
           </div>
         ) : (
