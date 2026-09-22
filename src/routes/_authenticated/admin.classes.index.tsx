@@ -24,6 +24,7 @@ import {
   Download,
   Filter,
   MapPin,
+  Minus,
   Pencil,
   Plus,
   Search,
@@ -126,8 +127,9 @@ const CARD_COLOUR_NAMES = Object.keys(CARD_COLOURS) as CardColour[];
 
 const HOURS = Array.from({ length: 13 }, (_, index) => index + 8);
 const CALENDAR_HOUR_HEIGHT = 100;
-const CALENDAR_MINUTE_SCALE = CALENDAR_HOUR_HEIGHT / 60;
-const CALENDAR_HEIGHT = HOURS.length * CALENDAR_HOUR_HEIGHT;
+const CALENDAR_ZOOM_MIN = 0.6;
+const CALENDAR_ZOOM_MAX = 1.6;
+const CALENDAR_ZOOM_STEP = 0.2;
 
 function minutes(time: string | null) {
   if (!time) return 0;
@@ -188,6 +190,7 @@ function SchedulePage() {
   const updateEnrolment = useUpdateRow("class_enrolments", ["classes"]);
 
   const [view, setView] = useState<CalendarView>("day");
+  const [calendarZoom, setCalendarZoom] = useState(1);
   const [selectedDate, setSelectedDate] = useState(currentDateIso);
   const [search, setSearch] = useState("");
   const [tutorId, setTutorId] = useState("all");
@@ -217,6 +220,10 @@ function SchedulePage() {
   const [studentSearch, setStudentSearch] = useState("");
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
   const [form, setForm] = useState(BLANK);
+
+  const calendarHourHeight = CALENDAR_HOUR_HEIGHT * calendarZoom;
+  const calendarMinuteScale = calendarHourHeight / 60;
+  const calendarHeight = HOURS.length * calendarHourHeight;
 
   useEffect(() => {
     if (!add) return;
@@ -427,7 +434,7 @@ function SchedulePage() {
 
     const rect = target.getBoundingClientRect();
     const duration = Math.max(15, minutes(drag.lesson.end_time) - minutes(drag.lesson.start_time));
-    const rawStart = 8 * 60 + (event.clientY - rect.top) / CALENDAR_MINUTE_SCALE;
+    const rawStart = 8 * 60 + (event.clientY - rect.top) / calendarMinuteScale;
     const snappedStart = Math.round(rawStart / 15) * 15;
     const start = Math.max(8 * 60, Math.min(21 * 60 - duration, snappedStart));
     const end = start + duration;
@@ -785,12 +792,12 @@ function SchedulePage() {
           className="grid"
           style={{ gridTemplateColumns: `4rem repeat(${days.length}, minmax(0, 1fr))` }}
         >
-          <div className="relative" style={{ height: CALENDAR_HEIGHT }}>
+          <div className="relative" style={{ height: calendarHeight }}>
             {HOURS.map((hour) => (
               <span
                 key={hour}
                 className="absolute right-2 -translate-y-2 text-[10px] text-muted-foreground"
-                style={{ top: `${(hour - 8) * CALENDAR_HOUR_HEIGHT}px` }}
+                style={{ top: `${(hour - 8) * calendarHourHeight}px` }}
               >
                 {hour}:00
               </span>
@@ -802,8 +809,8 @@ function SchedulePage() {
               className="relative border-l border-border"
               data-calendar-date={format(day, "yyyy-MM-dd")}
               style={{
-                height: CALENDAR_HEIGHT,
-                backgroundImage: `repeating-linear-gradient(to bottom, transparent 0, transparent ${CALENDAR_HOUR_HEIGHT - 1}px, var(--border) ${CALENDAR_HOUR_HEIGHT}px)`,
+                height: calendarHeight,
+                backgroundImage: `repeating-linear-gradient(to bottom, transparent 0, transparent ${calendarHourHeight - 1}px, var(--border) ${calendarHourHeight}px)`,
               }}
               onDoubleClick={() => openNew(format(day, "yyyy-MM-dd"))}
             >
@@ -811,10 +818,10 @@ function SchedulePage() {
                 .filter((lesson) => lessonRunsOn(lesson, day))
                 .map((lesson, _index, dayLessons) => {
                   const top =
-                    Math.max(0, minutes(lesson.start_time) - 8 * 60) * CALENDAR_MINUTE_SCALE;
+                    Math.max(0, minutes(lesson.start_time) - 8 * 60) * calendarMinuteScale;
                   const height = Math.max(
                     44,
-                    (minutes(lesson.end_time) - minutes(lesson.start_time)) * CALENDAR_MINUTE_SCALE,
+                    (minutes(lesson.end_time) - minutes(lesson.start_time)) * calendarMinuteScale,
                   );
                   const overlappingLessons = dayLessons.filter(
                     (candidate) =>
@@ -902,6 +909,54 @@ function SchedulePage() {
               </button>
             ))}
           </div>
+          {view === "day" || view === "week" ? (
+            <div
+              className="flex items-center rounded-xl border border-border bg-card p-0.5"
+              aria-label="Calendar zoom controls"
+            >
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                className="h-8 w-8"
+                onClick={() =>
+                  setCalendarZoom((current) =>
+                    Math.max(CALENDAR_ZOOM_MIN, current - CALENDAR_ZOOM_STEP),
+                  )
+                }
+                disabled={calendarZoom <= CALENDAR_ZOOM_MIN}
+                aria-label="Zoom out calendar"
+                title="Zoom out"
+              >
+                <Minus className="h-4 w-4" />
+              </Button>
+              <button
+                type="button"
+                onClick={() => setCalendarZoom(1)}
+                className="min-w-12 px-1 text-center text-[11px] font-bold text-muted-foreground hover:text-foreground"
+                aria-label="Reset calendar zoom"
+                title="Reset zoom"
+              >
+                {Math.round(calendarZoom * 100)}%
+              </button>
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                className="h-8 w-8"
+                onClick={() =>
+                  setCalendarZoom((current) =>
+                    Math.min(CALENDAR_ZOOM_MAX, current + CALENDAR_ZOOM_STEP),
+                  )
+                }
+                disabled={calendarZoom >= CALENDAR_ZOOM_MAX}
+                aria-label="Zoom in calendar"
+                title="Zoom in"
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+          ) : null}
           <Button size="sm" variant="secondary" onClick={() => setFiltersOpen(true)}>
             <Filter className="h-4 w-4" /> Filters{activeFilterCount ? ` ${activeFilterCount}` : ""}
           </Button>
