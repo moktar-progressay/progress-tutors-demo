@@ -1339,14 +1339,22 @@ function SchedulePage() {
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-3 text-sm">
-                <p className="flex items-center gap-2">
-                  <Avatar
-                    initials={initialsOf(fullName(tutorFor(detail)))}
-                    tone={avatarTone(fullName(tutorFor(detail)))}
-                    size="sm"
-                  />
-                  {fullName(tutorFor(detail))}
-                </p>
+                {tutorFor(detail) ? (
+                  <Link
+                    to="/admin/tutors/$id"
+                    params={{ id: tutorFor(detail)!.id }}
+                    className="flex w-fit items-center gap-2 font-bold hover:text-primary"
+                  >
+                    <Avatar
+                      initials={initialsOf(fullName(tutorFor(detail)))}
+                      tone={avatarTone(fullName(tutorFor(detail)))}
+                      size="sm"
+                    />
+                    {fullName(tutorFor(detail))}
+                  </Link>
+                ) : (
+                  <p className="text-muted-foreground">Tutor not assigned</p>
+                )}
                 <p className="flex items-center gap-2">
                   {detail.delivery_mode === "online" ? (
                     <Video className="h-4 w-4 text-primary" />
