@@ -658,31 +658,29 @@ function AdminDashboard() {
 
   return (
     <Page className="space-y-5">
-      <div className="sticky top-[104px] z-30 -mx-4 border-b border-border/70 bg-background/95 px-4 py-2 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/90 lg:top-[46px] lg:-mx-6 lg:px-6">
-        <PageHeader
-          title="Operations dashboard"
-          subtitle="Schedule, attendance and teaching activity. Financial information stays in Payments."
-          actions={
-            <div className="flex flex-wrap gap-2">
-              <Button variant="secondary" asChild>
-                <Link to="/admin/students" search={{ add: true }}>
-                  <UserPlus className="h-4 w-4" /> Add student
-                </Link>
-              </Button>
-              <Button variant="secondary" asChild>
-                <Link to="/admin/tutors" search={{ add: true }}>
-                  <Users className="h-4 w-4" /> Add teacher
-                </Link>
-              </Button>
-              <Button asChild>
-                <Link to="/admin/classes" search={{ add: true }}>
-                  <Plus className="h-4 w-4" /> Add lesson
-                </Link>
-              </Button>
-            </div>
-          }
-        />
-      </div>
+      <PageHeader
+        title="Operations dashboard"
+        subtitle="Schedule, attendance and teaching activity. Financial information stays in Payments."
+        actions={
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" asChild>
+              <Link to="/admin/students" search={{ add: true }}>
+                <UserPlus className="h-4 w-4" /> Add student
+              </Link>
+            </Button>
+            <Button variant="secondary" asChild>
+              <Link to="/admin/tutors" search={{ add: true }}>
+                <Users className="h-4 w-4" /> Add teacher
+              </Link>
+            </Button>
+            <Button asChild>
+              <Link to="/admin/classes" search={{ add: true }}>
+                <Plus className="h-4 w-4" /> Add lesson
+              </Link>
+            </Button>
+          </div>
+        }
+      />
 
       <div className="flex items-center justify-between gap-3">
         <p className="text-xs text-muted-foreground">
