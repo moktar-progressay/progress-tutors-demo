@@ -12,7 +12,7 @@ import {
   Users,
   Wallet,
 } from "lucide-react";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useDemo } from "@/lib/demo-store";
@@ -130,17 +130,32 @@ export function AppShell({ children }: { children: ReactNode }) {
   const email = useSignedInUser();
   const initials = (email.slice(0, 2) || "PT").toUpperCase();
   const isPublic = pathname === "/" || pathname === "/auth";
+  const headerRef = useRef<HTMLElement>(null);
+  const [headerHeight, setHeaderHeight] = useState(0);
 
   useEffect(() => {
     if (access.data?.role === "tutor" && role !== "tutor") setRole("tutor");
   }, [access.data?.role, role, setRole]);
 
+  useEffect(() => {
+    const header = headerRef.current;
+    if (!header) return;
+    const updateHeight = () => setHeaderHeight(Math.ceil(header.getBoundingClientRect().height));
+    updateHeight();
+    const observer = new ResizeObserver(updateHeight);
+    observer.observe(header);
+    return () => observer.disconnect();
+  }, []);
+
   if (isPublic) return <>{children}</>;
 
   return (
-    <div className="min-h-screen max-w-full bg-background">
+    <div
+      className="min-h-screen max-w-full bg-background"
+      style={{ "--app-header-height": `${headerHeight}px` } as CSSProperties}
+    >
       {/* Sticky application header */}
-      <header className="sticky top-0 z-40">
+      <header ref={headerRef} className="sticky top-0 z-40">
         <div className="flex items-center justify-between border-b border-border bg-card px-4 py-3 lg:hidden">
           <Link
             to={ROLE_HOME[role]}
@@ -187,7 +202,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <div className="mx-auto flex w-full min-w-0 max-w-[1500px]">
         {/* Desktop sidebar */}
-        <aside className="sticky top-[46px] hidden h-[calc(100vh-46px)] w-64 shrink-0 flex-col border-r border-border px-4 py-6 lg:flex">
+        <aside className="sticky top-[var(--app-header-height)] hidden h-[calc(100vh-var(--app-header-height))] w-64 shrink-0 flex-col border-r border-border px-4 py-6 lg:flex">
           <Link
             to={ROLE_HOME[role]}
             className="flex items-center gap-2 px-2"
