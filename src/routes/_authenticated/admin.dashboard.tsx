@@ -658,7 +658,7 @@ function AdminDashboard() {
 
   return (
     <Page className="space-y-5">
-      <div className="sticky top-[104px] z-30 -mx-4 border-b border-border/70 bg-background/95 px-4 py-2 shadow-sm backdrop-blur lg:top-[46px] lg:-mx-6 lg:px-6">
+      <div className="sticky top-[104px] z-30 -mx-4 border-b border-border/70 bg-background/95 px-4 py-2 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/90 lg:top-[46px] lg:-mx-6 lg:px-6">
         <PageHeader
           title="Operations dashboard"
           subtitle="Schedule, attendance and teaching activity. Financial information stays in Payments."
