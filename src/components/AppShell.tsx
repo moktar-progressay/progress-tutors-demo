@@ -138,7 +138,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   if (isPublic) return <>{children}</>;
 
   return (
-    <div className="min-h-screen max-w-full overflow-x-clip bg-background">
+    <div className="min-h-screen max-w-full bg-background">
       {/* Sticky application header */}
       <header className="sticky top-0 z-40">
         <div className="flex items-center justify-between border-b border-border bg-card px-4 py-3 lg:hidden">
