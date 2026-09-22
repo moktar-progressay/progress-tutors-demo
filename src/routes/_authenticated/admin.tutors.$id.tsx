@@ -165,35 +165,33 @@ function TutorProfile() {
 
   return (
     <Page className="space-y-5">
-      <div className="sticky top-[104px] z-30 -mx-4 border-b border-border/70 bg-background/95 px-4 py-2 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/90 lg:top-[46px] lg:-mx-6 lg:px-6">
-        <PageHeader
-          breadcrumb={
-            <Link to="/admin/tutors" className="inline-flex items-center gap-1 hover:text-primary">
-              <ArrowLeft className="h-4 w-4" /> Teachers
-            </Link>
-          }
-          title={fullName(tutor)}
-          subtitle="Teaching activity, lesson records and payment requests"
-          actions={
-            <label className="flex min-w-56 flex-col gap-1 text-xs font-semibold text-muted-foreground">
-              View tutor
-              <select
-                value={id}
-                onChange={(event) =>
-                  navigate({ to: "/admin/tutors/$id", params: { id: event.target.value } })
-                }
-                className="h-10 rounded-xl border border-border bg-card px-3 text-sm font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-              >
-                {(tutors.data ?? []).map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {fullName(item)}
-                  </option>
-                ))}
-              </select>
-            </label>
-          }
-        />
-      </div>
+      <PageHeader
+        breadcrumb={
+          <Link to="/admin/tutors" className="inline-flex items-center gap-1 hover:text-primary">
+            <ArrowLeft className="h-4 w-4" /> Teachers
+          </Link>
+        }
+        title={fullName(tutor)}
+        subtitle="Teaching activity, lesson records and payment requests"
+        actions={
+          <label className="flex min-w-56 flex-col gap-1 text-xs font-semibold text-muted-foreground">
+            View tutor
+            <select
+              value={id}
+              onChange={(event) =>
+                navigate({ to: "/admin/tutors/$id", params: { id: event.target.value } })
+              }
+              className="h-10 rounded-xl border border-border bg-card px-3 text-sm font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+            >
+              {(tutors.data ?? []).map((item) => (
+                <option key={item.id} value={item.id}>
+                  {fullName(item)}
+                </option>
+              ))}
+            </select>
+          </label>
+        }
+      />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard
