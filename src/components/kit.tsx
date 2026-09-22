@@ -29,6 +29,7 @@ export function StatCard({
   tone = "pink",
   icon,
   compact = false,
+  progress,
 }: {
   label: string;
   value: ReactNode;
@@ -36,6 +37,7 @@ export function StatCard({
   tone?: Tone;
   icon?: ReactNode;
   compact?: boolean;
+  progress?: number;
 }) {
   return (
     <div
@@ -63,6 +65,14 @@ export function StatCard({
       </p>
       {hint ? (
         <p className={cn("opacity-70", compact ? "mt-0.5 text-[10px]" : "mt-1 text-xs")}>{hint}</p>
+      ) : null}
+      {typeof progress === "number" ? (
+        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-current/15" aria-hidden="true">
+          <div
+            className="h-full rounded-full bg-current/75 transition-[width]"
+            style={{ width: `${Math.max(0, Math.min(100, progress))}%` }}
+          />
+        </div>
       ) : null}
     </div>
   );

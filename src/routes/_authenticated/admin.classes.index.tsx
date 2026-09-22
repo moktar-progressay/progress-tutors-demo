@@ -208,7 +208,7 @@ function SchedulePage() {
   const updateAttendance = useUpdateRow("student_attendance");
 
   const [view, setView] = useState<CalendarView>(requestedView ?? "day");
-  const [calendarZoom, setCalendarZoom] = useState(1);
+  const [calendarZoom, setCalendarZoom] = useState(1.25);
   const [selectedDate, setSelectedDate] = useState(requestedDate ?? currentDateIso);
   const [search, setSearch] = useState("");
   const [tutorId, setTutorId] = useState("all");
@@ -222,7 +222,6 @@ function SchedulePage() {
   const [detail, setDetail] = useState<ClassRow | null>(null);
   const [detailDate, setDetailDate] = useState(currentDateIso);
   const [attendanceSearch, setAttendanceSearch] = useState("");
-  const [quickAttendanceOpen, setQuickAttendanceOpen] = useState(false);
   const [lessonPendingDelete, setLessonPendingDelete] = useState<ClassRow | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const dragRef = useRef<{
@@ -346,6 +345,10 @@ function SchedulePage() {
           0,
         );
   const summaryCapacity = summaryLessons.reduce((total, lesson) => total + lesson.capacity, 0);
+  const summarySeatsTaken = summaryEnrolments.length;
+  const summaryOccupancy = summaryCapacity
+    ? Math.round((summarySeatsTaken / summaryCapacity) * 100)
+    : 0;
   const detailSession = detail
     ? (sessions.data ?? []).find(
         (session) => session.class_id === detail.id && session.session_date === detailDate,
@@ -822,7 +825,6 @@ function SchedulePage() {
             format(occurrenceDate ?? parseISO(lesson.start_date ?? selectedDate), "yyyy-MM-dd"),
           );
           setAttendanceSearch("");
-          setQuickAttendanceOpen(false);
           setDetail(lesson);
         }}
         className={cn(
@@ -880,10 +882,15 @@ function SchedulePage() {
 
   const timeline = (days: Date[]) => (
     <div className="overflow-x-auto rounded-2xl border border-border bg-card">
-      <div className={cn("min-w-[760px]", days.length === 1 && "min-w-0")}>
+      <div style={{ minWidth: days.length === 1 ? 0 : `${64 + days.length * 520}px` }}>
         <div
           className="grid border-b border-border"
-          style={{ gridTemplateColumns: `4rem repeat(${days.length}, minmax(0, 1fr))` }}
+          style={{
+            gridTemplateColumns:
+              days.length === 1
+                ? "4rem minmax(0, 1fr)"
+                : `4rem repeat(${days.length}, minmax(520px, 1fr))`,
+          }}
         >
           <div className="p-2" />
           {days.map((day) => (
@@ -910,7 +917,12 @@ function SchedulePage() {
         </div>
         <div
           className="grid"
-          style={{ gridTemplateColumns: `4rem repeat(${days.length}, minmax(0, 1fr))` }}
+          style={{
+            gridTemplateColumns:
+              days.length === 1
+                ? "4rem minmax(0, 1fr)"
+                : `4rem repeat(${days.length}, minmax(520px, 1fr))`,
+          }}
         >
           <div className="relative" style={{ height: calendarHeight }}>
             {HOURS.map((hour) => (
@@ -1052,7 +1064,7 @@ function SchedulePage() {
               </Button>
               <button
                 type="button"
-                onClick={() => setCalendarZoom(1)}
+                onClick={() => setCalendarZoom(1.25)}
                 className="min-w-12 px-1 text-center text-[11px] font-bold text-muted-foreground hover:text-foreground"
                 aria-label="Reset calendar zoom"
                 title="Reset zoom"
@@ -1118,10 +1130,12 @@ function SchedulePage() {
           compact
         />
         <StatCard
-          label="Seats available"
-          value={String(Math.max(0, summaryCapacity - summaryEnrolments.length))}
+          label="Seats filled"
+          value={`${summaryOccupancy}%`}
+          hint={`${summarySeatsTaken} / ${summaryCapacity} seats`}
           tone="blue"
           compact
+          progress={summaryOccupancy}
         />
       </div>
 
@@ -1186,7 +1200,6 @@ function SchedulePage() {
                     onClick={() => {
                       setDetailDate(lesson.start_date ?? selectedDate);
                       setAttendanceSearch("");
-                      setQuickAttendanceOpen(false);
                       setDetail(lesson);
                     }}
                     className="grid w-full grid-cols-[4.5rem_minmax(0,1fr)_auto] items-center gap-3 px-4 py-4 text-left hover:bg-muted/50"
@@ -1313,11 +1326,10 @@ function SchedulePage() {
           if (!open) {
             setDetail(null);
             setEditingId(null);
-            setQuickAttendanceOpen(false);
           }
         }}
       >
-        <DialogContent className="max-h-[calc(100dvh-1rem)] overflow-y-auto overscroll-contain pb-[calc(env(safe-area-inset-bottom)+1rem)] sm:max-h-[90vh] sm:max-w-md sm:pb-6">
+        <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] overflow-y-auto overscroll-contain pb-[calc(env(safe-area-inset-bottom)+1rem)] sm:max-h-[90vh] sm:max-w-3xl sm:pb-6 xl:max-w-4xl">
           {detail ? (
             <>
               <DialogHeader>
@@ -1445,108 +1457,88 @@ function SchedulePage() {
                   </Button>
                 </div>
                 <div className="border-t border-border pt-3">
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    className="w-full justify-between"
-                    aria-expanded={quickAttendanceOpen}
-                    onClick={() => setQuickAttendanceOpen((open) => !open)}
-                  >
-                    <span className="inline-flex items-center gap-2">
-                      <Check className="h-4 w-4" /> Take attendance
-                    </span>
-                    <ChevronRight
-                      className={cn(
-                        "h-4 w-4 transition-transform",
-                        quickAttendanceOpen && "rotate-90",
-                      )}
-                    />
-                  </Button>
-
-                  {quickAttendanceOpen ? (
-                    <div className="mt-3 space-y-3">
-                      <div className="flex flex-wrap items-end justify-between gap-2">
-                        <div>
-                          <p className="font-bold">Attendance register</p>
-                          <p className="text-xs text-muted-foreground">
-                            Mark students without leaving this lesson.
-                          </p>
-                        </div>
-                        <label className="grid gap-1 text-xs font-semibold text-muted-foreground">
-                          Lesson date
-                          <Input
-                            type="date"
-                            value={detailDate}
-                            onChange={(event) => setDetailDate(event.target.value)}
-                            className="h-9 w-40 rounded-xl"
-                          />
-                        </label>
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap items-end justify-between gap-2">
+                      <div>
+                        <p className="font-bold">Attendance register</p>
+                        <p className="text-xs text-muted-foreground">
+                          Mark students without leaving this lesson.
+                        </p>
                       </div>
-                      <Input
-                        value={attendanceSearch}
-                        onChange={(event) => setAttendanceSearch(event.target.value)}
-                        placeholder="Search students"
-                        className="h-9 rounded-xl"
-                      />
-                      {attendanceStudents.length ? (
-                        <div className="overflow-hidden rounded-xl border border-border">
-                          <table className="w-full table-fixed text-left text-xs">
-                            <thead className="bg-muted/50 text-muted-foreground">
-                              <tr>
-                                <th className="w-[48%] px-2 py-2">Student</th>
-                                <th className="w-[26%] px-1 py-2 text-center">Present</th>
-                                <th className="w-[26%] px-1 py-2 text-center">Absent</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-border">
-                              {attendanceStudents.map((student) => {
-                                const mark = detailAttendance.find(
-                                  (item) => item.student_id === student.id,
-                                );
-                                const saving =
-                                  addSession.isPending ||
-                                  addAttendance.isPending ||
-                                  updateAttendance.isPending;
-                                return (
-                                  <tr key={student.id}>
-                                    <td className="px-2 py-2 font-bold">{fullName(student)}</td>
-                                    <td className="px-1 py-2 text-center">
-                                      <Button
-                                        type="button"
-                                        size="sm"
-                                        variant={mark?.status === "present" ? "default" : "outline"}
-                                        className="h-8 w-full px-1 text-[10px]"
-                                        disabled={saving}
-                                        onClick={() => markQuickAttendance(student.id, "present")}
-                                      >
-                                        <Check className="h-3.5 w-3.5" /> Present
-                                      </Button>
-                                    </td>
-                                    <td className="px-1 py-2 text-center">
-                                      <Button
-                                        type="button"
-                                        size="sm"
-                                        variant={
-                                          mark?.status === "absent" ? "destructive" : "outline"
-                                        }
-                                        className="h-8 w-full px-1 text-[10px]"
-                                        disabled={saving}
-                                        onClick={() => markQuickAttendance(student.id, "absent")}
-                                      >
-                                        <X className="h-3.5 w-3.5" /> Absent
-                                      </Button>
-                                    </td>
-                                  </tr>
-                                );
-                              })}
-                            </tbody>
-                          </table>
-                        </div>
-                      ) : (
-                        <Empty>No enrolled students match this search.</Empty>
-                      )}
+                      <label className="grid gap-1 text-xs font-semibold text-muted-foreground">
+                        Lesson date
+                        <Input
+                          type="date"
+                          value={detailDate}
+                          onChange={(event) => setDetailDate(event.target.value)}
+                          className="h-9 w-40 rounded-xl"
+                        />
+                      </label>
                     </div>
-                  ) : null}
+                    <Input
+                      value={attendanceSearch}
+                      onChange={(event) => setAttendanceSearch(event.target.value)}
+                      placeholder="Search students"
+                      className="h-9 rounded-xl"
+                    />
+                    {attendanceStudents.length ? (
+                      <div className="overflow-hidden rounded-xl border border-border">
+                        <table className="w-full table-fixed text-left text-xs">
+                          <thead className="bg-muted/50 text-muted-foreground">
+                            <tr>
+                              <th className="w-[48%] px-2 py-2">Student</th>
+                              <th className="w-[26%] px-1 py-2 text-center">Present</th>
+                              <th className="w-[26%] px-1 py-2 text-center">Absent</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-border">
+                            {attendanceStudents.map((student) => {
+                              const mark = detailAttendance.find(
+                                (item) => item.student_id === student.id,
+                              );
+                              const saving =
+                                addSession.isPending ||
+                                addAttendance.isPending ||
+                                updateAttendance.isPending;
+                              return (
+                                <tr key={student.id}>
+                                  <td className="px-2 py-2 font-bold">{fullName(student)}</td>
+                                  <td className="px-1 py-2 text-center">
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant={mark?.status === "present" ? "default" : "outline"}
+                                      className="h-8 w-full px-1 text-[10px]"
+                                      disabled={saving}
+                                      onClick={() => markQuickAttendance(student.id, "present")}
+                                    >
+                                      <Check className="h-3.5 w-3.5" /> Present
+                                    </Button>
+                                  </td>
+                                  <td className="px-1 py-2 text-center">
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant={
+                                        mark?.status === "absent" ? "destructive" : "outline"
+                                      }
+                                      className="h-8 w-full px-1 text-[10px]"
+                                      disabled={saving}
+                                      onClick={() => markQuickAttendance(student.id, "absent")}
+                                    >
+                                      <X className="h-3.5 w-3.5" /> Absent
+                                    </Button>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <Empty>No enrolled students match this search.</Empty>
+                    )}
+                  </div>
                 </div>
               </div>
               <div className="sticky bottom-0 z-10 -mx-2 grid grid-cols-4 gap-2 border-t border-border bg-background px-2 py-3">

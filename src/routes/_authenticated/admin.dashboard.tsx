@@ -22,6 +22,7 @@ import {
   ChevronRight,
   Filter,
   GraduationCap,
+  Info,
   Plus,
   RotateCcw,
   UserPlus,
@@ -48,6 +49,12 @@ import { Page } from "@/components/AppShell";
 import { SelectField } from "@/components/form-kit";
 import { Avatar, avatarTone, Empty, PageHeader, StatCard } from "@/components/kit";
 import { Button } from "@/components/ui/button";
+import {
+  Tooltip as InfoTooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { fullName, hhmm, initialsOf, useTable, type ClassRow } from "@/lib/db";
 import { cn } from "@/lib/utils";
 
@@ -134,18 +141,43 @@ function genderGroup(value: string | null | undefined) {
 function ChartCard({
   title,
   subtitle,
+  help,
   children,
 }: {
   title: string;
   subtitle: string;
+  help?: string;
   children: ReactNode;
 }) {
   return (
     <section className="surface min-w-0 p-4 sm:p-5">
-      <h2 className="font-bold">{title}</h2>
+      <div className="flex items-center gap-1.5">
+        <h2 className="font-bold">{title}</h2>
+        {help ? <InfoButton label={help} /> : null}
+      </div>
       <p className="mt-1 text-xs text-muted-foreground">{subtitle}</p>
       <div className="mt-4 h-64 min-w-0 sm:h-72">{children}</div>
     </section>
+  );
+}
+
+function InfoButton({ label }: { label: string }) {
+  return (
+    <TooltipProvider delayDuration={100}>
+      <InfoTooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            aria-label={label}
+            title={label}
+            className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+          >
+            <Info className="h-3.5 w-3.5" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent className="max-w-72 text-xs">{label}</TooltipContent>
+      </InfoTooltip>
+    </TooltipProvider>
   );
 }
 
@@ -294,8 +326,12 @@ function AdminDashboard() {
       sessionsByDate.set(session.session_date, existing);
     });
     const attendanceBySession = new Map<string, number>();
+    const attendedBySession = new Map<string, number>();
     filteredAttendance.forEach((mark) => {
       attendanceBySession.set(mark.session_id, (attendanceBySession.get(mark.session_id) ?? 0) + 1);
+      if (["present", "late"].includes(mark.status)) {
+        attendedBySession.set(mark.session_id, (attendedBySession.get(mark.session_id) ?? 0) + 1);
+      }
     });
 
     return analyticsDates
@@ -309,12 +345,20 @@ function AdminDashboard() {
           (total, session) => total + (attendanceBySession.get(session.id) ?? 0),
           0,
         );
+        const attendedMarks = daySessions.reduce(
+          (total, session) => total + (attendedBySession.get(session.id) ?? 0),
+          0,
+        );
         return {
           date: dateKey,
           dateLabel: format(date, "EEE d MMM"),
           scheduledLessons,
           sessionRecords: daySessions.length,
           attendanceMarks,
+          attendedMarks,
+          attendanceRate: attendanceMarks
+            ? Math.round((attendedMarks / attendanceMarks) * 100)
+            : null,
         };
       })
       .filter(
@@ -324,11 +368,16 @@ function AdminDashboard() {
   const attendanceAuditTotals = attendanceAudit.reduce(
     (totals, row) => ({
       scheduledLessons: totals.scheduledLessons + row.scheduledLessons,
-      sessionRecords: totals.sessionRecords + row.sessionRecords,
       attendanceMarks: totals.attendanceMarks + row.attendanceMarks,
+      attendedMarks: totals.attendedMarks + row.attendedMarks,
     }),
-    { scheduledLessons: 0, sessionRecords: 0, attendanceMarks: 0 },
+    { scheduledLessons: 0, attendanceMarks: 0, attendedMarks: 0 },
   );
+  const attendanceAuditRate = attendanceAuditTotals.attendanceMarks
+    ? Math.round(
+        (attendanceAuditTotals.attendedMarks / attendanceAuditTotals.attendanceMarks) * 100,
+      )
+    : null;
 
   const genderAttendance = useMemo(() => {
     const studentMap = new Map((students.data ?? []).map((student) => [student.id, student]));
@@ -400,6 +449,33 @@ function AdminDashboard() {
       .sort((a, b) => b.hours - a.hours || b.lessons - a.lessons)
       .slice(0, 8);
   }, [analyticsDates, filteredLessons, tutors.data]);
+
+  const studentLeaderboard = useMemo(() => {
+    const totals = new Map<string, number>();
+    filteredAttendance.forEach((mark) => {
+      if (!["present", "late"].includes(mark.status)) return;
+      totals.set(mark.student_id, (totals.get(mark.student_id) ?? 0) + 1);
+    });
+    return Array.from(totals.entries())
+      .map(([studentId, attended]) => ({
+        student: (students.data ?? []).find((item) => item.id === studentId),
+        attended,
+      }))
+      .filter((item) => item.student)
+      .sort(
+        (a, b) =>
+          b.attended - a.attended ||
+          fullName(a.student).localeCompare(fullName(b.student), "en-GB"),
+      )
+      .slice(0, 8);
+  }, [filteredAttendance, students.data]);
+
+  const attendanceYAxisMax = Math.max(
+    5,
+    Math.ceil(
+      (Math.max(...attendanceTimeline.map((point) => point.studentsAttended), 0) * 1.15) / 5,
+    ) * 5,
+  );
 
   const anchor = parseISO(selectedDate);
   const weekStart = startOfWeek(anchor, { weekStartsOn: 1 });
@@ -582,29 +658,31 @@ function AdminDashboard() {
 
   return (
     <Page className="space-y-5">
-      <PageHeader
-        title="Operations dashboard"
-        subtitle="Schedule, attendance and teaching activity. Financial information stays in Payments."
-        actions={
-          <div className="flex flex-wrap gap-2">
-            <Button variant="secondary" asChild>
-              <Link to="/admin/students" search={{ add: true }}>
-                <UserPlus className="h-4 w-4" /> Add student
-              </Link>
-            </Button>
-            <Button variant="secondary" asChild>
-              <Link to="/admin/tutors" search={{ add: true }}>
-                <Users className="h-4 w-4" /> Add teacher
-              </Link>
-            </Button>
-            <Button asChild>
-              <Link to="/admin/classes" search={{ add: true }}>
-                <Plus className="h-4 w-4" /> Add lesson
-              </Link>
-            </Button>
-          </div>
-        }
-      />
+      <div className="sticky top-[104px] z-30 -mx-4 border-b border-border/70 bg-background/95 px-4 py-2 shadow-sm backdrop-blur lg:top-[46px] lg:-mx-6 lg:px-6">
+        <PageHeader
+          title="Operations dashboard"
+          subtitle="Schedule, attendance and teaching activity. Financial information stays in Payments."
+          actions={
+            <div className="flex flex-wrap gap-2">
+              <Button variant="secondary" asChild>
+                <Link to="/admin/students" search={{ add: true }}>
+                  <UserPlus className="h-4 w-4" /> Add student
+                </Link>
+              </Button>
+              <Button variant="secondary" asChild>
+                <Link to="/admin/tutors" search={{ add: true }}>
+                  <Users className="h-4 w-4" /> Add teacher
+                </Link>
+              </Button>
+              <Button asChild>
+                <Link to="/admin/classes" search={{ add: true }}>
+                  <Plus className="h-4 w-4" /> Add lesson
+                </Link>
+              </Button>
+            </div>
+          }
+        />
+      </div>
 
       <div className="flex items-center justify-between gap-3">
         <p className="text-xs text-muted-foreground">
@@ -713,57 +791,14 @@ function AdminDashboard() {
         />
       </div>
 
-      <ChartCard
-        title="Attendance over time"
-        subtitle={`Students marked present or late across all lessons each day · ${reportingPeriod}`}
-      >
-        <div className="h-full overflow-x-auto">
-          <div
-            className="h-full"
-            style={{ minWidth: `${Math.max(640, attendanceTimeline.length * 64)}px` }}
-          >
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart
-                data={attendanceTimeline}
-                margin={{ top: 24, right: 18, left: -16, bottom: 8 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="dateLabel" tick={<AttendanceDateTick />} interval={0} height={42} />
-                <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
-                <Tooltip
-                  contentStyle={tooltipStyle}
-                  formatter={(value) => [Number(value), "Students attended"]}
-                  labelFormatter={(label, payload) =>
-                    String(payload[0]?.payload?.fullDate ?? label)
-                  }
-                />
-                <Line
-                  type="monotone"
-                  dataKey="studentsAttended"
-                  name="Students attended"
-                  stroke="#ec2d70"
-                  strokeWidth={3}
-                  dot={{ r: 4 }}
-                  activeDot={{ r: 6 }}
-                >
-                  <LabelList
-                    dataKey="studentsAttended"
-                    position="top"
-                    className="fill-foreground text-xs font-bold"
-                    formatter={(value: unknown) => (Number(value) > 0 ? Number(value) : "")}
-                  />
-                </Line>
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      </ChartCard>
-
       <section className="surface overflow-hidden">
         <div className="border-b border-border px-3 py-3 sm:px-5">
-          <h2 className="font-bold">Attendance records</h2>
+          <div className="flex items-center gap-1.5">
+            <h2 className="font-bold">Daily attendance</h2>
+            <InfoButton label="This table compares scheduled lessons with saved student attendance for each day. All figures follow the dashboard filters." />
+          </div>
           <p className="mt-1 text-xs text-muted-foreground">
-            Scheduled lessons, opened registers and saved attendance marks · {reportingPeriod}
+            Compare attendance performance by day · {reportingPeriod}
           </p>
         </div>
         {attendanceAudit.length ? (
@@ -772,9 +807,24 @@ function AdminDashboard() {
               <thead className="bg-muted/50 text-xs text-muted-foreground">
                 <tr>
                   <th className="px-3 py-3 sm:px-5">Date</th>
-                  <th className="px-3 py-3 text-center">Scheduled lessons</th>
-                  <th className="px-3 py-3 text-center">Registers opened</th>
-                  <th className="px-3 py-3 text-center">Attendance marks</th>
+                  <th className="px-3 py-3 text-center">
+                    <span className="inline-flex items-center gap-1">
+                      Scheduled lessons
+                      <InfoButton label="The number of lessons expected to run on this date from the timetable, after applying the selected filters." />
+                    </span>
+                  </th>
+                  <th className="min-w-52 px-3 py-3 text-center">
+                    <span className="inline-flex items-center gap-1">
+                      Attendance
+                      <InfoButton label="The percentage of saved attendance marks recorded as Present or Late. Days without saved marks show Not recorded." />
+                    </span>
+                  </th>
+                  <th className="px-3 py-3 text-center">
+                    <span className="inline-flex items-center gap-1">
+                      Attendance marks
+                      <InfoButton label="The number of individual student attendance results saved. Each Present, Late or Absent result counts as one mark." />
+                    </span>
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -791,13 +841,31 @@ function AdminDashboard() {
                       </Link>
                     </td>
                     <td className="px-3 py-3 text-center font-bold">{row.scheduledLessons}</td>
-                    <td
-                      className={cn(
-                        "px-3 py-3 text-center font-bold",
-                        row.scheduledLessons > 0 && row.sessionRecords === 0 && "text-amber-700",
+                    <td className="px-3 py-3">
+                      {row.attendanceRate === null ? (
+                        <p className="text-center text-xs font-bold text-amber-700">Not recorded</p>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-muted">
+                            <div
+                              className={cn(
+                                "h-full rounded-full",
+                                row.attendanceRate >= 90
+                                  ? "bg-emerald-600"
+                                  : row.attendanceRate >= 70
+                                    ? "bg-blue-600"
+                                    : row.attendanceRate >= 50
+                                      ? "bg-amber-400"
+                                      : "bg-pink-600",
+                              )}
+                              style={{ width: `${row.attendanceRate}%` }}
+                            />
+                          </div>
+                          <span className="w-10 text-right text-xs font-extrabold">
+                            {row.attendanceRate}%
+                          </span>
+                        </div>
                       )}
-                    >
-                      {row.sessionRecords}
                     </td>
                     <td
                       className={cn(
@@ -817,7 +885,7 @@ function AdminDashboard() {
                     {attendanceAuditTotals.scheduledLessons}
                   </td>
                   <td className="px-3 py-3 text-center font-extrabold">
-                    {attendanceAuditTotals.sessionRecords}
+                    {attendanceAuditRate === null ? "Not recorded" : `${attendanceAuditRate}%`}
                   </td>
                   <td className="px-3 py-3 text-center font-extrabold">
                     {attendanceAuditTotals.attendanceMarks}
@@ -832,6 +900,75 @@ function AdminDashboard() {
           </div>
         )}
       </section>
+
+      <ChartCard
+        title="Attendance over time"
+        subtitle={`Students marked present or late across all lessons each day · ${reportingPeriod}`}
+        help="This totals Present and Late marks across every filtered lesson on each day. A student attending two lessons on the same day counts twice."
+      >
+        <div className="flex h-full min-w-0">
+          <div className="relative z-10 h-full w-12 shrink-0 bg-card">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart
+                data={attendanceTimeline}
+                margin={{ top: 24, right: 0, left: -20, bottom: 50 }}
+              >
+                <YAxis
+                  allowDecimals={false}
+                  domain={[0, attendanceYAxisMax]}
+                  tick={{ fontSize: 11 }}
+                  width={48}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="min-w-0 flex-1 overflow-x-auto">
+            <div
+              className="h-full"
+              style={{ minWidth: `${Math.max(640, attendanceTimeline.length * 64)}px` }}
+            >
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart
+                  data={attendanceTimeline}
+                  margin={{ top: 24, right: 18, left: 0, bottom: 8 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis
+                    dataKey="dateLabel"
+                    tick={<AttendanceDateTick />}
+                    interval={0}
+                    height={42}
+                  />
+                  <YAxis domain={[0, attendanceYAxisMax]} hide />
+                  <Tooltip
+                    contentStyle={tooltipStyle}
+                    formatter={(value) => [Number(value), "Students attended"]}
+                    labelFormatter={(label, payload) =>
+                      String(payload[0]?.payload?.fullDate ?? label)
+                    }
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="studentsAttended"
+                    name="Students attended"
+                    stroke="#ec2d70"
+                    strokeWidth={3}
+                    dot={{ r: 4 }}
+                    activeDot={{ r: 6 }}
+                  >
+                    <LabelList
+                      dataKey="studentsAttended"
+                      position="top"
+                      className="fill-foreground text-xs font-bold"
+                      formatter={(value: unknown) => (Number(value) > 0 ? Number(value) : "")}
+                    />
+                  </Line>
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+      </ChartCard>
 
       <section className="surface p-3 sm:p-5">
         <div className="flex flex-wrap items-center gap-2">
@@ -940,6 +1077,7 @@ function AdminDashboard() {
         <ChartCard
           title="Attendance by gender"
           subtitle={`Present students only · ${reportingPeriod}`}
+          help="This compares Present and Late attendance marks for students recorded as boys or girls. Students without recorded gender data are not assigned to either group."
         >
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
@@ -970,6 +1108,7 @@ function AdminDashboard() {
         <ChartCard
           title={`Attendance by lesson · ${reportingPeriod}`}
           subtitle="Unique students marked present or late for each lesson"
+          help="Each bar shows the number of different students with at least one Present or Late mark for that lesson during the filtered period."
         >
           <div className="h-full overflow-y-auto">
             <div
@@ -1016,7 +1155,10 @@ function AdminDashboard() {
         <section className="surface min-w-0 p-4 sm:p-5">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h2 className="font-bold">Teacher leaderboard</h2>
+              <div className="flex items-center gap-1.5">
+                <h2 className="font-bold">Teacher leaderboard</h2>
+                <InfoButton label="Ranks teachers by scheduled teaching hours in the filtered period. This is timetable data, not tutor payment data." />
+              </div>
               <p className="mt-1 text-xs text-muted-foreground">
                 Scheduled teaching hours in the selected reporting period
               </p>
@@ -1052,6 +1194,56 @@ function AdminDashboard() {
                       </span>
                       <span className="text-sm font-extrabold text-primary">
                         {item.hours.toFixed(item.hours % 1 ? 1 : 0)}h
+                      </span>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    </Link>
+                  </li>
+                );
+              })}
+            </ol>
+          )}
+        </section>
+
+        <section className="surface min-w-0 p-4 sm:p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-1.5">
+                <h2 className="font-bold">Student attendance leaderboard</h2>
+                <InfoButton label="Ranks students by the number of Present or Late marks saved during the filtered period. Attending two lessons counts as two attendances." />
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Most lessons attended in the selected reporting period
+              </p>
+            </div>
+            <Link to="/admin/students" className="text-xs font-bold text-primary">
+              All students
+            </Link>
+          </div>
+          {studentLeaderboard.length === 0 ? (
+            <div className="mt-4">
+              <Empty>No student attendance matches these filters.</Empty>
+            </div>
+          ) : (
+            <ol className="mt-4 space-y-2">
+              {studentLeaderboard.map((item, index) => {
+                const name = fullName(item.student);
+                return (
+                  <li key={item.student!.id}>
+                    <Link
+                      to="/admin/students/$id"
+                      params={{ id: item.student!.id }}
+                      className="flex items-center gap-3 rounded-xl border border-border px-3 py-2.5 hover:border-primary/40"
+                    >
+                      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-600 text-xs font-black text-white">
+                        {index + 1}
+                      </span>
+                      <Avatar initials={initialsOf(name)} tone={avatarTone(name)} size="sm" />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-bold">{name}</span>
+                        <span className="block text-xs text-muted-foreground">Present or late</span>
+                      </span>
+                      <span className="text-sm font-extrabold text-blue-700">
+                        {item.attended} lesson{item.attended === 1 ? "" : "s"}
                       </span>
                       <ChevronRight className="h-4 w-4 text-muted-foreground" />
                     </Link>
