@@ -222,7 +222,7 @@ function AdminDashboard() {
   const attendanceTimeline = useMemo(() => {
     const points = new Map<
       string,
-      { date: string; dateLabel: string; fullDate: string; studentsAttended: number }
+      { date: string; dateLabel: string; fullDate: string; studentIds: Set<string> }
     >();
     analyticsDates.forEach((date) => {
       const dateKey = format(date, "yyyy-MM-dd");
@@ -230,7 +230,7 @@ function AdminDashboard() {
         date: dateKey,
         dateLabel: format(date, "d MMM"),
         fullDate: format(date, "EEEE d MMMM yyyy"),
-        studentsAttended: 0,
+        studentIds: new Set<string>(),
       });
     });
     const sessionDates = new Map(
@@ -241,9 +241,16 @@ function AdminDashboard() {
       if (!sessionDate) return;
       const point = points.get(sessionDate);
       if (!point) return;
-      if (["present", "late"].includes(mark.status)) point.studentsAttended += 1;
+      if (["present", "late"].includes(mark.status)) point.studentIds.add(mark.student_id);
     });
-    return Array.from(points.values()).sort((a, b) => a.date.localeCompare(b.date));
+    return Array.from(points.values())
+      .map((point) => ({
+        date: point.date,
+        dateLabel: point.dateLabel,
+        fullDate: point.fullDate,
+        studentsAttended: point.studentIds.size,
+      }))
+      .sort((a, b) => a.date.localeCompare(b.date));
   }, [analyticsDates, filteredAttendance, filteredSessions]);
 
   const genderAttendance = useMemo(() => {
@@ -275,17 +282,19 @@ function AdminDashboard() {
     const sessionClasses = new Map(
       filteredSessions.map((session) => [session.id, session.class_id]),
     );
-    const totals = new Map(filteredLessons.map((lesson) => [lesson.id, 0]));
+    const studentsByLesson = new Map(
+      filteredLessons.map((lesson) => [lesson.id, new Set<string>()]),
+    );
     filteredAttendance.forEach((mark) => {
       if (!["present", "late"].includes(mark.status)) return;
       const classId = sessionClasses.get(mark.session_id);
-      if (!classId || !totals.has(classId)) return;
-      totals.set(classId, (totals.get(classId) ?? 0) + 1);
+      if (!classId) return;
+      studentsByLesson.get(classId)?.add(mark.student_id);
     });
     return filteredLessons
       .map((lesson) => ({
         lesson: lesson.name,
-        studentsAttended: totals.get(lesson.id) ?? 0,
+        studentsAttended: studentsByLesson.get(lesson.id)?.size ?? 0,
       }))
       .sort(
         (a, b) =>
@@ -715,7 +724,7 @@ function AdminDashboard() {
       <div className="grid min-w-0 gap-5 xl:grid-cols-2">
         <ChartCard
           title="Attendance over time"
-          subtitle="Total students marked present or late across all lessons on each day"
+          subtitle="Unique students marked present or late across all lessons on each day"
         >
           <ResponsiveContainer width="100%" height="100%">
             <LineChart
@@ -727,13 +736,13 @@ function AdminDashboard() {
               <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
               <Tooltip
                 contentStyle={tooltipStyle}
-                formatter={(value) => [Number(value), "Students attended"]}
+                formatter={(value) => [Number(value), "Unique students attended"]}
                 labelFormatter={(label, payload) => String(payload[0]?.payload?.fullDate ?? label)}
               />
               <Line
                 type="monotone"
                 dataKey="studentsAttended"
-                name="Students attended"
+                name="Unique students attended"
                 stroke="#ec2d70"
                 strokeWidth={3}
                 dot={{ r: 3 }}
@@ -762,7 +771,7 @@ function AdminDashboard() {
 
         <ChartCard
           title="Students attending each lesson"
-          subtitle="Present and late attendance marks by lesson in the selected reporting period"
+          subtitle="Unique students marked present or late for each lesson in the selected reporting period"
         >
           <div className="h-full overflow-x-auto">
             <div
@@ -786,11 +795,11 @@ function AdminDashboard() {
                   <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
                   <Tooltip
                     contentStyle={tooltipStyle}
-                    formatter={(value) => [Number(value), "Students attended"]}
+                    formatter={(value) => [Number(value), "Unique students attended"]}
                   />
                   <Bar
                     dataKey="studentsAttended"
-                    name="Students attended"
+                    name="Unique students attended"
                     fill="#6c49b8"
                     radius={[8, 8, 0, 0]}
                   />
