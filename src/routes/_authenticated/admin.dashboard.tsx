@@ -255,7 +255,7 @@ function AdminDashboard() {
   const attendanceTimeline = useMemo(() => {
     const points = new Map<
       string,
-      { date: string; dateLabel: string; fullDate: string; studentIds: Set<string> }
+      { date: string; dateLabel: string; fullDate: string; studentsAttended: number }
     >();
     analyticsDates.forEach((date) => {
       const key = format(date, "yyyy-MM-dd");
@@ -263,7 +263,7 @@ function AdminDashboard() {
         date: key,
         dateLabel: format(date, "EEE d MMM"),
         fullDate: format(date, "EEEE d MMMM yyyy"),
-        studentIds: new Set<string>(),
+        studentsAttended: 0,
       });
     });
     const sessionDates = new Map(
@@ -274,14 +274,14 @@ function AdminDashboard() {
       if (!sessionDate) return;
       const point = points.get(sessionDate);
       if (!point) return;
-      if (["present", "late"].includes(mark.status)) point.studentIds.add(mark.student_id);
+      if (["present", "late"].includes(mark.status)) point.studentsAttended += 1;
     });
     return Array.from(points.values())
       .map((point) => ({
         date: point.date,
         dateLabel: point.dateLabel,
         fullDate: point.fullDate,
-        studentsAttended: point.studentIds.size,
+        studentsAttended: point.studentsAttended,
       }))
       .sort((a, b) => a.date.localeCompare(b.date));
   }, [analyticsDates, filteredAttendance, filteredSessions]);
@@ -671,7 +671,7 @@ function AdminDashboard() {
 
       <ChartCard
         title="Attendance over time"
-        subtitle={`Unique students marked present or late each day · ${reportingPeriod}`}
+        subtitle={`Students marked present or late across all lessons each day · ${reportingPeriod}`}
       >
         <div className="h-full overflow-x-auto">
           <div
@@ -688,7 +688,7 @@ function AdminDashboard() {
                 <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
                 <Tooltip
                   contentStyle={tooltipStyle}
-                  formatter={(value) => [Number(value), "Unique students attended"]}
+                  formatter={(value) => [Number(value), "Students attended"]}
                   labelFormatter={(label, payload) =>
                     String(payload[0]?.payload?.fullDate ?? label)
                   }
@@ -696,7 +696,7 @@ function AdminDashboard() {
                 <Line
                   type="monotone"
                   dataKey="studentsAttended"
-                  name="Unique students attended"
+                  name="Students attended"
                   stroke="#ec2d70"
                   strokeWidth={3}
                   dot={{ r: 4 }}
