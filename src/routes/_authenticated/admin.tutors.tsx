@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
 import { eachDayOfInterval, format, startOfMonth } from "date-fns";
 import { LayoutGrid, List, Pencil, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -51,8 +51,18 @@ export const Route = createFileRoute("/_authenticated/admin/tutors")({
       { name: "robots", content: "noindex" },
     ],
   }),
-  component: TutorsPage,
+  component: TutorsRoute,
 });
+
+function TutorsRoute() {
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
+
+  if (pathname.replace(/\/+$/, "") !== "/admin/tutors") {
+    return <Outlet />;
+  }
+
+  return <TutorsPage />;
+}
 
 const BLANK = {
   first_name: "",
