@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { format } from "date-fns";
 import { useMemo, useState } from "react";
 import { ArrowLeft, Check, Filter, Pencil, Plus, Search, X } from "lucide-react";
 import { toast } from "sonner";
@@ -85,7 +86,7 @@ function ClassProfile() {
     studentName: string;
   } | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const [attendanceDate, setAttendanceDate] = useState(DEMO_DATE);
+  const [attendanceDate, setAttendanceDate] = useState(() => format(new Date(), "yyyy-MM-dd"));
   const [attendanceSearch, setAttendanceSearch] = useState("");
   const [edit, setEdit] = useState({
     name: "",
