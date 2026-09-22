@@ -173,21 +173,43 @@ function AdminPaymentRequests() {
               return (
                 <li key={r.id} className="rounded-2xl border border-border p-3 sm:p-4">
                   <div className="flex items-start gap-3">
-                    <Avatar initials={initialsOf(fullName(t))} tone={avatarTone(fullName(t))} />
-                    <button
-                      type="button"
-                      className="min-w-0 flex-1 text-left"
-                      onClick={() => setExpanded(open ? null : r.id)}
-                    >
-                      <p className="text-sm font-bold">{fullName(t)}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {r.reference ?? "Payment request"} · submitted{" "}
-                        {prettyDate(r.submitted_at.slice(0, 10))}
-                      </p>
-                      <p className="mt-1 text-xs font-semibold">
-                        {lines.length} lessons · {num(r.total_hours)} hours
-                      </p>
-                    </button>
+                    {t ? (
+                      <Link
+                        to="/admin/tutors/$id"
+                        params={{ id: t.id }}
+                        aria-label={`Open ${fullName(t)}'s tutor page`}
+                      >
+                        <Avatar initials={initialsOf(fullName(t))} tone={avatarTone(fullName(t))} />
+                      </Link>
+                    ) : (
+                      <Avatar initials={initialsOf(fullName(t))} tone={avatarTone(fullName(t))} />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      {t ? (
+                        <Link
+                          to="/admin/tutors/$id"
+                          params={{ id: t.id }}
+                          className="text-sm font-bold hover:text-primary"
+                        >
+                          {fullName(t)}
+                        </Link>
+                      ) : (
+                        <p className="text-sm font-bold">{fullName(t)}</p>
+                      )}
+                      <button
+                        type="button"
+                        className="block w-full text-left"
+                        onClick={() => setExpanded(open ? null : r.id)}
+                      >
+                        <p className="text-xs text-muted-foreground">
+                          {r.reference ?? "Payment request"} · submitted{" "}
+                          {prettyDate(r.submitted_at.slice(0, 10))}
+                        </p>
+                        <p className="mt-1 text-xs font-semibold">
+                          {lines.length} lessons · {num(r.total_hours)} hours
+                        </p>
+                      </button>
+                    </div>
                     <div className="shrink-0 text-right">
                       <p className="font-extrabold">{money(r.total_amount)}</p>
                       <Pill tone={tone(r.status)} className="mt-1">
