@@ -15,11 +15,15 @@ import {
   LayoutDashboard,
   ListFilter,
   List,
+  Mail,
   MoreHorizontal,
   PackageOpen,
   Plus,
+  Printer,
   RotateCcw,
+  Save,
   Search,
+  Trash2,
   UsersRound,
   WalletCards,
   X,
@@ -600,7 +604,44 @@ function ParentPayments() {
         </nav>
       </div>
 
-      {view === "invoices" ? (
+      {view === "invoices" && invoiceOpen && selectedInvoice ? (
+        <InvoiceSplitWorkspace
+          invoices={filteredInvoices.slice(0, invoiceLimit)}
+          invoiceItems={invoiceItems.data ?? []}
+          selectedInvoice={selectedInvoice}
+          edit={invoiceEdit}
+          onEditChange={setInvoiceEdit}
+          parentName={parentName}
+          parentEmail={(id) =>
+            (parents.data ?? []).find((parent) => parent.id === id)?.email ?? "No email address"
+          }
+          studentName={studentName}
+          onSelect={openInvoice}
+          onClose={() => {
+            setInvoiceOpen(false);
+            setSelectedInvoice(null);
+          }}
+          onNew={() => setFamilyInvoiceOpen(true)}
+          onDelete={() => {
+            setInvoicePendingDelete(selectedInvoice);
+            setInvoiceOpen(false);
+            setSelectedInvoice(null);
+          }}
+          saving={updateInvoice.isPending}
+          onSave={async () => {
+            const values = {
+              status: invoiceEdit.status,
+              due_date: invoiceEdit.due_date || null,
+              notes: invoiceEdit.notes || null,
+            };
+            await updateInvoice.mutateAsync({ id: selectedInvoice.id, values });
+            setSelectedInvoice({ ...selectedInvoice, ...values });
+            toast.success("Invoice updated");
+          }}
+        />
+      ) : null}
+
+      {view === "invoices" && (!invoiceOpen || !selectedInvoice) ? (
         <div className="space-y-4">
           <div className="hidden flex-wrap items-center justify-between gap-3 md:flex">
             <div>
@@ -622,39 +663,29 @@ function ParentPayments() {
             </div>
           </div>
 
-          <div className="hidden grid-cols-2 gap-3 md:grid lg:grid-cols-4">
-            <StatCard
-              label="Outstanding"
-              value={money(outstandingTotal)}
-              hint={`${allPayments.filter((item) => item.status !== "received").length} invoices`}
-              tone="blue"
-              icon={<CircleDollarSign className="h-5 w-5" />}
-            />
-            <StatCard
-              label="Overdue"
-              value={money(
-                allPayments
-                  .filter((item) => item.status === "overdue")
-                  .reduce((sum, item) => sum + num(item.amount), 0),
-              )}
-              hint={`${allPayments.filter((item) => item.status === "overdue").length} invoices`}
-              tone="amber"
-              icon={<ArrowUpRight className="h-5 w-5" />}
-            />
-            <StatCard
-              label="Paid this month"
-              value={money(receivedTotal)}
-              hint={`${allPayments.filter((item) => item.status === "received").length} payments`}
-              tone="green"
-              icon={<Check className="h-5 w-5" />}
-            />
-            <StatCard
-              label="Draft invoices"
-              value={money(draftInvoices.reduce((sum, item) => sum + num(item.total), 0))}
-              hint={`${draftInvoices.length} drafts`}
-              tone="purple"
-              icon={<FileText className="h-5 w-5" />}
-            />
+          <div className="hidden items-center gap-5 rounded-xl border border-border bg-muted/45 px-4 py-3 md:flex">
+            <div className="flex min-w-0 items-center gap-2 font-bold">
+              <FileText className="h-4 w-4 text-primary" />
+              <span className="whitespace-nowrap">Invoice insights</span>
+            </div>
+            <div className="grid min-w-0 flex-1 grid-cols-4 gap-4 text-xs">
+              <p className="truncate">
+                <span className="text-muted-foreground">Outstanding </span>
+                <strong>{money(outstandingTotal)}</strong>
+              </p>
+              <p className="truncate">
+                <span className="text-muted-foreground">Overdue </span>
+                <strong>{allPayments.filter((item) => item.status === "overdue").length}</strong>
+              </p>
+              <p className="truncate">
+                <span className="text-muted-foreground">Paid </span>
+                <strong>{money(receivedTotal)}</strong>
+              </p>
+              <p className="truncate">
+                <span className="text-muted-foreground">Drafts </span>
+                <strong>{draftInvoices.length}</strong>
+              </p>
+            </div>
           </div>
 
           <div className="grid grid-cols-4 gap-1.5 md:hidden">
@@ -1966,106 +1997,6 @@ function ParentPayments() {
       </FormDialog>
 
       <FormDialog
-        open={invoiceOpen}
-        onOpenChange={setInvoiceOpen}
-        title={selectedInvoice ? `Invoice ${selectedInvoice.invoice_number}` : "Invoice"}
-        description={
-          selectedInvoice
-            ? `${parentName(selectedInvoice.parent_id)} · ${money(selectedInvoice.total)}`
-            : "Review and edit this invoice."
-        }
-        submitLabel="Save invoice"
-        busy={updateInvoice.isPending}
-        fullScreen
-        dangerLabel="Delete invoice"
-        onDanger={() => {
-          if (selectedInvoice) setInvoicePendingDelete(selectedInvoice);
-          setInvoiceOpen(false);
-        }}
-        onSubmit={async () => {
-          if (!selectedInvoice) return;
-          await updateInvoice.mutateAsync({
-            id: selectedInvoice.id,
-            values: {
-              status: invoiceEdit.status,
-              due_date: invoiceEdit.due_date || null,
-              notes: invoiceEdit.notes || null,
-            },
-          });
-          toast.success("Invoice updated");
-          setInvoiceOpen(false);
-        }}
-      >
-        {selectedInvoice ? (
-          <div className="grid gap-3 rounded-2xl bg-muted p-4 sm:grid-cols-3">
-            <div>
-              <p className="text-xs text-muted-foreground">Client</p>
-              <p className="font-bold">{parentName(selectedInvoice.parent_id)}</p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Invoice total</p>
-              <p className="font-bold">{money(selectedInvoice.total)}</p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Balance due</p>
-              <p className="font-bold">{money(selectedInvoice.balance_due)}</p>
-            </div>
-          </div>
-        ) : null}
-        <SelectField
-          label="Status"
-          value={invoiceEdit.status}
-          onChange={(value) => setInvoiceEdit({ ...invoiceEdit, status: value })}
-          options={[
-            { value: "draft", label: "Draft" },
-            { value: "approved", label: "Approved" },
-            { value: "sent", label: "Sent" },
-            { value: "paid", label: "Paid" },
-            { value: "void", label: "Void" },
-          ]}
-        />
-        <TextField
-          label="Due date"
-          type="date"
-          value={invoiceEdit.due_date}
-          onChange={(value) => setInvoiceEdit({ ...invoiceEdit, due_date: value })}
-        />
-        <TextAreaField
-          label="Notes"
-          value={invoiceEdit.notes}
-          onChange={(value) => setInvoiceEdit({ ...invoiceEdit, notes: value })}
-        />
-        {selectedInvoice ? (
-          <div className="overflow-x-auto rounded-2xl border border-border">
-            <table className="w-full min-w-[620px] text-left text-sm">
-              <thead className="bg-muted text-xs text-muted-foreground">
-                <tr>
-                  <th className="px-4 py-3">Student</th>
-                  <th className="px-4 py-3">Description</th>
-                  <th className="px-4 py-3 text-right">Qty</th>
-                  <th className="px-4 py-3 text-right">Rate</th>
-                  <th className="px-4 py-3 text-right">Amount</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {(invoiceItems.data ?? [])
-                  .filter((item) => item.invoice_id === selectedInvoice.id)
-                  .map((item) => (
-                    <tr key={item.id}>
-                      <td className="px-4 py-3">{studentName(item.student_id)}</td>
-                      <td className="px-4 py-3">{item.description}</td>
-                      <td className="px-4 py-3 text-right">{item.quantity}</td>
-                      <td className="px-4 py-3 text-right">{money(item.unit_price)}</td>
-                      <td className="px-4 py-3 text-right font-bold">{money(item.line_total)}</td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
-          </div>
-        ) : null}
-      </FormDialog>
-
-      <FormDialog
         open={productOpen}
         onOpenChange={setProductOpen}
         title={editingProductId ? "Edit product or service" : "Add product or service"}
@@ -2346,5 +2277,334 @@ function ParentPayments() {
         plans={(billingPlans.data ?? []).filter((plan) => plan.active)}
       />
     </Page>
+  );
+}
+
+type InvoiceEditState = { status: string; due_date: string; notes: string };
+
+function InvoiceSplitWorkspace({
+  invoices,
+  invoiceItems,
+  selectedInvoice,
+  edit,
+  onEditChange,
+  parentName,
+  parentEmail,
+  studentName,
+  onSelect,
+  onClose,
+  onNew,
+  onDelete,
+  onSave,
+  saving,
+}: {
+  invoices: Row<"billing_invoices">[];
+  invoiceItems: Row<"billing_invoice_items">[];
+  selectedInvoice: Row<"billing_invoices">;
+  edit: InvoiceEditState;
+  onEditChange: (value: InvoiceEditState) => void;
+  parentName: (id: string | null) => string;
+  parentEmail: (id: string | null) => string;
+  studentName: (id: string | null) => string;
+  onSelect: (invoice: Row<"billing_invoices">) => void;
+  onClose: () => void;
+  onNew: () => void;
+  onDelete: () => void;
+  onSave: () => Promise<void>;
+  saving: boolean;
+}) {
+  const lines = invoiceItems.filter((item) => item.invoice_id === selectedInvoice.id);
+  const clientName = parentName(selectedInvoice.parent_id);
+  const clientEmail = parentEmail(selectedInvoice.parent_id);
+  const paid = edit.status === "paid";
+
+  return (
+    <section className="-mx-4 -mb-6 overflow-hidden border-y border-border bg-card sm:-mx-6 lg:-mx-8 lg:rounded-xl lg:border">
+      <div className="grid min-h-[calc(100dvh-var(--app-header-height)-8.75rem)] grid-cols-1 lg:grid-cols-[320px_minmax(0,1fr)]">
+        <aside className="hidden min-h-0 border-r border-border bg-background lg:flex lg:flex-col">
+          <div className="flex h-14 shrink-0 items-center justify-between border-b border-border px-4">
+            <div>
+              <h2 className="font-extrabold">All invoices</h2>
+              <p className="text-[11px] text-muted-foreground">{invoices.length} shown</p>
+            </div>
+            <Button size="icon" className="h-9 w-9" onClick={onNew} aria-label="New invoice">
+              <Plus className="h-4 w-4" />
+            </Button>
+          </div>
+          <div className="min-h-0 flex-1 divide-y divide-border overflow-y-auto">
+            {invoices.map((invoice) => {
+              const isSelected = invoice.id === selectedInvoice.id;
+              return (
+                <button
+                  key={invoice.id}
+                  type="button"
+                  onClick={() => onSelect(invoice)}
+                  className={`w-full px-4 py-3 text-left transition-colors ${
+                    isSelected ? "bg-secondary" : "hover:bg-muted/60"
+                  }`}
+                >
+                  <div className="flex items-start gap-2">
+                    <Avatar
+                      initials={initialsOf(parentName(invoice.parent_id))}
+                      tone={avatarTone(parentName(invoice.parent_id))}
+                      size="sm"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="truncate text-sm font-bold">
+                          {parentName(invoice.parent_id)}
+                        </p>
+                        <p className="shrink-0 text-sm font-extrabold">{money(invoice.total)}</p>
+                      </div>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {invoice.invoice_number} ·{" "}
+                        {prettyDate(invoice.issue_date ?? invoice.created_at.slice(0, 10))}
+                      </p>
+                      <p
+                        className={`mt-1 text-[10px] font-extrabold uppercase ${invoice.status === "paid" ? "text-emerald-600" : invoice.status === "draft" ? "text-muted-foreground" : "text-amber-600"}`}
+                      >
+                        {invoice.status}
+                      </p>
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </aside>
+
+        <div className="min-w-0 bg-muted/35">
+          <div className="sticky top-[var(--app-header-height)] z-20 border-b border-border bg-background/95 backdrop-blur">
+            <div className="flex h-14 items-center gap-2 px-3 sm:px-4">
+              <button
+                type="button"
+                onClick={onClose}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground lg:hidden"
+                aria-label="Back to all invoices"
+              >
+                <X className="h-5 w-5" />
+              </button>
+              <div className="min-w-0 flex-1">
+                <h2 className="truncate text-lg font-extrabold">
+                  {selectedInvoice.invoice_number}
+                </h2>
+                <p className="truncate text-xs text-muted-foreground">
+                  {clientName} · {money(selectedInvoice.total)}
+                </p>
+              </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                className="hidden sm:flex"
+                onClick={() => window.print()}
+              >
+                <Printer className="h-4 w-4" /> PDF/Print
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="hidden h-9 w-9 lg:flex"
+                onClick={onClose}
+                aria-label="Close invoice"
+              >
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+            <div className="flex items-end gap-2 overflow-x-auto border-t border-border px-3 py-2 sm:px-4">
+              <label className="shrink-0">
+                <span className="sr-only">Invoice status</span>
+                <select
+                  value={edit.status}
+                  onChange={(event) => onEditChange({ ...edit, status: event.target.value })}
+                  className="h-9 rounded-lg border border-input bg-background px-3 text-xs font-bold"
+                >
+                  <option value="draft">Draft</option>
+                  <option value="approved">Approved</option>
+                  <option value="sent">Sent</option>
+                  <option value="paid">Paid</option>
+                  <option value="void">Void</option>
+                </select>
+              </label>
+              <label className="shrink-0">
+                <span className="sr-only">Due date</span>
+                <input
+                  type="date"
+                  value={edit.due_date}
+                  onChange={(event) => onEditChange({ ...edit, due_date: event.target.value })}
+                  className="h-9 rounded-lg border border-input bg-background px-3 text-xs"
+                />
+              </label>
+              <Button size="sm" onClick={() => void onSave()} disabled={saving}>
+                <Save className="h-4 w-4" /> {saving ? "Saving…" : "Save"}
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="shrink-0"
+                onClick={() => {
+                  window.location.href = `mailto:${clientEmail}?subject=${encodeURIComponent(`Invoice ${selectedInvoice.invoice_number}`)}`;
+                }}
+              >
+                <Mail className="h-4 w-4" /> Email
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="shrink-0 sm:hidden"
+                onClick={() => window.print()}
+              >
+                <Printer className="h-4 w-4" /> Print
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="ml-auto h-9 w-9 shrink-0 text-destructive"
+                onClick={onDelete}
+                aria-label="Delete invoice"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+
+          <div className="mx-auto max-w-5xl p-3 sm:p-5 lg:p-8">
+            <div className="mb-3 rounded-xl border border-border bg-background px-4 py-3">
+              <label className="text-xs font-bold text-muted-foreground" htmlFor="invoice-notes">
+                Internal notes
+              </label>
+              <textarea
+                id="invoice-notes"
+                value={edit.notes}
+                onChange={(event) => onEditChange({ ...edit, notes: event.target.value })}
+                placeholder="Add an internal note"
+                rows={2}
+                className="mt-1 w-full resize-y bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+              />
+            </div>
+
+            <article className="relative mx-auto min-h-[720px] max-w-4xl overflow-hidden border border-border bg-white p-6 text-slate-900 shadow-sm sm:p-10 lg:p-14">
+              <div
+                className={`absolute top-6 -left-12 w-44 -rotate-45 py-1 text-center text-xs font-bold text-white ${paid ? "bg-emerald-500" : edit.status === "void" ? "bg-slate-500" : "bg-primary"}`}
+              >
+                {edit.status.toUpperCase()}
+              </div>
+              <header className="flex items-start justify-between gap-6 border-b border-slate-200 pb-8">
+                <div>
+                  <p className="text-xl font-black text-primary">ProgressTutors</p>
+                  <p className="mt-2 text-xs leading-5 text-slate-500">
+                    Progressay Impact CIC
+                    <br />
+                    196 Freston Road
+                    <br />
+                    London W10 6TT
+                    <br />
+                    moktar@progressay.com
+                  </p>
+                </div>
+                <div className="text-right">
+                  <h1 className="text-4xl font-light">Invoice</h1>
+                  <p className="mt-2 text-sm font-bold">{selectedInvoice.invoice_number}</p>
+                  <p className="mt-7 text-xs text-slate-500">Balance due</p>
+                  <p className="text-xl font-extrabold">
+                    {money(paid ? 0 : selectedInvoice.balance_due)}
+                  </p>
+                </div>
+              </header>
+
+              <div className="grid gap-8 py-8 sm:grid-cols-2">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
+                    Bill to
+                  </p>
+                  <Link
+                    to="/admin/parents/$id"
+                    params={{ id: selectedInvoice.parent_id }}
+                    className="mt-2 block font-bold text-primary hover:underline"
+                  >
+                    {clientName}
+                  </Link>
+                  <p className="text-sm text-slate-500">{clientEmail}</p>
+                </div>
+                <dl className="grid grid-cols-2 gap-x-5 gap-y-2 text-sm sm:justify-self-end">
+                  <dt className="text-slate-500">Invoice date</dt>
+                  <dd className="text-right font-semibold">
+                    {prettyDate(
+                      selectedInvoice.issue_date ?? selectedInvoice.created_at.slice(0, 10),
+                    )}
+                  </dd>
+                  <dt className="text-slate-500">Due date</dt>
+                  <dd className="text-right font-semibold">
+                    {edit.due_date ? prettyDate(edit.due_date) : "Not set"}
+                  </dd>
+                  <dt className="text-slate-500">Status</dt>
+                  <dd className="text-right font-semibold capitalize">{edit.status}</dd>
+                </dl>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[540px] text-left text-sm">
+                  <thead className="bg-slate-100 text-xs uppercase text-slate-500">
+                    <tr>
+                      <th className="px-4 py-3">Student / description</th>
+                      <th className="px-4 py-3 text-right">Qty</th>
+                      <th className="px-4 py-3 text-right">Rate</th>
+                      <th className="px-4 py-3 text-right">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200">
+                    {lines.length ? (
+                      lines.map((item) => (
+                        <tr key={item.id}>
+                          <td className="px-4 py-4">
+                            <p className="font-semibold">{studentName(item.student_id)}</p>
+                            <p className="text-xs text-slate-500">{item.description}</p>
+                          </td>
+                          <td className="px-4 py-4 text-right">{item.quantity}</td>
+                          <td className="px-4 py-4 text-right">{money(item.unit_price)}</td>
+                          <td className="px-4 py-4 text-right font-bold">
+                            {money(item.line_total)}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={4} className="px-4 py-10 text-center text-slate-400">
+                          No detailed line items are stored for this imported invoice.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="ml-auto mt-8 w-full max-w-xs space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Subtotal</span>
+                  <span>{money(selectedInvoice.subtotal)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Tax</span>
+                  <span>{money(selectedInvoice.tax_total)}</span>
+                </div>
+                <div className="flex justify-between border-t border-slate-300 pt-3 text-base font-extrabold">
+                  <span>Total</span>
+                  <span>{money(selectedInvoice.total)}</span>
+                </div>
+                <div className="flex justify-between rounded-md bg-rose-50 px-3 py-2 font-extrabold text-primary">
+                  <span>Amount due</span>
+                  <span>{money(paid ? 0 : selectedInvoice.balance_due)}</span>
+                </div>
+              </div>
+              {edit.notes ? (
+                <div className="mt-10 border-t border-slate-200 pt-5">
+                  <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Notes</p>
+                  <p className="mt-2 whitespace-pre-wrap text-sm text-slate-600">{edit.notes}</p>
+                </div>
+              ) : null}
+            </article>
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }
