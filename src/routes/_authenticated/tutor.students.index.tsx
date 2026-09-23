@@ -63,14 +63,15 @@ function TutorStudents() {
     if (!form.class_id || !form.first_name.trim()) return;
     setSaving(true);
     try {
+      const optional = (value: string) => (value.trim() ? { value: value.trim() } : null);
       const { error } = await supabase.rpc("add_student_to_tutor_class", {
         p_class_id: form.class_id,
         p_first_name: form.first_name.trim(),
-        p_last_name: form.last_name.trim() || undefined,
-        p_year_group: form.year_group.trim() || undefined,
-        p_school: form.school.trim() || undefined,
-        p_date_of_birth: form.date_of_birth || undefined,
-        p_notes: form.notes.trim() || undefined,
+        ...(optional(form.last_name) && { p_last_name: form.last_name.trim() }),
+        ...(optional(form.year_group) && { p_year_group: form.year_group.trim() }),
+        ...(optional(form.school) && { p_school: form.school.trim() }),
+        ...(optional(form.date_of_birth) && { p_date_of_birth: form.date_of_birth.trim() }),
+        ...(optional(form.notes) && { p_notes: form.notes.trim() }),
       });
       if (error) throw error;
       await invalidate("students", "class_enrolments");
