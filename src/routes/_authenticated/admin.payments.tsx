@@ -10,9 +10,9 @@ import {
   Download,
   ExternalLink,
   FileText,
-  Filter,
   LayoutDashboard,
   ListFilter,
+  MoreHorizontal,
   PackageOpen,
   Plus,
   RotateCcw,
@@ -26,7 +26,7 @@ import { Page } from "@/components/AppShell";
 import { FamilyInvoiceDialog } from "@/components/family-invoice-dialog";
 import { PaymentDocumentDialog } from "@/components/payment-document-dialog";
 import { ZohoSyncPanel } from "@/components/zoho-sync-panel";
-import { Avatar, Empty, PageHeader, Pill, Section, StatCard, avatarTone } from "@/components/kit";
+import { Avatar, Empty, Pill, Section, StatCard, avatarTone } from "@/components/kit";
 import { FormDialog, SelectField, TextAreaField, TextField } from "@/components/form-kit";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -104,6 +104,8 @@ function ParentPayments() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [view, setView] = useState<PaymentView>("invoices");
   const [invoiceLimit, setInvoiceLimit] = useState(10);
+  const [invoiceFilter, setInvoiceFilter] = useState<"all" | "draft" | "unpaid">("all");
+  const [moreOpen, setMoreOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
   const [subscriptionOpen, setSubscriptionOpen] = useState(false);
@@ -195,7 +197,12 @@ function ParentPayments() {
       const haystack = `${invoice.invoice_number ?? ""} ${parentName(invoice.parent_id)} ${lines
         .map((line) => studentName(line.student_id))
         .join(" ")}`.toLowerCase();
-      return query === "" || haystack.includes(query.toLowerCase());
+      const matchesQuery = query === "" || haystack.includes(query.toLowerCase());
+      const matchesStatus =
+        invoiceFilter === "all" ||
+        (invoiceFilter === "draft" && invoice.status === "draft") ||
+        (invoiceFilter === "unpaid" && invoice.status !== "paid");
+      return matchesQuery && matchesStatus;
     })
     .slice()
     .reverse();
@@ -247,43 +254,111 @@ function ParentPayments() {
   }
 
   return (
-    <Page>
-      <PageHeader
-        title="Payments"
-        subtitle="Manage money coming in from parents and requests from tutors."
-        actions={
-          <>
-            <Button variant="secondary" onClick={() => setDocumentOpen(true)}>
-              <FileText className="h-4 w-4" /> Documents
-            </Button>
-            <Button onClick={() => setFamilyInvoiceOpen(true)}>
-              <Plus className="h-4 w-4" /> New family invoice
-            </Button>
-          </>
-        }
-      />
-
-      <div className="sticky top-[calc(var(--app-header-height)+77px)] z-20 -mx-4 border-b border-border bg-background/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
-        <div className="flex items-center gap-2">
-          <div className="relative min-w-0 flex-1 sm:max-w-xl">
+    <Page className="pt-0 sm:pt-0">
+      <div className="sticky top-[var(--app-header-height)] z-30 -mx-4 border-b border-border bg-background/95 px-4 py-2 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+        <div className="relative flex items-center gap-2">
+          <h1 className="hidden shrink-0 text-xl font-extrabold lg:block">Payments</h1>
+          <div className="relative min-w-0 flex-1 lg:ml-4 lg:max-w-xl">
             <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search invoices, clients or students"
-              className="h-11 rounded-xl bg-muted pl-9"
+              className="h-10 rounded-xl bg-muted pl-9"
             />
           </div>
           <Button
+            size="icon"
+            aria-label="Create invoice"
+            onClick={() => setFamilyInvoiceOpen(true)}
+          >
+            <Plus className="h-5 w-5" />
+          </Button>
+          <Button
             variant="secondary"
             size="icon"
-            aria-label="Payment filters"
-            onClick={() => setFiltersOpen((open) => !open)}
+            aria-label="More payment options"
+            onClick={() => setMoreOpen((open) => !open)}
           >
-            <ListFilter className="h-4 w-4" />
+            <MoreHorizontal className="h-5 w-5" />
           </Button>
+          {moreOpen ? (
+            <div className="absolute top-[calc(100%+0.5rem)] right-0 z-50 w-64 rounded-2xl border border-border bg-card p-2 shadow-xl">
+              <p className="px-2 py-1 text-[10px] font-bold tracking-wide text-muted-foreground uppercase">
+                Payments
+              </p>
+              {PAYMENT_VIEWS.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => {
+                    setView(item.id);
+                    setMoreOpen(false);
+                  }}
+                  className={`flex w-full items-center justify-between rounded-lg px-2 py-2 text-left text-sm font-semibold ${
+                    view === item.id
+                      ? "bg-secondary text-primary"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  }`}
+                >
+                  {item.label}
+                  {view === item.id ? <Check className="h-4 w-4" /> : null}
+                </button>
+              ))}
+              <div className="my-1 border-t border-border" />
+              <button
+                type="button"
+                onClick={() => {
+                  setDocumentOpen(true);
+                  setMoreOpen(false);
+                }}
+                className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm font-semibold text-muted-foreground hover:bg-muted hover:text-foreground"
+              >
+                <FileText className="h-4 w-4" /> Create PDF document
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  exportTransactions();
+                  setMoreOpen(false);
+                }}
+                className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm font-semibold text-muted-foreground hover:bg-muted hover:text-foreground"
+              >
+                <Download className="h-4 w-4" /> Export CSV
+              </button>
+            </div>
+          ) : null}
         </div>
-        <nav className="mt-3 flex gap-1 overflow-x-auto pb-1" aria-label="Payments sections">
+        {view === "invoices" ? (
+          <div className="mt-2 flex items-center gap-2 md:hidden">
+            {(["draft", "unpaid", "all"] as const).map((item) => (
+              <button
+                key={item}
+                type="button"
+                onClick={() => setInvoiceFilter(item)}
+                className={`rounded-full px-3 py-1.5 text-xs font-bold capitalize ${
+                  invoiceFilter === item
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground"
+                }`}
+              >
+                {item}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => setFiltersOpen((open) => !open)}
+              className="ml-auto flex h-8 w-8 items-center justify-center rounded-full bg-muted text-muted-foreground"
+              aria-label="Invoice filters"
+            >
+              <ListFilter className="h-4 w-4" />
+            </button>
+          </div>
+        ) : null}
+        <nav
+          className="mt-2 hidden gap-1 overflow-x-auto pb-1 md:flex"
+          aria-label="Payments sections"
+        >
           {PAYMENT_VIEWS.map((item) => (
             <button
               key={item.id}
@@ -303,7 +378,7 @@ function ParentPayments() {
 
       {view === "invoices" ? (
         <div className="space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="hidden flex-wrap items-center justify-between gap-3 md:flex">
             <div>
               <h2 className="text-xl font-extrabold">All invoices</h2>
               <p className="text-sm text-muted-foreground">
@@ -323,7 +398,7 @@ function ParentPayments() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <div className="hidden grid-cols-2 gap-3 md:grid lg:grid-cols-4">
             <StatCard
               label="Outstanding"
               value={money(outstandingTotal)}
@@ -358,7 +433,78 @@ function ParentPayments() {
             />
           </div>
 
-          <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+          <div className="md:hidden">
+            <div className="mb-2 flex items-center justify-between">
+              <h2 className="text-xl font-extrabold">Invoices</h2>
+              <span className="text-xs font-semibold text-muted-foreground">
+                {filteredInvoices.length} total
+              </span>
+            </div>
+            {filteredInvoices.length === 0 ? (
+              <Empty>No invoices match this view.</Empty>
+            ) : (
+              <div className="divide-y divide-border">
+                {filteredInvoices.slice(0, invoiceLimit).map((invoice) => {
+                  const statusLabel =
+                    invoice.status === "paid"
+                      ? "Paid"
+                      : invoice.status === "draft"
+                        ? "Draft"
+                        : invoice.due_date && invoice.due_date < DEMO_DATE
+                          ? "Overdue"
+                          : "Unpaid";
+                  return (
+                    <article key={invoice.id} className="py-4 first:pt-1">
+                      <div className="flex items-start gap-3">
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-base font-extrabold">
+                            {parentName(invoice.parent_id)}
+                          </p>
+                          <p className="mt-1 text-sm text-muted-foreground">
+                            {prettyDate(String(invoice.created_at).slice(0, 10))} ·{" "}
+                            {invoice.invoice_number}
+                          </p>
+                          <p
+                            className={`mt-2 text-xs font-extrabold tracking-wide uppercase ${
+                              statusLabel === "Paid"
+                                ? "text-emerald-600"
+                                : statusLabel === "Overdue"
+                                  ? "text-rose-500"
+                                  : "text-muted-foreground"
+                            }`}
+                          >
+                            {statusLabel}
+                          </p>
+                        </div>
+                        <div className="shrink-0 text-right">
+                          <p className="text-base font-extrabold">{money(invoice.total)}</p>
+                          <button
+                            type="button"
+                            onClick={() => setDocumentOpen(true)}
+                            className="mt-3 rounded-full px-2 py-1 text-lg leading-none text-muted-foreground"
+                            aria-label={`Open actions for ${invoice.invoice_number}`}
+                          >
+                            <MoreHorizontal className="h-5 w-5" />
+                          </button>
+                        </div>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+            {invoiceLimit < filteredInvoices.length ? (
+              <Button
+                className="mt-3 w-full"
+                variant="secondary"
+                onClick={() => setInvoiceLimit((value) => value + 10)}
+              >
+                Load more
+              </Button>
+            ) : null}
+          </div>
+
+          <div className="hidden overflow-hidden rounded-2xl border border-border bg-card shadow-sm md:block">
             {filteredInvoices.length === 0 ? (
               <Empty>No invoices match this view.</Empty>
             ) : (
