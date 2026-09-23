@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   ArrowDownLeft,
+  ArrowDownUp,
   ArrowUpRight,
   Banknote,
   Boxes,
@@ -19,6 +20,7 @@ import {
   Search,
   UsersRound,
   WalletCards,
+  X,
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -105,6 +107,14 @@ function ParentPayments() {
   const [view, setView] = useState<PaymentView>("invoices");
   const [invoiceLimit, setInvoiceLimit] = useState(10);
   const [invoiceFilter, setInvoiceFilter] = useState<"all" | "draft" | "unpaid">("all");
+  const [invoiceSortOpen, setInvoiceSortOpen] = useState(false);
+  const [invoiceSort, setInvoiceSort] = useState<
+    "created" | "date" | "number" | "client" | "amount"
+  >("created");
+  const [invoiceSortDirection, setInvoiceSortDirection] = useState<"asc" | "desc">("desc");
+  const [subscriptionFilter, setSubscriptionFilter] = useState<"active" | "cancelled" | "all">(
+    "all",
+  );
   const [moreOpen, setMoreOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
@@ -205,11 +215,32 @@ function ParentPayments() {
       return matchesQuery && matchesStatus;
     })
     .slice()
-    .reverse();
+    .sort((a, b) => {
+      const values = {
+        created: [a.created_at, b.created_at],
+        date: [a.issue_date ?? a.created_at, b.issue_date ?? b.created_at],
+        number: [a.invoice_number, b.invoice_number],
+        client: [parentName(a.parent_id), parentName(b.parent_id)],
+        amount: [a.total, b.total],
+      }[invoiceSort];
+      const result =
+        typeof values[0] === "number"
+          ? Number(values[0]) - Number(values[1])
+          : String(values[0]).localeCompare(String(values[1]));
+      return invoiceSortDirection === "asc" ? result : -result;
+    });
+  const filteredSubscriptions = (subscriptions.data ?? []).filter((item) => {
+    const haystack = `${parentName(item.parent_id)} ${studentName(item.student_id)} ${
+      item.plan_name ?? ""
+    }`.toLowerCase();
+    const matchesQuery = query === "" || haystack.includes(query.toLowerCase());
+    const matchesStatus = subscriptionFilter === "all" || item.status === subscriptionFilter;
+    return matchesQuery && matchesStatus;
+  });
 
   function exportTransactions() {
     const rows = [
-      ["Parent", "Student", "Status", "Amount", "Date", "Reference"],
+      ["Client", "Student", "Status", "Amount", "Date", "Reference"],
       ...filteredPayments.map((item) => [
         parentName(item.parent_id),
         studentName(item.student_id),
@@ -246,6 +277,22 @@ function ParentPayments() {
     setPaymentOpen(true);
   }
 
+  function openPrimaryAction() {
+    if (view === "subscriptions") {
+      setSubscriptionOpen(true);
+      return;
+    }
+    if (view === "transactions") {
+      openPayment("received");
+      return;
+    }
+    if (view === "documents") {
+      setDocumentOpen(true);
+      return;
+    }
+    setFamilyInvoiceOpen(true);
+  }
+
   function calculatedAmount(planId: string, weeklyHours: string, cadence: string) {
     const plan = (plans.data ?? []).find((item) => item.id === planId);
     if (!plan) return "";
@@ -263,14 +310,26 @@ function ParentPayments() {
             <Input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search invoices, clients or students"
+              placeholder={
+                view === "subscriptions"
+                  ? "Search subscriptions, clients or students"
+                  : "Search invoices, clients or students"
+              }
               className="h-10 rounded-xl bg-muted pl-9"
             />
           </div>
           <Button
             size="icon"
-            aria-label="Create invoice"
-            onClick={() => setFamilyInvoiceOpen(true)}
+            aria-label={
+              view === "subscriptions"
+                ? "Add subscription"
+                : view === "transactions"
+                  ? "Record payment"
+                  : view === "documents"
+                    ? "Create document"
+                    : "Create invoice"
+            }
+            onClick={openPrimaryAction}
           >
             <Plus className="h-5 w-5" />
           </Button>
@@ -353,6 +412,35 @@ function ParentPayments() {
             >
               <ListFilter className="h-4 w-4" />
             </button>
+            <button
+              type="button"
+              onClick={() => setInvoiceSortOpen(true)}
+              className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-muted-foreground"
+              aria-label="Sort invoices"
+            >
+              <ArrowDownUp className="h-4 w-4" />
+            </button>
+          </div>
+        ) : null}
+        {view === "subscriptions" ? (
+          <div className="mt-2 flex items-center gap-2 md:hidden">
+            {(["active", "cancelled", "all"] as const).map((item) => (
+              <button
+                key={item}
+                type="button"
+                onClick={() => setSubscriptionFilter(item)}
+                className={`rounded-full px-3 py-1.5 text-xs font-bold capitalize ${
+                  subscriptionFilter === item
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground"
+                }`}
+              >
+                {item}
+              </button>
+            ))}
+            <span className="ml-auto text-xs font-semibold text-muted-foreground">
+              {filteredSubscriptions.length} total
+            </span>
           </div>
         ) : null}
         <nav
@@ -433,6 +521,76 @@ function ParentPayments() {
             />
           </div>
 
+          <div className="grid grid-cols-4 gap-1.5 md:hidden">
+            {[
+              {
+                label: "Outstanding",
+                value: money(
+                  allInvoices
+                    .filter((item) => item.status !== "paid")
+                    .reduce((sum, item) => sum + num(item.balance_due), 0),
+                ),
+                tone: "bg-tile-blue text-tile-blue-ink",
+              },
+              {
+                label: "Overdue",
+                value: money(
+                  allInvoices
+                    .filter(
+                      (item) =>
+                        item.status !== "paid" && item.due_date && item.due_date < DEMO_DATE,
+                    )
+                    .reduce((sum, item) => sum + num(item.balance_due), 0),
+                ),
+                tone: "bg-tile-amber text-tile-amber-ink",
+              },
+              {
+                label: "Paid",
+                value: money(allInvoices.reduce((sum, item) => sum + num(item.amount_paid), 0)),
+                tone: "bg-tile-green text-tile-green-ink",
+              },
+              {
+                label: "Drafts",
+                value: String(draftInvoices.length),
+                tone: "bg-tile-purple text-tile-purple-ink",
+              },
+            ].map((item) => (
+              <div key={item.label} className={`min-w-0 rounded-xl px-2 py-2.5 ${item.tone}`}>
+                <p className="truncate text-sm font-black">{item.value}</p>
+                <p className="mt-0.5 truncate text-[8px] font-extrabold tracking-wide uppercase">
+                  {item.label}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          <section className="rounded-2xl border border-border bg-card p-3 md:hidden">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-extrabold">Revenue over time</h3>
+                <p className="text-[10px] text-muted-foreground">Payments received</p>
+              </div>
+              <span className="text-xs font-extrabold text-primary">{money(receivedTotal)}</span>
+            </div>
+            {revenueSeries.length === 0 ? (
+              <p className="py-4 text-center text-xs text-muted-foreground">No revenue data yet.</p>
+            ) : (
+              <div className="mt-3 flex h-20 items-end gap-2">
+                {revenueSeries.map(([month, value]) => (
+                  <div key={month} className="flex h-full flex-1 flex-col justify-end gap-1">
+                    <div
+                      className="w-full rounded-t-md bg-primary/80"
+                      style={{ height: `${Math.max(8, (value / revenueMax) * 56)}px` }}
+                    />
+                    <span className="truncate text-center text-[8px] text-muted-foreground">
+                      {month.slice(5)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+
           <div className="md:hidden">
             <div className="mb-2 flex items-center justify-between">
               <h2 className="text-xl font-extrabold">Invoices</h2>
@@ -445,6 +603,14 @@ function ParentPayments() {
             ) : (
               <div className="divide-y divide-border">
                 {filteredInvoices.slice(0, invoiceLimit).map((invoice) => {
+                  const children = Array.from(
+                    new Set(
+                      (invoiceItems.data ?? [])
+                        .filter((line) => line.invoice_id === invoice.id)
+                        .map((line) => line.student_id)
+                        .filter(Boolean),
+                    ),
+                  );
                   const statusLabel =
                     invoice.status === "paid"
                       ? "Paid"
@@ -457,13 +623,26 @@ function ParentPayments() {
                     <article key={invoice.id} className="py-4 first:pt-1">
                       <div className="flex items-start gap-3">
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-base font-extrabold">
+                          <Link
+                            to="/admin/parents/$id"
+                            params={{ id: invoice.parent_id }}
+                            className="block truncate text-base font-extrabold hover:text-primary"
+                          >
                             {parentName(invoice.parent_id)}
-                          </p>
+                          </Link>
                           <p className="mt-1 text-sm text-muted-foreground">
                             {prettyDate(String(invoice.created_at).slice(0, 10))} ·{" "}
                             {invoice.invoice_number}
                           </p>
+                          {children.length ? (
+                            <div className="mt-2 flex flex-wrap gap-1">
+                              {children.map((studentId) => (
+                                <Pill key={studentId} tone="neutral">
+                                  {studentName(studentId)}
+                                </Pill>
+                              ))}
+                            </div>
+                          ) : null}
                           <p
                             className={`mt-2 text-xs font-extrabold tracking-wide uppercase ${
                               statusLabel === "Paid"
@@ -541,7 +720,13 @@ function ParentPayments() {
                             {invoice.invoice_number}
                           </td>
                           <td className="px-4 py-3 font-semibold">
-                            {parentName(invoice.parent_id)}
+                            <Link
+                              to="/admin/parents/$id"
+                              params={{ id: invoice.parent_id }}
+                              className="hover:text-primary hover:underline"
+                            >
+                              {parentName(invoice.parent_id)}
+                            </Link>
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex flex-wrap gap-1">
@@ -755,7 +940,7 @@ function ParentPayments() {
         <Section
           id="payment-clients"
           title="Clients"
-          subtitle={`${allParents.length} parent billing accounts`}
+          subtitle={`${allParents.length} client billing accounts`}
           action={
             <Button size="sm" variant="secondary" asChild>
               <Link to="/admin/parents">
@@ -788,7 +973,13 @@ function ParentPayments() {
                         tone={avatarTone(fullName(parent))}
                       />
                       <div className="min-w-0">
-                        <h3 className="truncate font-bold">{fullName(parent)}</h3>
+                        <Link
+                          to="/admin/parents/$id"
+                          params={{ id: parent.id }}
+                          className="block truncate font-bold hover:text-primary hover:underline"
+                        >
+                          {fullName(parent)}
+                        </Link>
                         <p className="truncate text-xs text-muted-foreground">
                           {parent.email ?? parent.phone ?? "No contact details"}
                         </p>
@@ -825,69 +1016,146 @@ function ParentPayments() {
       ) : null}
 
       {view === "subscriptions" ? (
-        <Section
-          id="payment-subscriptions"
-          title="Subscriptions"
-          subtitle="Recurring plans agreed with parents"
-          action={
-            <Button size="sm" onClick={() => setSubscriptionOpen(true)}>
-              <Plus className="h-4 w-4" /> Add subscription
-            </Button>
-          }
-        >
-          {activeSubscriptions.length === 0 ? (
-            <Empty>No active subscriptions yet.</Empty>
-          ) : (
-            <div className="grid gap-3 lg:grid-cols-2">
-              {(subscriptions.data ?? []).map((item) => (
-                <article key={item.id} className="rounded-2xl border border-border p-4">
-                  <div className="flex items-start gap-3">
-                    <Avatar
-                      initials={initialsOf(parentName(item.parent_id))}
-                      tone={avatarTone(parentName(item.parent_id))}
-                    />
-                    <div className="min-w-0 flex-1">
-                      <h3 className="font-bold">{parentName(item.parent_id)}</h3>
-                      <p className="text-xs text-muted-foreground">
-                        {studentName(item.student_id)} · {item.plan_name ?? "Subscription"}
-                      </p>
+        <div className="space-y-4">
+          <div className="md:hidden">
+            <h2 className="mb-2 text-xl font-extrabold">Subscriptions</h2>
+            {filteredSubscriptions.length === 0 ? (
+              <Empty>No subscriptions match this view.</Empty>
+            ) : (
+              <div className="divide-y divide-border">
+                {filteredSubscriptions.map((item) => (
+                  <article key={item.id} className="py-4 first:pt-1">
+                    <div className="flex items-start gap-3">
+                      <div className="min-w-0 flex-1">
+                        <Link
+                          to="/admin/parents/$id"
+                          params={{ id: item.parent_id }}
+                          className="block truncate text-base font-extrabold hover:text-primary"
+                        >
+                          {parentName(item.parent_id)}
+                        </Link>
+                        <p className="mt-1 truncate text-sm text-muted-foreground">
+                          {studentName(item.student_id)} · {item.plan_name ?? "Subscription"}
+                        </p>
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          {item.next_due_date
+                            ? `Next due ${prettyDate(item.next_due_date)}`
+                            : "No due date"}
+                        </p>
+                        <p
+                          className={`mt-2 text-xs font-extrabold tracking-wide uppercase ${
+                            item.status === "active"
+                              ? "text-emerald-600"
+                              : item.status === "cancelled"
+                                ? "text-rose-500"
+                                : "text-muted-foreground"
+                          }`}
+                        >
+                          {item.status}
+                        </p>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <p className="text-base font-extrabold">{money(item.amount)}</p>
+                        <p className="text-xs text-muted-foreground">
+                          /{item.cadence.replace("_", " ")}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            updateSubscription.mutate(
+                              {
+                                id: item.id,
+                                values: { status: item.status === "active" ? "paused" : "active" },
+                              },
+                              { onSuccess: () => toast.success("Subscription updated") },
+                            )
+                          }
+                          className="mt-3 text-sm font-bold text-primary"
+                        >
+                          {item.status === "active" ? "Pause" : "Resume"}
+                        </button>
+                      </div>
                     </div>
-                    <Pill tone={item.status === "active" ? "green" : "neutral"}>{item.status}</Pill>
-                  </div>
-                  <div className="mt-4 flex items-end justify-between border-t border-border pt-3">
-                    <div>
-                      <strong className="text-lg">{money(item.amount)}</strong>
-                      <span className="text-xs text-muted-foreground">
-                        {" "}
-                        / {item.cadence.replace("_", " ")}
-                      </span>
-                      <p className="text-xs text-muted-foreground">
-                        {item.next_due_date
-                          ? `Next due ${prettyDate(item.next_due_date)}`
-                          : "No due date"}
-                      </p>
-                    </div>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() =>
-                        updateSubscription.mutate(
-                          {
-                            id: item.id,
-                            values: { status: item.status === "active" ? "paused" : "active" },
-                          },
-                          { onSuccess: () => toast.success("Subscription updated") },
-                        )
-                      }
-                    >
-                      {item.status === "active" ? "Pause" : "Resume"}
-                    </Button>
-                  </div>
-                </article>
-              ))}
-            </div>
-          )}
-        </Section>
+                  </article>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="hidden md:block">
+            <Section
+              id="payment-subscriptions"
+              title="Subscriptions"
+              subtitle="Recurring plans agreed with clients"
+              action={
+                <Button size="sm" onClick={() => setSubscriptionOpen(true)}>
+                  <Plus className="h-4 w-4" /> Add subscription
+                </Button>
+              }
+            >
+              {filteredSubscriptions.length === 0 ? (
+                <Empty>No subscriptions match this view.</Empty>
+              ) : (
+                <div className="grid gap-3 lg:grid-cols-2">
+                  {filteredSubscriptions.map((item) => (
+                    <article key={item.id} className="rounded-2xl border border-border p-4">
+                      <div className="flex items-start gap-3">
+                        <Avatar
+                          initials={initialsOf(parentName(item.parent_id))}
+                          tone={avatarTone(parentName(item.parent_id))}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <Link
+                            to="/admin/parents/$id"
+                            params={{ id: item.parent_id }}
+                            className="font-bold hover:text-primary hover:underline"
+                          >
+                            {parentName(item.parent_id)}
+                          </Link>
+                          <p className="text-xs text-muted-foreground">
+                            {studentName(item.student_id)} · {item.plan_name ?? "Subscription"}
+                          </p>
+                        </div>
+                        <Pill tone={item.status === "active" ? "green" : "neutral"}>
+                          {item.status}
+                        </Pill>
+                      </div>
+                      <div className="mt-4 flex items-end justify-between border-t border-border pt-3">
+                        <div>
+                          <strong className="text-lg">{money(item.amount)}</strong>
+                          <span className="text-xs text-muted-foreground">
+                            {" "}
+                            / {item.cadence.replace("_", " ")}
+                          </span>
+                          <p className="text-xs text-muted-foreground">
+                            {item.next_due_date
+                              ? `Next due ${prettyDate(item.next_due_date)}`
+                              : "No due date"}
+                          </p>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() =>
+                            updateSubscription.mutate(
+                              {
+                                id: item.id,
+                                values: { status: item.status === "active" ? "paused" : "active" },
+                              },
+                              { onSuccess: () => toast.success("Subscription updated") },
+                            )
+                          }
+                        >
+                          {item.status === "active" ? "Pause" : "Resume"}
+                        </Button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </Section>
+          </div>
+        </div>
       ) : null}
 
       {view === "transactions" ? (
@@ -1038,7 +1306,7 @@ function ParentPayments() {
             <span className="min-w-0 flex-1">
               <span className="block font-bold">Create and preview a PDF</span>
               <span className="block text-xs text-muted-foreground">
-                Choose a parent and student, edit every field and download.
+                Choose a client and student, edit every field and download.
               </span>
             </span>
             <span className="text-sm font-bold text-primary">Create</span>
@@ -1077,6 +1345,64 @@ function ParentPayments() {
         </Section>
       ) : null}
 
+      {invoiceSortOpen ? (
+        <div className="fixed inset-0 z-[80] flex items-end justify-center bg-foreground/25 p-3 sm:items-center">
+          <div className="w-full max-w-md rounded-[2rem] bg-card p-5 shadow-2xl">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-extrabold">Sort by</h2>
+              <button
+                type="button"
+                onClick={() => setInvoiceSortOpen(false)}
+                className="flex h-10 w-10 items-center justify-center rounded-full bg-muted"
+                aria-label="Close sort options"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="mt-5 space-y-1">
+              {[
+                ["created", "Created time"],
+                ["date", "Invoice date"],
+                ["number", "Invoice number"],
+                ["client", "Client name"],
+                ["amount", "Amount"],
+              ].map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setInvoiceSort(value as typeof invoiceSort)}
+                  className={`flex w-full items-center justify-between rounded-xl px-4 py-3 text-left font-semibold ${
+                    invoiceSort === value ? "border border-primary text-primary" : "hover:bg-muted"
+                  }`}
+                >
+                  {label}
+                  {invoiceSort === value ? (
+                    <span className="text-xs">
+                      {invoiceSortDirection === "desc" ? "New to old" : "Old to new"}
+                    </span>
+                  ) : null}
+                </button>
+              ))}
+            </div>
+            <div className="mt-5 flex items-center gap-2 border-t border-border pt-4">
+              <Button
+                variant="secondary"
+                className="flex-1"
+                onClick={() =>
+                  setInvoiceSortDirection((direction) => (direction === "desc" ? "asc" : "desc"))
+                }
+              >
+                <ArrowDownUp className="h-4 w-4" />
+                {invoiceSortDirection === "desc" ? "Descending" : "Ascending"}
+              </Button>
+              <Button className="flex-1" onClick={() => setInvoiceSortOpen(false)}>
+                Apply
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <FormDialog
         open={subscriptionOpen}
         onOpenChange={setSubscriptionOpen}
@@ -1086,7 +1412,7 @@ function ParentPayments() {
         busy={addSubscription.isPending}
         onSubmit={async () => {
           if (!subscription.parent_id || !subscription.amount) {
-            toast.error("Choose a parent and enter an amount");
+            toast.error("Choose a client and enter an amount");
             return;
           }
           const plan = (plans.data ?? []).find((item) => item.id === subscription.pricing_plan_id);
@@ -1107,11 +1433,11 @@ function ParentPayments() {
         }}
       >
         <SelectField
-          label="Parent"
+          label="Client"
           value={subscription.parent_id}
           onChange={(value) => setSubscription({ ...subscription, parent_id: value })}
           options={[
-            { value: "", label: "Choose parent" },
+            { value: "", label: "Choose client" },
             ...(parents.data ?? []).map((item) => ({ value: item.id, label: fullName(item) })),
           ]}
         />
@@ -1217,17 +1543,17 @@ function ParentPayments() {
       <FormDialog
         open={paymentOpen}
         onOpenChange={setPaymentOpen}
-        title={paymentMode === "invoice" ? "Create invoice" : "Record parent payment"}
+        title={paymentMode === "invoice" ? "Create invoice" : "Record client payment"}
         description={
           paymentMode === "invoice"
-            ? "Add an amount due from a parent."
+            ? "Add an amount due from a client."
             : "Record money that has already been received."
         }
         submitLabel={paymentMode === "invoice" ? "Create invoice" : "Record payment"}
         busy={addPayment.isPending}
         onSubmit={async () => {
           if (!payment.parent_id || !payment.amount) {
-            toast.error("Choose a parent and enter an amount");
+            toast.error("Choose a client and enter an amount");
             return;
           }
           await addPayment.mutateAsync({
@@ -1250,11 +1576,11 @@ function ParentPayments() {
         }}
       >
         <SelectField
-          label="Parent"
+          label="Client"
           value={payment.parent_id}
           onChange={(value) => setPayment({ ...payment, parent_id: value })}
           options={[
-            { value: "", label: "Choose parent" },
+            { value: "", label: "Choose client" },
             ...(parents.data ?? []).map((item) => ({ value: item.id, label: fullName(item) })),
           ]}
         />
