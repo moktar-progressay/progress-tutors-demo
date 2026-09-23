@@ -1,8 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Check, ChevronDown, CircleHelp, Filter, WalletCards, X } from "lucide-react";
+import { Check, CircleHelp, Filter, WalletCards, X } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Page } from "@/components/AppShell";
+import { FilterDialog } from "@/components/filter-dialog";
 import { Avatar, Empty, PageHeader, Pill, Section, StatCard, avatarTone } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -125,43 +126,12 @@ function AdminPaymentRequests() {
         title="Tutor payment requests"
         subtitle="Review each request, approve it, then mark it paid"
         action={
-          <Button size="sm" variant="secondary" onClick={() => setFiltersOpen((open) => !open)}>
+          <Button size="sm" variant="secondary" onClick={() => setFiltersOpen(true)}>
             <Filter className="h-4 w-4" /> Filters
-            <ChevronDown className={`h-3.5 w-3.5 ${filtersOpen ? "rotate-180" : ""}`} />
+            {q || status !== "all" ? <span>1</span> : null}
           </Button>
         }
       >
-        {filtersOpen ? (
-          <div className="mb-4 grid gap-2 rounded-2xl bg-muted p-3 sm:grid-cols-[1fr_180px_auto]">
-            <Input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Search tutor or reference"
-              className="h-10 rounded-xl bg-card"
-            />
-            <select
-              value={status}
-              onChange={(e) => setStatus(e.target.value)}
-              className="h-10 rounded-xl border border-border bg-card px-3 text-sm font-medium"
-            >
-              <option value="all">All statuses</option>
-              <option value="submitted">Needs review</option>
-              <option value="approved">Approved</option>
-              <option value="paid">Paid</option>
-              <option value="queried">Query sent</option>
-              <option value="rejected">Declined</option>
-            </select>
-            <Button
-              variant="ghost"
-              onClick={() => {
-                setQ("");
-                setStatus("all");
-              }}
-            >
-              Clear
-            </Button>
-          </div>
-        ) : null}
         {rows.length === 0 ? (
           <Empty>No payment requests have been submitted yet.</Empty>
         ) : (
@@ -265,6 +235,42 @@ function AdminPaymentRequests() {
           </ul>
         )}
       </Section>
+
+      <FilterDialog
+        open={filtersOpen}
+        onOpenChange={setFiltersOpen}
+        title="Filter tutor requests"
+        description={`${rows.length} request${rows.length === 1 ? "" : "s"} match these filters.`}
+        onClear={() => {
+          setQ("");
+          setStatus("all");
+        }}
+      >
+        <label className="space-y-1.5 sm:col-span-2">
+          <span className="text-xs font-bold text-muted-foreground">Search</span>
+          <Input
+            value={q}
+            onChange={(event) => setQ(event.target.value)}
+            placeholder="Tutor or reference"
+            className="h-10 rounded-xl"
+          />
+        </label>
+        <label className="space-y-1.5 sm:col-span-2">
+          <span className="text-xs font-bold text-muted-foreground">Status</span>
+          <select
+            value={status}
+            onChange={(event) => setStatus(event.target.value)}
+            className="h-10 w-full rounded-xl border border-border bg-card px-3 text-sm font-medium"
+          >
+            <option value="all">All statuses</option>
+            <option value="submitted">Needs review</option>
+            <option value="approved">Approved</option>
+            <option value="paid">Paid</option>
+            <option value="queried">Query sent</option>
+            <option value="rejected">Declined</option>
+          </select>
+        </label>
+      </FilterDialog>
     </Page>
   );
 }

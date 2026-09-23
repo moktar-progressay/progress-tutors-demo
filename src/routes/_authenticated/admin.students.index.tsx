@@ -13,6 +13,8 @@ import {
 } from "@/components/form-kit";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { FilterDialog } from "@/components/filter-dialog";
+import { Filter } from "lucide-react";
 import {
   fullName,
   initialsOf,
@@ -85,6 +87,7 @@ function StudentsPage() {
   const [siteId, setSiteId] = useState("all");
   const [programmeId, setProgrammeId] = useState("all");
   const [classId, setClassId] = useState("all");
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<StudentRow | null>(null);
   const [studentPendingDelete, setStudentPendingDelete] = useState<StudentRow | null>(null);
@@ -98,7 +101,7 @@ function StudentsPage() {
   }, [add]);
 
   const rows = students.data ?? [];
-  const classList = classes.data ?? [];
+  const classList = useMemo(() => classes.data ?? [], [classes.data]);
   const enrolList = enrolments.data ?? [];
 
   const classIdsForFilters = useMemo(() => {
@@ -133,6 +136,19 @@ function StudentsPage() {
   const archived = rows.filter((s) => s.status === "archived").length;
   const enrolled = new Set(enrolList.filter((e) => e.status === "active").map((e) => e.student_id));
   const unassigned = rows.filter((s) => s.status === "active" && !enrolled.has(s.id)).length;
+  const activeFilterCount = [
+    status === "active" ? "all" : status,
+    siteId,
+    programmeId,
+    classId,
+  ].filter((value) => value !== "all").length;
+
+  function clearFilters() {
+    setStatus("active");
+    setSiteId("all");
+    setProgrammeId("all");
+    setClassId("all");
+  }
 
   function openNew() {
     setEditing(null);
@@ -231,13 +247,27 @@ function StudentsPage() {
         <StatCard label="Total records" value={String(rows.length)} tone="pink" />
       </div>
 
-      <div className="surface flex flex-wrap items-end gap-3 p-4">
+      <div className="surface flex items-center gap-2 p-3">
         <Input
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Search by name or email"
-          className="h-10 max-w-xs rounded-xl"
+          className="h-10 min-w-0 flex-1 rounded-xl sm:max-w-md"
         />
+        <Button variant="secondary" onClick={() => setFiltersOpen(true)}>
+          <Filter className="h-4 w-4" />
+          <span className="hidden sm:inline">Filters</span>
+          {activeFilterCount ? <span>{activeFilterCount}</span> : null}
+        </Button>
+      </div>
+
+      <FilterDialog
+        open={filtersOpen}
+        onOpenChange={setFiltersOpen}
+        title="Filter students"
+        description={`${filtered.length} student${filtered.length === 1 ? "" : "s"} match these filters.`}
+        onClear={clearFilters}
+      >
         <SelectField
           label="Status"
           value={status}
@@ -277,7 +307,7 @@ function StudentsPage() {
             ...classList.map((c) => ({ value: c.id, label: c.name })),
           ]}
         />
-      </div>
+      </FilterDialog>
 
       <Section id="students-table" title="Student roster" subtitle={`${filtered.length} shown`}>
         {students.isLoading ? (

@@ -46,6 +46,7 @@ import {
   YAxis,
 } from "recharts";
 import { Page } from "@/components/AppShell";
+import { FilterDialog } from "@/components/filter-dialog";
 import { SelectField } from "@/components/form-kit";
 import { Avatar, avatarTone, Empty, PageHeader, StatCard } from "@/components/kit";
 import { Button } from "@/components/ui/button";
@@ -228,9 +229,7 @@ function AdminDashboard() {
   const [customStartDate, setCustomStartDate] = useState(() =>
     format(subDays(new Date(), 6), "yyyy-MM-dd"),
   );
-  const [customEndDate, setCustomEndDate] = useState(() =>
-    format(new Date(), "yyyy-MM-dd"),
-  );
+  const [customEndDate, setCustomEndDate] = useState(() => format(new Date(), "yyyy-MM-dd"));
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [siteFilter, setSiteFilter] = useState("all");
   const [tutorFilter, setTutorFilter] = useState("all");
@@ -249,9 +248,8 @@ function AdminDashboard() {
     [activeLessons],
   );
   const activeFilterCount =
-    [siteFilter, tutorFilter, subjectFilter, deliveryFilter].filter(
-      (value) => value !== "all",
-    ).length + (rangeDays === "7" ? 0 : 1);
+    [siteFilter, tutorFilter, subjectFilter, deliveryFilter].filter((value) => value !== "all")
+      .length + (rangeDays === "7" ? 0 : 1);
   const filteredLessons = useMemo(
     () =>
       activeLessons.filter(
@@ -703,93 +701,92 @@ function AdminDashboard() {
             ? `${activeFilterCount} active filter${activeFilterCount === 1 ? "" : "s"}`
             : "Showing all activity"}
         </p>
-        <Button variant="secondary" onClick={() => setFiltersOpen((open) => !open)}>
+        <Button variant="secondary" onClick={() => setFiltersOpen(true)}>
           <Filter className="h-4 w-4" /> Filters{activeFilterCount ? ` ${activeFilterCount}` : ""}
         </Button>
       </div>
 
-      {filtersOpen ? (
-        <section className="surface p-4 sm:p-5">
-          <div className="flex flex-wrap items-end gap-3">
-            <SelectField
-              label="Reporting period"
-              value={rangeDays}
-              onChange={setRangeDays}
-              options={RANGE_OPTIONS}
-            />
-            {rangeDays === "custom" ? (
-              <>
-                <label className="space-y-1.5">
-                  <span className="text-xs font-bold text-muted-foreground">From</span>
-                  <Input
-                    type="date"
-                    value={customStartDate}
-                    max={customEndDate}
-                    onChange={(event) => setCustomStartDate(event.target.value)}
-                    className="h-10 w-40 rounded-xl"
-                  />
-                </label>
-                <label className="space-y-1.5">
-                  <span className="text-xs font-bold text-muted-foreground">To</span>
-                  <Input
-                    type="date"
-                    value={customEndDate}
-                    min={customStartDate}
-                    max={format(new Date(), "yyyy-MM-dd")}
-                    onChange={(event) => setCustomEndDate(event.target.value)}
-                    className="h-10 w-40 rounded-xl"
-                  />
-                </label>
-              </>
-            ) : null}
-            <SelectField
-              label="Site"
-              value={siteFilter}
-              onChange={setSiteFilter}
-              options={[
-                { value: "all", label: "All sites" },
-                ...(sites.data ?? []).map((site) => ({ value: site.id, label: site.name })),
-              ]}
-            />
-            <SelectField
-              label="Teacher"
-              value={tutorFilter}
-              onChange={setTutorFilter}
-              options={[
-                { value: "all", label: "All teachers" },
-                { value: "unassigned", label: "Unassigned" },
-                ...(tutors.data ?? []).map((tutor) => ({
-                  value: tutor.id,
-                  label: fullName(tutor),
-                })),
-              ]}
-            />
-            <SelectField
-              label="Subject"
-              value={subjectFilter}
-              onChange={setSubjectFilter}
-              options={[
-                { value: "all", label: "All subjects" },
-                ...subjects.map((subject) => ({ value: subject, label: subject })),
-              ]}
-            />
-            <SelectField
-              label="Delivery"
-              value={deliveryFilter}
-              onChange={setDeliveryFilter}
-              options={[
-                { value: "all", label: "All delivery" },
-                { value: "in_person", label: "Face-to-face" },
-                { value: "online", label: "Online" },
-                { value: "hybrid", label: "Hybrid" },
-              ]}
-            />
-            <Button variant="ghost" onClick={resetFilters}>
-              <RotateCcw className="h-4 w-4" /> Reset
-            </Button>
-          </div>
-        </section>
-      ) : null}
+      <FilterDialog
+        open={filtersOpen}
+        onOpenChange={setFiltersOpen}
+        title="Filter dashboard"
+        description="Choose the reporting period and lesson filters. The dashboard updates immediately."
+        onClear={resetFilters}
+      >
+        <SelectField
+          label="Reporting period"
+          value={rangeDays}
+          onChange={setRangeDays}
+          options={RANGE_OPTIONS}
+        />
+        {rangeDays === "custom" ? (
+          <>
+            <label className="space-y-1.5">
+              <span className="text-xs font-bold text-muted-foreground">From</span>
+              <Input
+                type="date"
+                value={customStartDate}
+                max={customEndDate}
+                onChange={(event) => setCustomStartDate(event.target.value)}
+                className="h-10 w-40 rounded-xl"
+              />
+            </label>
+            <label className="space-y-1.5">
+              <span className="text-xs font-bold text-muted-foreground">To</span>
+              <Input
+                type="date"
+                value={customEndDate}
+                min={customStartDate}
+                max={format(new Date(), "yyyy-MM-dd")}
+                onChange={(event) => setCustomEndDate(event.target.value)}
+                className="h-10 w-40 rounded-xl"
+              />
+            </label>
+          </>
+        ) : null}
+        <SelectField
+          label="Site"
+          value={siteFilter}
+          onChange={setSiteFilter}
+          options={[
+            { value: "all", label: "All sites" },
+            ...(sites.data ?? []).map((site) => ({ value: site.id, label: site.name })),
+          ]}
+        />
+        <SelectField
+          label="Teacher"
+          value={tutorFilter}
+          onChange={setTutorFilter}
+          options={[
+            { value: "all", label: "All teachers" },
+            { value: "unassigned", label: "Unassigned" },
+            ...(tutors.data ?? []).map((tutor) => ({
+              value: tutor.id,
+              label: fullName(tutor),
+            })),
+          ]}
+        />
+        <SelectField
+          label="Subject"
+          value={subjectFilter}
+          onChange={setSubjectFilter}
+          options={[
+            { value: "all", label: "All subjects" },
+            ...subjects.map((subject) => ({ value: subject, label: subject })),
+          ]}
+        />
+        <SelectField
+          label="Delivery"
+          value={deliveryFilter}
+          onChange={setDeliveryFilter}
+          options={[
+            { value: "all", label: "All delivery" },
+            { value: "in_person", label: "Face-to-face" },
+            { value: "online", label: "Online" },
+            { value: "hybrid", label: "Hybrid" },
+          ]}
+        />
+      </FilterDialog>
 
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <Link to="/admin/classes" className="block rounded-2xl focus:outline-none focus:ring-2">

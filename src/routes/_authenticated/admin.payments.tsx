@@ -30,12 +30,20 @@ import {
   X,
 } from "lucide-react";
 import { useState } from "react";
+import {
+  CartesianGrid,
+  LabelList,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { toast } from "sonner";
 import { Page } from "@/components/AppShell";
-import {
-  InvoiceEditScreen,
-  type InvoiceEditValues,
-} from "@/components/invoice-edit-screen";
+import { FilterDialog } from "@/components/filter-dialog";
+import { InvoiceEditScreen, type InvoiceEditValues } from "@/components/invoice-edit-screen";
 import { FamilyInvoiceDialog } from "@/components/family-invoice-dialog";
 import { PaymentDocumentDialog } from "@/components/payment-document-dialog";
 import { ZohoSyncPanel } from "@/components/zoho-sync-panel";
@@ -98,10 +106,11 @@ const PAYMENT_VIEWS: Array<{ id: PaymentView; label: string }> = [
   { id: "documents", label: "Documents" },
   { id: "products", label: "Products & services" },
 ];
+const isPaidStatus = (status: string) => status === "received" || status === "paid";
 const paymentTone = (status: string) =>
-  status === "received" ? "green" : status === "overdue" ? "pink" : "amber";
+  isPaidStatus(status) ? "green" : status === "overdue" ? "pink" : "amber";
 const paymentLabel = (status: string) =>
-  status === "received" ? "Paid" : status === "overdue" ? "Overdue" : "Payment due";
+  isPaidStatus(status) ? "Paid" : status === "overdue" ? "Overdue" : "Payment due";
 
 function ParentPayments() {
   const parents = useTable("parents", "first_name");
@@ -133,7 +142,12 @@ function ParentPayments() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [view, setView] = useState<PaymentView>("invoices");
   const [invoiceLimit, setInvoiceLimit] = useState(10);
-  const [invoiceFilter, setInvoiceFilter] = useState<"all" | "draft" | "unpaid">("all");
+  const [invoiceFilter, setInvoiceFilter] = useState<
+    "all" | "draft" | "unpaid" | "paid" | "overdue"
+  >("all");
+  const [clientFilter, setClientFilter] = useState("all");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [invoiceSortOpen, setInvoiceSortOpen] = useState(false);
   const [invoiceSort, setInvoiceSort] = useState<
     "created" | "date" | "number" | "client" | "amount"
@@ -203,10 +217,22 @@ function ParentPayments() {
   const allPayments = payments.data ?? [];
   const activeSubscriptions = (subscriptions.data ?? []).filter((item) => item.status === "active");
   const filteredPayments = allPayments.filter((item) => {
-    const matchesStatus = status === "all" || item.status === status;
+    const matchesStatus =
+      status === "all" ||
+      item.status === status ||
+      (status === "received" && isPaidStatus(item.status));
+    const matchesClient = clientFilter === "all" || item.parent_id === clientFilter;
+    const paymentDate = item.payment_date ?? "";
+    const matchesDate =
+      (!dateFrom || paymentDate >= dateFrom) && (!dateTo || paymentDate <= dateTo);
     const haystack =
       `${parentName(item.parent_id)} ${studentName(item.student_id)} ${item.reference ?? ""}`.toLowerCase();
-    return matchesStatus && (query === "" || haystack.includes(query.toLowerCase()));
+    return (
+      matchesStatus &&
+      matchesClient &&
+      matchesDate &&
+      (query === "" || haystack.includes(query.toLowerCase()))
+    );
   });
   const allInvoices = invoices.data ?? [];
   const allParents = parents.data ?? [];
@@ -214,10 +240,10 @@ function ParentPayments() {
     (parent) => query === "" || fullName(parent).toLowerCase().includes(query.toLowerCase()),
   );
   const receivedTotal = allPayments
-    .filter((item) => item.status === "received")
+    .filter((item) => isPaidStatus(item.status))
     .reduce((total, item) => total + num(item.amount), 0);
   const outstandingTotal = allPayments
-    .filter((item) => item.status !== "received")
+    .filter((item) => !isPaidStatus(item.status))
     .reduce((total, item) => total + num(item.amount), 0);
   const recurringTotal = activeSubscriptions.reduce((total, item) => total + num(item.amount), 0);
   const draftInvoices = allInvoices.filter((item) => item.status === "draft");
@@ -235,7 +261,7 @@ function ParentPayments() {
     })),
     ...allPayments.map((item) => ({
       id: `payment-${item.id}`,
-      type: item.status === "received" ? "Payment" : "Collection",
+      type: isPaidStatus(item.status) ? "Payment" : "Collection",
       name: parentName(item.parent_id),
       amount: num(item.amount),
       date: item.payment_date,
@@ -244,17 +270,24 @@ function ParentPayments() {
   ]
     .sort((a, b) => String(b.date).localeCompare(String(a.date)))
     .slice(0, 6);
-  const revenueByMonth = allPayments
-    .filter((item) => item.status === "received" && item.payment_date)
+  const revenueByDay = allPayments
+    .filter((item) => isPaidStatus(item.status) && item.payment_date)
     .reduce<Record<string, number>>((groups, item) => {
-      const key = String(item.payment_date).slice(0, 7);
+      const key = String(item.payment_date).slice(0, 10);
       groups[key] = (groups[key] ?? 0) + num(item.amount);
       return groups;
     }, {});
-  const revenueSeries = Object.entries(revenueByMonth)
+  const revenueSeries = Object.entries(revenueByDay)
     .sort(([a], [b]) => a.localeCompare(b))
-    .slice(-6);
-  const revenueMax = Math.max(1, ...revenueSeries.map(([, value]) => value));
+    .slice(-14)
+    .map(([date, value]) => ({
+      date,
+      label: new Date(`${date}T00:00:00`).toLocaleDateString("en-GB", {
+        day: "numeric",
+        month: "short",
+      }),
+      value,
+    }));
   const filteredInvoices = allInvoices
     .filter((invoice) => {
       const lines = (invoiceItems.data ?? []).filter((line) => line.invoice_id === invoice.id);
@@ -265,8 +298,16 @@ function ParentPayments() {
       const matchesStatus =
         invoiceFilter === "all" ||
         (invoiceFilter === "draft" && invoice.status === "draft") ||
-        (invoiceFilter === "unpaid" && invoice.status !== "paid");
-      return matchesQuery && matchesStatus;
+        (invoiceFilter === "paid" && invoice.status === "paid") ||
+        (invoiceFilter === "overdue" &&
+          invoice.status !== "paid" &&
+          Boolean(invoice.due_date && invoice.due_date < DEMO_DATE)) ||
+        (invoiceFilter === "unpaid" && invoice.status !== "paid" && invoice.status !== "draft");
+      const matchesClient = clientFilter === "all" || invoice.parent_id === clientFilter;
+      const invoiceDate = invoice.issue_date ?? String(invoice.created_at).slice(0, 10);
+      const matchesDate =
+        (!dateFrom || invoiceDate >= dateFrom) && (!dateTo || invoiceDate <= dateTo);
+      return matchesQuery && matchesStatus && matchesClient && matchesDate;
     })
     .slice()
     .sort((a, b) => {
@@ -291,6 +332,19 @@ function ParentPayments() {
     const matchesStatus = subscriptionFilter === "all" || item.status === subscriptionFilter;
     return matchesQuery && matchesStatus;
   });
+  const activePaymentFilterCount =
+    (view === "transactions" ? (status === "all" ? 0 : 1) : invoiceFilter === "all" ? 0 : 1) +
+    (clientFilter === "all" ? 0 : 1) +
+    (dateFrom ? 1 : 0) +
+    (dateTo ? 1 : 0);
+
+  function clearPaymentFilters() {
+    setInvoiceFilter("all");
+    setStatus("all");
+    setClientFilter("all");
+    setDateFrom("");
+    setDateTo("");
+  }
 
   function exportTransactions() {
     const rows = [
@@ -487,11 +541,7 @@ function ParentPayments() {
           parents={parents.data ?? []}
           students={students.data ?? []}
           plans={(billingPlans.data ?? []).filter((plan) => plan.active)}
-          busy={
-            updateInvoice.isPending ||
-            updateInvoiceItem.isPending ||
-            addInvoiceItem.isPending
-          }
+          busy={updateInvoice.isPending || updateInvoiceItem.isPending || addInvoiceItem.isPending}
           onCancel={() => setInvoiceEditing(false)}
           onDelete={() => {
             setInvoicePendingDelete(selectedInvoice);
@@ -633,11 +683,16 @@ function ParentPayments() {
             ))}
             <button
               type="button"
-              onClick={() => setFiltersOpen((open) => !open)}
-              className="ml-auto flex h-8 w-8 items-center justify-center rounded-full bg-muted text-muted-foreground"
+              onClick={() => setFiltersOpen(true)}
+              className="relative ml-auto flex h-8 w-8 items-center justify-center rounded-full bg-muted text-muted-foreground"
               aria-label="Invoice filters"
             >
               <ListFilter className="h-4 w-4" />
+              {activePaymentFilterCount ? (
+                <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-bold text-primary-foreground">
+                  {activePaymentFilterCount}
+                </span>
+              ) : null}
             </button>
             <button
               type="button"
@@ -739,6 +794,10 @@ function ParentPayments() {
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
+              <Button variant="secondary" size="sm" onClick={() => setFiltersOpen(true)}>
+                <ListFilter className="h-4 w-4" /> Filters
+                {activePaymentFilterCount ? ` ${activePaymentFilterCount}` : ""}
+              </Button>
               <Button variant="secondary" size="sm" onClick={exportTransactions}>
                 <Download className="h-4 w-4" /> Export CSV
               </Button>
@@ -827,23 +886,7 @@ function ParentPayments() {
               </div>
               <span className="text-xs font-extrabold text-primary">{money(receivedTotal)}</span>
             </div>
-            {revenueSeries.length === 0 ? (
-              <p className="py-4 text-center text-xs text-muted-foreground">No revenue data yet.</p>
-            ) : (
-              <div className="mt-3 flex h-20 items-end gap-2">
-                {revenueSeries.map(([month, value]) => (
-                  <div key={month} className="flex h-full flex-1 flex-col justify-end gap-1">
-                    <div
-                      className="w-full rounded-t-md bg-primary/80"
-                      style={{ height: `${Math.max(8, (value / revenueMax) * 56)}px` }}
-                    />
-                    <span className="truncate text-center text-[8px] text-muted-foreground">
-                      {month.slice(5)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
+            <RevenueLineChart data={revenueSeries} compact />
           </section>
 
           <div className="md:hidden">
@@ -1190,7 +1233,7 @@ function ParentPayments() {
             <StatCard
               label="Received"
               value={money(receivedTotal)}
-              hint={`${allPayments.filter((item) => item.status === "received").length} payments`}
+              hint={`${allPayments.filter((item) => isPaidStatus(item.status)).length} payments`}
               tone="green"
               icon={<ArrowDownLeft className="h-5 w-5" />}
             />
@@ -1226,22 +1269,7 @@ function ParentPayments() {
                 </div>
                 <LayoutDashboard className="h-5 w-5 text-primary" />
               </div>
-              {revenueSeries.length === 0 ? (
-                <Empty>No received payments to chart yet.</Empty>
-              ) : (
-                <div className="mt-6 flex h-44 items-end gap-3">
-                  {revenueSeries.map(([month, value]) => (
-                    <div key={month} className="flex flex-1 flex-col items-center gap-2">
-                      <span className="text-xs font-bold">{money(value)}</span>
-                      <div
-                        className="w-full rounded-t-xl bg-primary/80"
-                        style={{ height: `${Math.max(12, (value / revenueMax) * 120)}px` }}
-                      />
-                      <span className="text-[11px] text-muted-foreground">{month}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <RevenueLineChart data={revenueSeries} />
             </section>
             <section className="surface p-5">
               <h2 className="font-extrabold">Quick actions</h2>
@@ -1716,6 +1744,10 @@ function ParentPayments() {
           subtitle="Invoices, collections and payments received"
           action={
             <div className="flex gap-2">
+              <Button size="sm" variant="secondary" onClick={() => setFiltersOpen(true)}>
+                <ListFilter className="h-4 w-4" /> Filters
+                {activePaymentFilterCount ? ` ${activePaymentFilterCount}` : ""}
+              </Button>
               <Button size="sm" variant="secondary" onClick={exportTransactions}>
                 <Download className="h-4 w-4" /> CSV
               </Button>
@@ -1725,23 +1757,6 @@ function ParentPayments() {
             </div>
           }
         >
-          {filtersOpen ? (
-            <div className="mb-4 flex flex-wrap gap-2 rounded-xl bg-muted p-3">
-              <select
-                value={status}
-                onChange={(event) => setStatus(event.target.value)}
-                className="h-10 rounded-xl border border-border bg-card px-3 text-sm"
-              >
-                <option value="all">All statuses</option>
-                <option value="due">Payment due</option>
-                <option value="overdue">Overdue</option>
-                <option value="received">Paid</option>
-              </select>
-              <Button variant="ghost" onClick={() => setStatus("all")}>
-                Clear
-              </Button>
-            </div>
-          ) : null}
           {filteredPayments.length === 0 ? (
             <Empty>No transactions match this view.</Empty>
           ) : (
@@ -1959,6 +1974,70 @@ function ParentPayments() {
           )}
         </Section>
       ) : null}
+
+      <FilterDialog
+        open={filtersOpen}
+        onOpenChange={setFiltersOpen}
+        title={view === "transactions" ? "Filter transactions" : "Filter invoices"}
+        description={`Showing ${view === "transactions" ? filteredPayments.length : filteredInvoices.length} matching records.`}
+        onClear={clearPaymentFilters}
+      >
+        {view === "transactions" ? (
+          <SelectField
+            label="Status"
+            value={status}
+            onChange={setStatus}
+            options={[
+              { value: "all", label: "All statuses" },
+              { value: "due", label: "Payment due" },
+              { value: "overdue", label: "Overdue" },
+              { value: "received", label: "Paid" },
+            ]}
+          />
+        ) : (
+          <SelectField
+            label="Status"
+            value={invoiceFilter}
+            onChange={(value) => setInvoiceFilter(value as typeof invoiceFilter)}
+            options={[
+              { value: "all", label: "All invoices" },
+              { value: "draft", label: "Draft" },
+              { value: "unpaid", label: "Unpaid" },
+              { value: "overdue", label: "Overdue" },
+              { value: "paid", label: "Paid" },
+            ]}
+          />
+        )}
+        <SelectField
+          label="Client"
+          value={clientFilter}
+          onChange={setClientFilter}
+          options={[
+            { value: "all", label: "All clients" },
+            ...allParents.map((parent) => ({ value: parent.id, label: fullName(parent) })),
+          ]}
+        />
+        <label className="space-y-1.5">
+          <span className="text-xs font-bold text-muted-foreground">From</span>
+          <Input
+            type="date"
+            value={dateFrom}
+            max={dateTo || undefined}
+            onChange={(event) => setDateFrom(event.target.value)}
+            className="h-10 rounded-xl"
+          />
+        </label>
+        <label className="space-y-1.5">
+          <span className="text-xs font-bold text-muted-foreground">To</span>
+          <Input
+            type="date"
+            value={dateTo}
+            min={dateFrom || undefined}
+            onChange={(event) => setDateTo(event.target.value)}
+            className="h-10 rounded-xl"
+          />
+        </label>
+      </FilterDialog>
 
       {invoiceSortOpen ? (
         <div className="fixed inset-0 z-[80] flex items-end justify-center bg-foreground/25 p-3 sm:items-center">
@@ -2457,6 +2536,65 @@ function ParentPayments() {
         plans={(billingPlans.data ?? []).filter((plan) => plan.active)}
       />
     </Page>
+  );
+}
+
+function RevenueLineChart({
+  data,
+  compact = false,
+}: {
+  data: Array<{ date: string; label: string; value: number }>;
+  compact?: boolean;
+}) {
+  if (data.length === 0) {
+    return <p className="py-5 text-center text-xs text-muted-foreground">No revenue data yet.</p>;
+  }
+
+  return (
+    <div className={compact ? "mt-2 h-28" : "mt-5 h-52"}>
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart data={data} margin={{ top: compact ? 8 : 24, right: 12, left: 4, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+          <XAxis
+            dataKey="label"
+            axisLine={false}
+            tickLine={false}
+            tick={{ fontSize: compact ? 9 : 11 }}
+            minTickGap={compact ? 20 : 12}
+          />
+          <YAxis
+            hide={compact}
+            axisLine={false}
+            tickLine={false}
+            width={52}
+            tick={{ fontSize: 11 }}
+          />
+          <Tooltip
+            formatter={(value) => money(Number(value))}
+            labelFormatter={(_, payload) => payload[0]?.payload.date ?? ""}
+            contentStyle={{ borderRadius: 12, borderColor: "#e5e7eb" }}
+          />
+          <Line
+            type="monotone"
+            dataKey="value"
+            name="Revenue"
+            stroke="#ec2d70"
+            strokeWidth={3}
+            dot={{ r: compact ? 3 : 4, fill: "#ffffff", strokeWidth: 3 }}
+            activeDot={{ r: 5 }}
+          >
+            {!compact ? (
+              <LabelList
+                dataKey="value"
+                position="top"
+                formatter={(value: unknown) => money(Number(value))}
+                className="fill-foreground text-[10px] font-bold"
+              />
+            ) : null}
+          </Line>
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
   );
 }
 
