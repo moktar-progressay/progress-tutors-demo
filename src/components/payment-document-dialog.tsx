@@ -94,15 +94,15 @@ export function PaymentDocumentDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[92vh] w-[calc(100%-1rem)] max-w-6xl overflow-y-auto rounded-3xl p-0">
+      <DialogContent className="flex h-[100dvh] w-screen max-w-none flex-col overflow-hidden rounded-none border-0 p-0 sm:h-[calc(100dvh-1rem)] sm:w-[calc(100vw-1rem)] sm:max-w-none sm:rounded-2xl sm:border">
         <DialogHeader className="border-b border-border px-5 py-4 text-left">
           <DialogTitle>Create document</DialogTitle>
           <DialogDescription>
             Edit the details, review the preview, then download the PDF.
           </DialogDescription>
         </DialogHeader>
-        <div className="grid lg:grid-cols-[380px_1fr]">
-          <div className="space-y-3 border-b border-border p-4 lg:border-r lg:border-b-0">
+        <div className="grid min-h-0 flex-1 overflow-y-auto lg:grid-cols-[380px_1fr] lg:overflow-hidden">
+          <div className="space-y-3 border-b border-border p-4 lg:overflow-y-auto lg:border-r lg:border-b-0">
             <Field label="Document type">
               <select
                 value={data.type}
