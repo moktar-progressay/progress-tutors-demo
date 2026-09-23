@@ -49,6 +49,7 @@ import { Page } from "@/components/AppShell";
 import { SelectField } from "@/components/form-kit";
 import { Avatar, avatarTone, Empty, PageHeader, StatCard } from "@/components/kit";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Tooltip as InfoTooltip,
   TooltipContent,
@@ -79,6 +80,7 @@ const RANGE_OPTIONS = [
   { value: "30", label: "Last 30 days" },
   { value: "90", label: "Last 90 days" },
   { value: "365", label: "Last 12 months" },
+  { value: "custom", label: "Custom dates" },
 ];
 
 const SCHEDULE_COLOURS = {
@@ -222,7 +224,13 @@ function AdminDashboard() {
 
   const [selectedDate, setSelectedDate] = useState(() => format(new Date(), "yyyy-MM-dd"));
   const [calendarView, setCalendarView] = useState<CalendarView>("day");
-  const [rangeDays, setRangeDays] = useState("30");
+  const [rangeDays, setRangeDays] = useState("7");
+  const [customStartDate, setCustomStartDate] = useState(() =>
+    format(subDays(new Date(), 6), "yyyy-MM-dd"),
+  );
+  const [customEndDate, setCustomEndDate] = useState(() =>
+    format(new Date(), "yyyy-MM-dd"),
+  );
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [siteFilter, setSiteFilter] = useState("all");
   const [tutorFilter, setTutorFilter] = useState("all");
@@ -240,9 +248,10 @@ function AdminDashboard() {
       ).sort((a, b) => a.localeCompare(b, "en-GB")),
     [activeLessons],
   );
-  const activeFilterCount = [siteFilter, tutorFilter, subjectFilter, deliveryFilter].filter(
-    (value) => value !== "all",
-  ).length;
+  const activeFilterCount =
+    [siteFilter, tutorFilter, subjectFilter, deliveryFilter].filter(
+      (value) => value !== "all",
+    ).length + (rangeDays === "7" ? 0 : 1);
   const filteredLessons = useMemo(
     () =>
       activeLessons.filter(
@@ -260,8 +269,12 @@ function AdminDashboard() {
     [filteredLessons],
   );
 
-  const analyticsEnd = new Date();
-  const analyticsStart = subDays(analyticsEnd, Number(rangeDays) - 1);
+  const analyticsEnd =
+    rangeDays === "custom" && customEndDate ? parseISO(customEndDate) : new Date();
+  const analyticsStart =
+    rangeDays === "custom" && customStartDate
+      ? parseISO(customStartDate)
+      : subDays(analyticsEnd, Number(rangeDays) - 1);
   const analyticsDates = eachDayOfInterval({ start: analyticsStart, end: analyticsEnd });
   const filteredSessions = (sessions.data ?? []).filter(
     (session) =>
@@ -649,7 +662,9 @@ function AdminDashboard() {
   );
 
   function resetFilters() {
-    setRangeDays("30");
+    setRangeDays("7");
+    setCustomStartDate(format(subDays(new Date(), 6), "yyyy-MM-dd"));
+    setCustomEndDate(format(new Date(), "yyyy-MM-dd"));
     setSiteFilter("all");
     setTutorFilter("all");
     setSubjectFilter("all");
@@ -702,6 +717,31 @@ function AdminDashboard() {
               onChange={setRangeDays}
               options={RANGE_OPTIONS}
             />
+            {rangeDays === "custom" ? (
+              <>
+                <label className="space-y-1.5">
+                  <span className="text-xs font-bold text-muted-foreground">From</span>
+                  <Input
+                    type="date"
+                    value={customStartDate}
+                    max={customEndDate}
+                    onChange={(event) => setCustomStartDate(event.target.value)}
+                    className="h-10 w-40 rounded-xl"
+                  />
+                </label>
+                <label className="space-y-1.5">
+                  <span className="text-xs font-bold text-muted-foreground">To</span>
+                  <Input
+                    type="date"
+                    value={customEndDate}
+                    min={customStartDate}
+                    max={format(new Date(), "yyyy-MM-dd")}
+                    onChange={(event) => setCustomEndDate(event.target.value)}
+                    className="h-10 w-40 rounded-xl"
+                  />
+                </label>
+              </>
+            ) : null}
             <SelectField
               label="Site"
               value={siteFilter}
@@ -788,6 +828,75 @@ function AdminDashboard() {
           compact
         />
       </div>
+
+      <ChartCard
+        title="Attendance over time"
+        subtitle={`Students marked present or late across all lessons each day · ${reportingPeriod}`}
+        help="This totals Present and Late marks across every filtered lesson on each day. A student attending two lessons on the same day counts twice."
+      >
+        <div className="flex h-full min-w-0">
+          <div className="relative z-10 h-full w-12 shrink-0 bg-card">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart
+                data={attendanceTimeline}
+                margin={{ top: 24, right: 0, left: -20, bottom: 50 }}
+              >
+                <YAxis
+                  allowDecimals={false}
+                  domain={[0, attendanceYAxisMax]}
+                  tick={{ fontSize: 11 }}
+                  width={48}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="min-w-0 flex-1 overflow-x-auto">
+            <div
+              className="h-full"
+              style={{ minWidth: `${Math.max(640, attendanceTimeline.length * 64)}px` }}
+            >
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart
+                  data={attendanceTimeline}
+                  margin={{ top: 24, right: 18, left: 0, bottom: 8 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis
+                    dataKey="dateLabel"
+                    tick={<AttendanceDateTick />}
+                    interval={0}
+                    height={42}
+                  />
+                  <YAxis domain={[0, attendanceYAxisMax]} hide />
+                  <Tooltip
+                    contentStyle={tooltipStyle}
+                    formatter={(value) => [Number(value), "Students attended"]}
+                    labelFormatter={(label, payload) =>
+                      String(payload[0]?.payload?.fullDate ?? label)
+                    }
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="studentsAttended"
+                    name="Students attended"
+                    stroke="#ec2d70"
+                    strokeWidth={3}
+                    dot={{ r: 4 }}
+                    activeDot={{ r: 6 }}
+                  >
+                    <LabelList
+                      dataKey="studentsAttended"
+                      position="top"
+                      className="fill-foreground text-xs font-bold"
+                      formatter={(value: unknown) => (Number(value) > 0 ? Number(value) : "")}
+                    />
+                  </Line>
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+      </ChartCard>
 
       <section className="surface overflow-hidden">
         <div className="border-b border-border px-3 py-3 sm:px-5">
@@ -898,75 +1007,6 @@ function AdminDashboard() {
           </div>
         )}
       </section>
-
-      <ChartCard
-        title="Attendance over time"
-        subtitle={`Students marked present or late across all lessons each day · ${reportingPeriod}`}
-        help="This totals Present and Late marks across every filtered lesson on each day. A student attending two lessons on the same day counts twice."
-      >
-        <div className="flex h-full min-w-0">
-          <div className="relative z-10 h-full w-12 shrink-0 bg-card">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart
-                data={attendanceTimeline}
-                margin={{ top: 24, right: 0, left: -20, bottom: 50 }}
-              >
-                <YAxis
-                  allowDecimals={false}
-                  domain={[0, attendanceYAxisMax]}
-                  tick={{ fontSize: 11 }}
-                  width={48}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="min-w-0 flex-1 overflow-x-auto">
-            <div
-              className="h-full"
-              style={{ minWidth: `${Math.max(640, attendanceTimeline.length * 64)}px` }}
-            >
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart
-                  data={attendanceTimeline}
-                  margin={{ top: 24, right: 18, left: 0, bottom: 8 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis
-                    dataKey="dateLabel"
-                    tick={<AttendanceDateTick />}
-                    interval={0}
-                    height={42}
-                  />
-                  <YAxis domain={[0, attendanceYAxisMax]} hide />
-                  <Tooltip
-                    contentStyle={tooltipStyle}
-                    formatter={(value) => [Number(value), "Students attended"]}
-                    labelFormatter={(label, payload) =>
-                      String(payload[0]?.payload?.fullDate ?? label)
-                    }
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="studentsAttended"
-                    name="Students attended"
-                    stroke="#ec2d70"
-                    strokeWidth={3}
-                    dot={{ r: 4 }}
-                    activeDot={{ r: 6 }}
-                  >
-                    <LabelList
-                      dataKey="studentsAttended"
-                      position="top"
-                      className="fill-foreground text-xs font-bold"
-                      formatter={(value: unknown) => (Number(value) > 0 ? Number(value) : "")}
-                    />
-                  </Line>
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        </div>
-      </ChartCard>
 
       <section className="surface p-3 sm:p-5">
         <div className="flex flex-wrap items-center gap-2">
