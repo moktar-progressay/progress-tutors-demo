@@ -917,8 +917,15 @@ function ParentPayments() {
                           <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
                             {prettyDate(String(invoice.created_at).slice(0, 10))}
                           </td>
-                          <td className="px-4 py-3 font-bold text-primary">
-                            {invoice.invoice_number}
+                          <td className="px-4 py-3 font-bold">
+                            <button
+                              type="button"
+                              onClick={() => openInvoice(invoice)}
+                              className="text-primary hover:underline focus-visible:rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                              aria-label={`Open invoice ${invoice.invoice_number}`}
+                            >
+                              {invoice.invoice_number}
+                            </button>
                           </td>
                           <td className="px-4 py-3 font-semibold">
                             <Link
