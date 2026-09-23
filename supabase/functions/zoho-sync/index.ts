@@ -6,7 +6,8 @@ type EntityType = "customer" | "plan" | "subscription" | "invoice" | "payment";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-sync-secret",
+  "Access-Control-Allow-Headers":
+    "authorization, apikey, content-type, x-client-info, x-sync-secret",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 const json = (body: unknown, status = 200) =>
