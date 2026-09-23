@@ -66,11 +66,11 @@ function TutorStudents() {
       const { error } = await supabase.rpc("add_student_to_tutor_class", {
         p_class_id: form.class_id,
         p_first_name: form.first_name.trim(),
-        p_last_name: form.last_name.trim() || null,
-        p_year_group: form.year_group.trim() || null,
-        p_school: form.school.trim() || null,
-        p_date_of_birth: form.date_of_birth || null,
-        p_notes: form.notes.trim() || null,
+        p_last_name: form.last_name.trim() || undefined,
+        p_year_group: form.year_group.trim() || undefined,
+        p_school: form.school.trim() || undefined,
+        p_date_of_birth: form.date_of_birth || undefined,
+        p_notes: form.notes.trim() || undefined,
       });
       if (error) throw error;
       await invalidate("students", "class_enrolments");
