@@ -14,6 +14,272 @@ export type Database = {
   }
   public: {
     Tables: {
+      billing_invoice_items: {
+        Row: {
+          billing_plan_id: string | null
+          created_at: string
+          description: string
+          discount_amount: number
+          id: string
+          invoice_id: string
+          line_subtotal: number | null
+          line_total: number | null
+          quantity: number
+          service_end: string | null
+          service_start: string | null
+          sort_order: number
+          student_id: string | null
+          subscription_id: string | null
+          tax_amount: number | null
+          tax_rate: number
+          unit_price: number
+          updated_at: string
+        }
+        Insert: {
+          billing_plan_id?: string | null
+          created_at?: string
+          description: string
+          discount_amount?: number
+          id?: string
+          invoice_id: string
+          line_subtotal?: number | null
+          line_total?: number | null
+          quantity?: number
+          service_end?: string | null
+          service_start?: string | null
+          sort_order?: number
+          student_id?: string | null
+          subscription_id?: string | null
+          tax_amount?: number | null
+          tax_rate?: number
+          unit_price?: number
+          updated_at?: string
+        }
+        Update: {
+          billing_plan_id?: string | null
+          created_at?: string
+          description?: string
+          discount_amount?: number
+          id?: string
+          invoice_id?: string
+          line_subtotal?: number | null
+          line_total?: number | null
+          quantity?: number
+          service_end?: string | null
+          service_start?: string | null
+          sort_order?: number
+          student_id?: string | null
+          subscription_id?: string | null
+          tax_amount?: number | null
+          tax_rate?: number
+          unit_price?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_invoice_items_billing_plan_id_fkey"
+            columns: ["billing_plan_id"]
+            isOneToOne: false
+            referencedRelation: "billing_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "billing_invoice_items_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "billing_invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "billing_invoice_items_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "billing_invoice_items_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "client_subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      billing_invoices: {
+        Row: {
+          amount_paid: number
+          approved_at: string | null
+          approved_by: string | null
+          balance_due: number
+          billing_last_synced_at: string | null
+          created_at: string
+          created_by: string | null
+          currency: string
+          discount_total: number
+          due_date: string | null
+          external_customer_id: string | null
+          external_invoice_id: string | null
+          external_provider: string | null
+          id: string
+          invoice_number: string
+          issue_date: string | null
+          issued_at: string | null
+          notes: string | null
+          parent_id: string
+          period_end: string | null
+          period_start: string | null
+          source: string
+          status: string
+          subtotal: number
+          tax_total: number
+          total: number
+          updated_at: string
+        }
+        Insert: {
+          amount_paid?: number
+          approved_at?: string | null
+          approved_by?: string | null
+          balance_due?: number
+          billing_last_synced_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          discount_total?: number
+          due_date?: string | null
+          external_customer_id?: string | null
+          external_invoice_id?: string | null
+          external_provider?: string | null
+          id?: string
+          invoice_number?: string
+          issue_date?: string | null
+          issued_at?: string | null
+          notes?: string | null
+          parent_id: string
+          period_end?: string | null
+          period_start?: string | null
+          source?: string
+          status?: string
+          subtotal?: number
+          tax_total?: number
+          total?: number
+          updated_at?: string
+        }
+        Update: {
+          amount_paid?: number
+          approved_at?: string | null
+          approved_by?: string | null
+          balance_due?: number
+          billing_last_synced_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          discount_total?: number
+          due_date?: string | null
+          external_customer_id?: string | null
+          external_invoice_id?: string | null
+          external_provider?: string | null
+          id?: string
+          invoice_number?: string
+          issue_date?: string | null
+          issued_at?: string | null
+          notes?: string | null
+          parent_id?: string
+          period_end?: string | null
+          period_start?: string | null
+          source?: string
+          status?: string
+          subtotal?: number
+          tax_total?: number
+          total?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_invoices_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "parent_billing_overview"
+            referencedColumns: ["parent_id"]
+          },
+          {
+            foreignKeyName: "billing_invoices_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "parents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      billing_plans: {
+        Row: {
+          active: boolean
+          billing_frequency: string
+          children_included: number
+          created_at: string
+          currency: string
+          description: string | null
+          id: string
+          name: string
+          needs_review: boolean
+          pricing_plan_id: string | null
+          programme_id: string | null
+          source: string
+          unit_amount: number
+          updated_at: string
+          zoho_plan_code: string | null
+        }
+        Insert: {
+          active?: boolean
+          billing_frequency?: string
+          children_included?: number
+          created_at?: string
+          currency?: string
+          description?: string | null
+          id?: string
+          name: string
+          needs_review?: boolean
+          pricing_plan_id?: string | null
+          programme_id?: string | null
+          source?: string
+          unit_amount?: number
+          updated_at?: string
+          zoho_plan_code?: string | null
+        }
+        Update: {
+          active?: boolean
+          billing_frequency?: string
+          children_included?: number
+          created_at?: string
+          currency?: string
+          description?: string | null
+          id?: string
+          name?: string
+          needs_review?: boolean
+          pricing_plan_id?: string | null
+          programme_id?: string | null
+          source?: string
+          unit_amount?: number
+          updated_at?: string
+          zoho_plan_code?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_plans_pricing_plan_id_fkey"
+            columns: ["pricing_plan_id"]
+            isOneToOne: false
+            referencedRelation: "pricing_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "billing_plans_programme_id_fkey"
+            columns: ["programme_id"]
+            isOneToOne: false
+            referencedRelation: "programmes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       class_enrolments: {
         Row: {
           class_id: string
@@ -70,72 +336,93 @@ export type Database = {
           active: boolean
           age_group: string | null
           capacity: number
+          card_colour: string | null
           created_at: string
           delivery_mode: string
+          end_date: string | null
           end_time: string | null
           goprogress_course_url: string | null
           id: string
           level: string | null
           name: string
           notes: string | null
+          online_url: string | null
+          owner_user_id: string
           price_per_session: number | null
           programme_id: string | null
+          recurrence: string
           room: string | null
           schedule_block_id: string | null
           session_rate: number | null
           site_id: string | null
+          start_date: string | null
           start_time: string | null
           subject: string | null
           tutor_id: string | null
           updated_at: string
+          venue_name: string | null
           weekday: string | null
         }
         Insert: {
           active?: boolean
           age_group?: string | null
           capacity?: number
+          card_colour?: string | null
           created_at?: string
           delivery_mode?: string
+          end_date?: string | null
           end_time?: string | null
           goprogress_course_url?: string | null
           id?: string
           level?: string | null
           name: string
           notes?: string | null
+          online_url?: string | null
+          owner_user_id?: string
           price_per_session?: number | null
           programme_id?: string | null
+          recurrence?: string
           room?: string | null
           schedule_block_id?: string | null
           session_rate?: number | null
           site_id?: string | null
+          start_date?: string | null
           start_time?: string | null
           subject?: string | null
           tutor_id?: string | null
           updated_at?: string
+          venue_name?: string | null
           weekday?: string | null
         }
         Update: {
           active?: boolean
           age_group?: string | null
           capacity?: number
+          card_colour?: string | null
           created_at?: string
           delivery_mode?: string
+          end_date?: string | null
           end_time?: string | null
           goprogress_course_url?: string | null
           id?: string
           level?: string | null
           name?: string
           notes?: string | null
+          online_url?: string | null
+          owner_user_id?: string
           price_per_session?: number | null
           programme_id?: string | null
+          recurrence?: string
           room?: string | null
           schedule_block_id?: string | null
           session_rate?: number | null
           site_id?: string | null
+          start_date?: string | null
           start_time?: string | null
           subject?: string | null
           tutor_id?: string | null
           updated_at?: string
+          venue_name?: string | null
           weekday?: string | null
         }
         Relationships: [
@@ -172,12 +459,21 @@ export type Database = {
       client_payments: {
         Row: {
           amount: number
+          billing_last_synced_at: string | null
           created_at: string
+          currency: string
+          due_date: string | null
+          external_customer_id: string | null
+          external_payment_id: string | null
+          external_provider: string | null
           id: string
+          invoice_id: string | null
           method: string | null
           note: string | null
+          paid_at: string | null
           parent_id: string | null
           payment_date: string
+          payment_link: string | null
           reference: string | null
           status: string
           student_id: string | null
@@ -186,12 +482,21 @@ export type Database = {
         }
         Insert: {
           amount: number
+          billing_last_synced_at?: string | null
           created_at?: string
+          currency?: string
+          due_date?: string | null
+          external_customer_id?: string | null
+          external_payment_id?: string | null
+          external_provider?: string | null
           id?: string
+          invoice_id?: string | null
           method?: string | null
           note?: string | null
+          paid_at?: string | null
           parent_id?: string | null
           payment_date?: string
+          payment_link?: string | null
           reference?: string | null
           status?: string
           student_id?: string | null
@@ -200,12 +505,21 @@ export type Database = {
         }
         Update: {
           amount?: number
+          billing_last_synced_at?: string | null
           created_at?: string
+          currency?: string
+          due_date?: string | null
+          external_customer_id?: string | null
+          external_payment_id?: string | null
+          external_provider?: string | null
           id?: string
+          invoice_id?: string | null
           method?: string | null
           note?: string | null
+          paid_at?: string | null
           parent_id?: string | null
           payment_date?: string
+          payment_link?: string | null
           reference?: string | null
           status?: string
           student_id?: string | null
@@ -213,6 +527,20 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "client_payments_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "billing_invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_payments_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "parent_billing_overview"
+            referencedColumns: ["parent_id"]
+          },
           {
             foreignKeyName: "client_payments_parent_id_fkey"
             columns: ["parent_id"]
@@ -239,9 +567,13 @@ export type Database = {
       client_subscriptions: {
         Row: {
           amount: number
+          billing_last_synced_at: string | null
           cadence: string
           class_id: string | null
           created_at: string
+          external_customer_id: string | null
+          external_provider: string | null
+          external_subscription_id: string | null
           id: string
           method_notes: string | null
           next_due_date: string | null
@@ -256,9 +588,13 @@ export type Database = {
         }
         Insert: {
           amount?: number
+          billing_last_synced_at?: string | null
           cadence?: string
           class_id?: string | null
           created_at?: string
+          external_customer_id?: string | null
+          external_provider?: string | null
+          external_subscription_id?: string | null
           id?: string
           method_notes?: string | null
           next_due_date?: string | null
@@ -273,9 +609,13 @@ export type Database = {
         }
         Update: {
           amount?: number
+          billing_last_synced_at?: string | null
           cadence?: string
           class_id?: string | null
           created_at?: string
+          external_customer_id?: string | null
+          external_provider?: string | null
+          external_subscription_id?: string | null
           id?: string
           method_notes?: string | null
           next_due_date?: string | null
@@ -295,6 +635,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "classes"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_subscriptions_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "parent_billing_overview"
+            referencedColumns: ["parent_id"]
           },
           {
             foreignKeyName: "client_subscriptions_parent_id_fkey"
@@ -467,6 +814,13 @@ export type Database = {
             foreignKeyName: "parent_students_parent_id_fkey"
             columns: ["parent_id"]
             isOneToOne: false
+            referencedRelation: "parent_billing_overview"
+            referencedColumns: ["parent_id"]
+          },
+          {
+            foreignKeyName: "parent_students_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
             referencedRelation: "parents"
             referencedColumns: ["id"]
           },
@@ -481,9 +835,12 @@ export type Database = {
       }
       parents: {
         Row: {
+          billing_last_synced_at: string | null
           billing_status: string
           created_at: string
           email: string | null
+          external_customer_id: string | null
+          external_provider: string | null
           first_name: string
           id: string
           last_name: string | null
@@ -493,9 +850,12 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          billing_last_synced_at?: string | null
           billing_status?: string
           created_at?: string
           email?: string | null
+          external_customer_id?: string | null
+          external_provider?: string | null
           first_name: string
           id?: string
           last_name?: string | null
@@ -505,9 +865,12 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          billing_last_synced_at?: string | null
           billing_status?: string
           created_at?: string
           email?: string | null
+          external_customer_id?: string | null
+          external_provider?: string | null
           first_name?: string
           id?: string
           last_name?: string | null
@@ -773,6 +1136,7 @@ export type Database = {
           end_time: string
           id: string
           notes: string | null
+          owner_user_id: string
           programme_id: string | null
           recurrence: string
           site_id: string | null
@@ -781,6 +1145,7 @@ export type Database = {
           status: string
           title: string
           updated_at: string
+          venue_name: string | null
           weekday: string
         }
         Insert: {
@@ -789,6 +1154,7 @@ export type Database = {
           end_time: string
           id?: string
           notes?: string | null
+          owner_user_id?: string
           programme_id?: string | null
           recurrence?: string
           site_id?: string | null
@@ -797,6 +1163,7 @@ export type Database = {
           status?: string
           title: string
           updated_at?: string
+          venue_name?: string | null
           weekday: string
         }
         Update: {
@@ -805,6 +1172,7 @@ export type Database = {
           end_time?: string
           id?: string
           notes?: string | null
+          owner_user_id?: string
           programme_id?: string | null
           recurrence?: string
           site_id?: string | null
@@ -813,6 +1181,7 @@ export type Database = {
           status?: string
           title?: string
           updated_at?: string
+          venue_name?: string | null
           weekday?: string
         }
         Relationships: [
@@ -996,6 +1365,7 @@ export type Database = {
       students: {
         Row: {
           allergy_notes: string | null
+          contact_type: string | null
           courses_note: string | null
           created_at: string
           date_of_birth: string | null
@@ -1004,6 +1374,7 @@ export type Database = {
           emergency_contact_name: string | null
           emergency_contact_phone: string | null
           first_name: string
+          gender: string | null
           id: string
           last_name: string | null
           medical_notes: string | null
@@ -1011,12 +1382,14 @@ export type Database = {
           phone: string | null
           school: string | null
           send_flag: boolean
+          source_data: Json | null
           status: string
           updated_at: string
           year_group: string | null
         }
         Insert: {
           allergy_notes?: string | null
+          contact_type?: string | null
           courses_note?: string | null
           created_at?: string
           date_of_birth?: string | null
@@ -1025,6 +1398,7 @@ export type Database = {
           emergency_contact_name?: string | null
           emergency_contact_phone?: string | null
           first_name: string
+          gender?: string | null
           id?: string
           last_name?: string | null
           medical_notes?: string | null
@@ -1032,12 +1406,14 @@ export type Database = {
           phone?: string | null
           school?: string | null
           send_flag?: boolean
+          source_data?: Json | null
           status?: string
           updated_at?: string
           year_group?: string | null
         }
         Update: {
           allergy_notes?: string | null
+          contact_type?: string | null
           courses_note?: string | null
           created_at?: string
           date_of_birth?: string | null
@@ -1046,6 +1422,7 @@ export type Database = {
           emergency_contact_name?: string | null
           emergency_contact_phone?: string | null
           first_name?: string
+          gender?: string | null
           id?: string
           last_name?: string | null
           medical_notes?: string | null
@@ -1053,6 +1430,7 @@ export type Database = {
           phone?: string | null
           school?: string | null
           send_flag?: boolean
+          source_data?: Json | null
           status?: string
           updated_at?: string
           year_group?: string | null
@@ -1257,6 +1635,7 @@ export type Database = {
           status: string
           subjects: string[]
           updated_at: string
+          user_id: string | null
         }
         Insert: {
           created_at?: string
@@ -1272,6 +1651,7 @@ export type Database = {
           status?: string
           subjects?: string[]
           updated_at?: string
+          user_id?: string | null
         }
         Update: {
           created_at?: string
@@ -1287,15 +1667,218 @@ export type Database = {
           status?: string
           subjects?: string[]
           updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          role: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      zoho_external_records: {
+        Row: {
+          entity_type: string
+          external_customer_id: string | null
+          external_id: string
+          first_seen_at: string
+          id: string
+          last_error: string | null
+          last_seen_at: string
+          parent_id: string | null
+          payload: Json
+          source_updated_at: string | null
+          sync_status: string
+        }
+        Insert: {
+          entity_type: string
+          external_customer_id?: string | null
+          external_id: string
+          first_seen_at?: string
+          id?: string
+          last_error?: string | null
+          last_seen_at?: string
+          parent_id?: string | null
+          payload?: Json
+          source_updated_at?: string | null
+          sync_status?: string
+        }
+        Update: {
+          entity_type?: string
+          external_customer_id?: string | null
+          external_id?: string
+          first_seen_at?: string
+          id?: string
+          last_error?: string | null
+          last_seen_at?: string
+          parent_id?: string | null
+          payload?: Json
+          source_updated_at?: string | null
+          sync_status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "zoho_external_records_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "parent_billing_overview"
+            referencedColumns: ["parent_id"]
+          },
+          {
+            foreignKeyName: "zoho_external_records_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "parents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      zoho_sync_runs: {
+        Row: {
+          completed_at: string | null
+          counts: Json
+          created_at: string
+          error_message: string | null
+          id: string
+          requested_by: string | null
+          started_at: string
+          status: string
+          trigger_source: string
+        }
+        Insert: {
+          completed_at?: string | null
+          counts?: Json
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          requested_by?: string | null
+          started_at?: string
+          status?: string
+          trigger_source?: string
+        }
+        Update: {
+          completed_at?: string | null
+          counts?: Json
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          requested_by?: string | null
+          started_at?: string
+          status?: string
+          trigger_source?: string
         }
         Relationships: []
       }
     }
     Views: {
-      [_ in never]: never
+      parent_billing_overview: {
+        Row: {
+          billing_status: string | null
+          children: Json | null
+          email: string | null
+          invoice_count: number | null
+          invoiced_total: number | null
+          outstanding_total: number | null
+          parent_id: string | null
+          parent_name: string | null
+          phone: string | null
+        }
+        Insert: {
+          billing_status?: string | null
+          children?: never
+          email?: string | null
+          invoice_count?: never
+          invoiced_total?: never
+          outstanding_total?: never
+          parent_id?: string | null
+          parent_name?: never
+          phone?: string | null
+        }
+        Update: {
+          billing_status?: string | null
+          children?: never
+          email?: string | null
+          invoice_count?: never
+          invoiced_total?: never
+          outstanding_total?: never
+          parent_id?: string | null
+          parent_name?: never
+          phone?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
-      [_ in never]: never
+      add_student_to_tutor_class: {
+        Args: {
+          p_class_id: string
+          p_date_of_birth?: string
+          p_first_name: string
+          p_last_name?: string
+          p_notes?: string
+          p_school?: string
+          p_year_group?: string
+        }
+        Returns: string
+      }
+      create_draft_invoice: {
+        Args: {
+          p_due_date: string
+          p_items: Json
+          p_notes: string
+          p_parent_id: string
+          p_period_end: string
+          p_period_start: string
+        }
+        Returns: {
+          amount_paid: number
+          approved_at: string | null
+          approved_by: string | null
+          balance_due: number
+          billing_last_synced_at: string | null
+          created_at: string
+          created_by: string | null
+          currency: string
+          discount_total: number
+          due_date: string | null
+          external_customer_id: string | null
+          external_invoice_id: string | null
+          external_provider: string | null
+          id: string
+          invoice_number: string
+          issue_date: string | null
+          issued_at: string | null
+          notes: string | null
+          parent_id: string
+          period_end: string | null
+          period_start: string | null
+          source: string
+          status: string
+          subtotal: number
+          tax_total: number
+          total: number
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "billing_invoices"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
     }
     Enums: {
       [_ in never]: never
