@@ -30,6 +30,7 @@ export function FormDialog({
   busy,
   children,
   wide,
+  fullScreen,
   dangerLabel,
   onDanger,
   dangerBusy,
@@ -43,6 +44,7 @@ export function FormDialog({
   busy?: boolean;
   children: ReactNode;
   wide?: boolean;
+  fullScreen?: boolean;
   dangerLabel?: string | undefined;
   onDanger?: (() => void) | undefined;
   dangerBusy?: boolean | undefined;
@@ -51,9 +53,11 @@ export function FormDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         className={
-          wide
-            ? "flex max-h-[calc(100dvh-1rem)] flex-col overflow-hidden p-0 sm:max-h-[90vh] sm:max-w-3xl"
-            : "flex max-h-[calc(100dvh-1rem)] flex-col overflow-hidden p-0 sm:max-h-[90vh]"
+          fullScreen
+            ? "flex h-[100dvh] w-screen max-w-none flex-col overflow-hidden rounded-none border-0 p-0 sm:h-[calc(100dvh-1rem)] sm:w-[calc(100vw-1rem)] sm:max-w-none sm:rounded-2xl sm:border"
+            : wide
+              ? "flex max-h-[calc(100dvh-1rem)] flex-col overflow-hidden p-0 sm:max-h-[90vh] sm:max-w-3xl"
+              : "flex max-h-[calc(100dvh-1rem)] flex-col overflow-hidden p-0 sm:max-h-[90vh]"
         }
       >
         <DialogHeader className="shrink-0 border-b border-border px-6 pt-6 pb-4 pr-12">
@@ -61,14 +65,14 @@ export function FormDialog({
           {description ? <DialogDescription>{description}</DialogDescription> : null}
         </DialogHeader>
         <form
-          className="grid min-h-0 flex-1 auto-rows-max content-start gap-3 overflow-y-auto overscroll-contain px-6 pt-4 sm:grid-cols-2"
+          className={`grid min-h-0 flex-1 auto-rows-max content-start gap-3 overflow-y-auto overscroll-contain px-6 pt-4 ${fullScreen ? "sm:grid-cols-1" : "sm:grid-cols-2"}`}
           onSubmit={(e) => {
             e.preventDefault();
             onSubmit();
           }}
         >
           {children}
-          <div className="sticky bottom-0 z-20 -mx-6 mt-1 grid grid-cols-2 gap-2 border-t border-border bg-background px-6 pt-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] shadow-[0_-8px_24px_rgba(0,0,0,0.06)] sm:col-span-2 sm:flex sm:flex-row">
+          <div className="sticky bottom-0 z-20 -mx-6 mt-1 grid grid-cols-2 gap-2 border-t border-border bg-background px-6 pt-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] shadow-[0_-8px_24px_rgba(0,0,0,0.06)] sm:col-span-full sm:flex sm:flex-row">
             {dangerLabel && onDanger ? (
               <Button
                 type="button"
