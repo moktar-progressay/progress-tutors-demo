@@ -1,12 +1,23 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
+  ArrowDownLeft,
+  ArrowUpRight,
+  Banknote,
+  Boxes,
   Check,
   ChevronDown,
+  CircleDollarSign,
+  Download,
   ExternalLink,
   FileText,
   Filter,
+  LayoutDashboard,
+  ListFilter,
+  PackageOpen,
   Plus,
   RotateCcw,
+  Search,
+  UsersRound,
   WalletCards,
 } from "lucide-react";
 import { useState } from "react";
@@ -46,6 +57,26 @@ export const Route = createFileRoute("/_authenticated/admin/payments")({
 });
 
 type PaymentMode = "invoice" | "received";
+type PaymentView =
+  | "overview"
+  | "clients"
+  | "invoices"
+  | "subscriptions"
+  | "transactions"
+  | "tutor-requests"
+  | "documents"
+  | "products";
+
+const PAYMENT_VIEWS: Array<{ id: PaymentView; label: string }> = [
+  { id: "overview", label: "Overview" },
+  { id: "clients", label: "Clients" },
+  { id: "invoices", label: "Invoices" },
+  { id: "subscriptions", label: "Subscriptions" },
+  { id: "transactions", label: "Transactions" },
+  { id: "tutor-requests", label: "Tutor requests" },
+  { id: "documents", label: "Documents" },
+  { id: "products", label: "Products & services" },
+];
 const paymentTone = (status: string) =>
   status === "received" ? "green" : status === "overdue" ? "pink" : "amber";
 const paymentLabel = (status: string) =>
@@ -62,6 +93,8 @@ function ParentPayments() {
   const billingPlans = useTable("billing_plans", "name");
   const invoices = useTable("billing_invoices", "created_at");
   const invoiceItems = useTable("billing_invoice_items", "sort_order");
+  const paymentRequests = useTable("payment_requests", "submitted_at");
+  const tutors = useTable("tutors", "first_name");
   const addSubscription = useUpsert("client_subscriptions");
   const updateSubscription = useUpdateRow("client_subscriptions");
   const addPayment = useUpsert("client_payments", ["parents"]);
@@ -69,6 +102,8 @@ function ParentPayments() {
   const updateInvoice = useUpdateRow("billing_invoices");
 
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [view, setView] = useState<PaymentView>("invoices");
+  const [invoiceLimit, setInvoiceLimit] = useState(10);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
   const [subscriptionOpen, setSubscriptionOpen] = useState(false);
@@ -110,6 +145,83 @@ function ParentPayments() {
       `${parentName(item.parent_id)} ${studentName(item.student_id)} ${item.reference ?? ""}`.toLowerCase();
     return matchesStatus && (query === "" || haystack.includes(query.toLowerCase()));
   });
+  const allInvoices = invoices.data ?? [];
+  const allParents = parents.data ?? [];
+  const receivedTotal = allPayments
+    .filter((item) => item.status === "received")
+    .reduce((total, item) => total + num(item.amount), 0);
+  const outstandingTotal = allPayments
+    .filter((item) => item.status !== "received")
+    .reduce((total, item) => total + num(item.amount), 0);
+  const recurringTotal = activeSubscriptions.reduce((total, item) => total + num(item.amount), 0);
+  const draftInvoices = allInvoices.filter((item) => item.status === "draft");
+  const submittedRequests = (paymentRequests.data ?? []).filter(
+    (item) => item.status === "submitted",
+  );
+  const recentActivity = [
+    ...allInvoices.map((item) => ({
+      id: `invoice-${item.id}`,
+      type: "Invoice",
+      name: parentName(item.parent_id),
+      amount: num(item.total),
+      date: item.created_at,
+      status: item.status,
+    })),
+    ...allPayments.map((item) => ({
+      id: `payment-${item.id}`,
+      type: item.status === "received" ? "Payment" : "Collection",
+      name: parentName(item.parent_id),
+      amount: num(item.amount),
+      date: item.payment_date,
+      status: item.status,
+    })),
+  ]
+    .sort((a, b) => String(b.date).localeCompare(String(a.date)))
+    .slice(0, 6);
+  const revenueByMonth = allPayments
+    .filter((item) => item.status === "received" && item.payment_date)
+    .reduce<Record<string, number>>((groups, item) => {
+      const key = String(item.payment_date).slice(0, 7);
+      groups[key] = (groups[key] ?? 0) + num(item.amount);
+      return groups;
+    }, {});
+  const revenueSeries = Object.entries(revenueByMonth)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .slice(-6);
+  const revenueMax = Math.max(1, ...revenueSeries.map(([, value]) => value));
+  const filteredInvoices = allInvoices
+    .filter((invoice) => {
+      const lines = (invoiceItems.data ?? []).filter((line) => line.invoice_id === invoice.id);
+      const haystack = `${invoice.invoice_number ?? ""} ${parentName(invoice.parent_id)} ${lines
+        .map((line) => studentName(line.student_id))
+        .join(" ")}`.toLowerCase();
+      return query === "" || haystack.includes(query.toLowerCase());
+    })
+    .slice()
+    .reverse();
+
+  function exportTransactions() {
+    const rows = [
+      ["Parent", "Student", "Status", "Amount", "Date", "Reference"],
+      ...filteredPayments.map((item) => [
+        parentName(item.parent_id),
+        studentName(item.student_id),
+        item.status,
+        String(item.amount ?? 0),
+        String(item.payment_date ?? ""),
+        String(item.reference ?? ""),
+      ]),
+    ];
+    const csv = rows
+      .map((row) => row.map((cell) => `"${cell.replaceAll('"', '""')}"`).join(","))
+      .join("\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "progress-tutors-transactions.csv";
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }
 
   function openPayment(mode: PaymentMode) {
     setPaymentMode(mode);
@@ -151,351 +263,673 @@ function ParentPayments() {
         }
       />
 
-      <ZohoSyncPanel />
-
-      <div className="grid grid-cols-2 gap-2 rounded-2xl bg-muted p-1.5">
-        <span className="rounded-xl bg-card px-3 py-2.5 text-center text-sm font-bold text-primary shadow-sm">
-          Parent payments
-        </span>
-        <Link
-          to="/admin/payment-requests"
-          className="rounded-xl px-3 py-2.5 text-center text-sm font-bold text-muted-foreground hover:text-foreground"
-        >
-          Tutor requests
-        </Link>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard
-          label="Draft invoices"
-          value={String((invoices.data ?? []).filter((item) => item.status === "draft").length)}
-          hint="Awaiting approval"
-          tone="amber"
-        />
-        <StatCard
-          label="Family invoice value"
-          value={money((invoices.data ?? []).reduce((total, item) => total + num(item.total), 0))}
-          hint={`${(invoices.data ?? []).length} invoices`}
-          tone="green"
-        />
-        <StatCard
-          label="Active subscriptions"
-          value={String(activeSubscriptions.length)}
-          tone="purple"
-        />
-        <StatCard
-          label="Next billing cycle"
-          value={money(activeSubscriptions.reduce((total, item) => total + num(item.amount), 0))}
-          tone="blue"
-        />
-      </div>
-
-      <Section
-        id="family-invoices"
-        title="Family invoices"
-        subtitle="One parent invoice can contain separate charges for every linked child"
-        action={
-          <Button size="sm" onClick={() => setFamilyInvoiceOpen(true)}>
-            <Plus className="h-4 w-4" /> New draft
+      <div className="sticky top-[calc(var(--app-header-height)+77px)] z-20 -mx-4 border-b border-border bg-background/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+        <div className="flex items-center gap-2">
+          <div className="relative min-w-0 flex-1 sm:max-w-xl">
+            <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search invoices, clients or students"
+              className="h-11 rounded-xl bg-muted pl-9"
+            />
+          </div>
+          <Button
+            variant="secondary"
+            size="icon"
+            aria-label="Payment filters"
+            onClick={() => setFiltersOpen((open) => !open)}
+          >
+            <ListFilter className="h-4 w-4" />
           </Button>
-        }
-      >
-        {(invoices.data ?? []).length === 0 ? (
-          <Empty>
-            No family invoice drafts yet. Create one to load the parent’s linked children.
-          </Empty>
-        ) : (
-          <ul className="space-y-2">
-            {(invoices.data ?? [])
-              .slice()
-              .reverse()
-              .map((invoice) => {
-                const name = parentName(invoice.parent_id);
-                const lines = (invoiceItems.data ?? []).filter(
-                  (item) => item.invoice_id === invoice.id,
-                );
-                const childIds = new Set(lines.map((item) => item.student_id).filter(Boolean));
-                return (
-                  <li key={invoice.id} className="rounded-2xl border border-border p-3 sm:p-4">
-                    <div className="flex flex-wrap items-start gap-3">
-                      <Avatar initials={initialsOf(name)} tone={avatarTone(name)} />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="font-bold">{name}</p>
-                          <Pill tone={invoice.status === "draft" ? "amber" : "green"}>
-                            {invoice.status}
-                          </Pill>
-                        </div>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                          {invoice.invoice_number} · {childIds.size}{" "}
-                          {childIds.size === 1 ? "child" : "children"} · {lines.length}{" "}
-                          {lines.length === 1 ? "line" : "lines"}
-                        </p>
-                        <div className="mt-2 flex flex-wrap gap-1.5">
-                          {lines.map((line) => (
-                            <Pill key={line.id} tone="purple">
-                              {studentName(line.student_id)} · {line.description}
+        </div>
+        <nav className="mt-3 flex gap-1 overflow-x-auto pb-1" aria-label="Payments sections">
+          {PAYMENT_VIEWS.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => setView(item.id)}
+              className={`shrink-0 rounded-lg px-3 py-2 text-xs font-bold transition-colors ${
+                view === item.id
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+              }`}
+            >
+              {item.label}
+            </button>
+          ))}
+        </nav>
+      </div>
+
+      {view === "invoices" ? (
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-xl font-extrabold">All invoices</h2>
+              <p className="text-sm text-muted-foreground">
+                Recent first · one invoice can cover multiple children
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="secondary" size="sm" onClick={exportTransactions}>
+                <Download className="h-4 w-4" /> Export CSV
+              </Button>
+              <Button variant="secondary" size="sm" onClick={() => setDocumentOpen(true)}>
+                <FileText className="h-4 w-4" /> Export PDF
+              </Button>
+              <Button size="sm" onClick={() => setFamilyInvoiceOpen(true)}>
+                <Plus className="h-4 w-4" /> New invoice
+              </Button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <StatCard
+              label="Outstanding"
+              value={money(outstandingTotal)}
+              hint={`${allPayments.filter((item) => item.status !== "received").length} invoices`}
+              tone="blue"
+              icon={<CircleDollarSign className="h-5 w-5" />}
+            />
+            <StatCard
+              label="Overdue"
+              value={money(
+                allPayments
+                  .filter((item) => item.status === "overdue")
+                  .reduce((sum, item) => sum + num(item.amount), 0),
+              )}
+              hint={`${allPayments.filter((item) => item.status === "overdue").length} invoices`}
+              tone="amber"
+              icon={<ArrowUpRight className="h-5 w-5" />}
+            />
+            <StatCard
+              label="Paid this month"
+              value={money(receivedTotal)}
+              hint={`${allPayments.filter((item) => item.status === "received").length} payments`}
+              tone="green"
+              icon={<Check className="h-5 w-5" />}
+            />
+            <StatCard
+              label="Draft invoices"
+              value={money(draftInvoices.reduce((sum, item) => sum + num(item.total), 0))}
+              hint={`${draftInvoices.length} drafts`}
+              tone="purple"
+              icon={<FileText className="h-5 w-5" />}
+            />
+          </div>
+
+          <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+            {filteredInvoices.length === 0 ? (
+              <Empty>No invoices match this view.</Empty>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[940px] text-left text-sm">
+                  <thead className="sticky top-0 bg-muted/90 text-xs text-muted-foreground">
+                    <tr>
+                      <th className="px-4 py-3 font-semibold">Date</th>
+                      <th className="px-4 py-3 font-semibold">Invoice #</th>
+                      <th className="px-4 py-3 font-semibold">Client</th>
+                      <th className="px-4 py-3 font-semibold">Students</th>
+                      <th className="px-4 py-3 font-semibold">Status</th>
+                      <th className="px-4 py-3 font-semibold">Due date</th>
+                      <th className="px-4 py-3 text-right font-semibold">Amount</th>
+                      <th className="px-4 py-3 text-right font-semibold">Balance due</th>
+                      <th className="px-4 py-3 text-right font-semibold">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {filteredInvoices.slice(0, invoiceLimit).map((invoice) => {
+                      const lines = (invoiceItems.data ?? []).filter(
+                        (line) => line.invoice_id === invoice.id,
+                      );
+                      const children = Array.from(
+                        new Set(lines.map((line) => line.student_id).filter(Boolean)),
+                      );
+                      const paid = invoice.status === "paid";
+                      return (
+                        <tr key={invoice.id} className="hover:bg-muted/45">
+                          <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
+                            {prettyDate(String(invoice.created_at).slice(0, 10))}
+                          </td>
+                          <td className="px-4 py-3 font-bold text-primary">
+                            {invoice.invoice_number}
+                          </td>
+                          <td className="px-4 py-3 font-semibold">
+                            {parentName(invoice.parent_id)}
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex flex-wrap gap-1">
+                              {children.slice(0, 2).map((id) => (
+                                <Pill key={id} tone="neutral">
+                                  {studentName(id)}
+                                </Pill>
+                              ))}
+                              {children.length > 2 ? (
+                                <Pill tone="neutral">+{children.length - 2}</Pill>
+                              ) : null}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <Pill
+                              tone={
+                                paid ? "green" : invoice.status === "draft" ? "neutral" : "amber"
+                              }
+                            >
+                              {invoice.status}
                             </Pill>
-                          ))}
-                        </div>
-                      </div>
-                      <div className="shrink-0 text-right">
-                        <p className="text-lg font-extrabold">{money(invoice.total)}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {invoice.due_date ? `Due ${prettyDate(invoice.due_date)}` : "No due date"}
+                          </td>
+                          <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
+                            {invoice.due_date ? prettyDate(invoice.due_date) : "Not set"}
+                          </td>
+                          <td className="px-4 py-3 text-right font-semibold">
+                            {money(invoice.total)}
+                          </td>
+                          <td className="px-4 py-3 text-right font-extrabold">
+                            {paid ? money(0) : money(invoice.total)}
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex justify-end gap-1">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => setDocumentOpen(true)}
+                              >
+                                View
+                              </Button>
+                              {invoice.status === "draft" ? (
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  disabled={updateInvoice.isPending}
+                                  onClick={() =>
+                                    updateInvoice.mutate(
+                                      {
+                                        id: invoice.id,
+                                        values: {
+                                          status: "approved",
+                                          approved_at: new Date().toISOString(),
+                                        },
+                                      },
+                                      {
+                                        onSuccess: () =>
+                                          toast.success("Draft approved. Nothing was emailed."),
+                                      },
+                                    )
+                                  }
+                                >
+                                  Approve
+                                </Button>
+                              ) : null}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3 text-xs text-muted-foreground">
+              <span>
+                Showing {Math.min(invoiceLimit, filteredInvoices.length)} of{" "}
+                {filteredInvoices.length} invoices
+              </span>
+              <div className="flex items-center gap-2">
+                {invoiceLimit < filteredInvoices.length ? (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => setInvoiceLimit((value) => value + 10)}
+                  >
+                    Load 10 more
+                  </Button>
+                ) : null}
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setInvoiceLimit(filteredInvoices.length || 10)}
+                >
+                  All
+                </Button>
+              </div>
+            </div>
+          </div>
+          <div className="flex justify-end">
+            <ZohoSyncPanel />
+          </div>
+        </div>
+      ) : null}
+
+      {view === "overview" ? (
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <StatCard
+              label="Received"
+              value={money(receivedTotal)}
+              hint={`${allPayments.filter((item) => item.status === "received").length} payments`}
+              tone="green"
+              icon={<ArrowDownLeft className="h-5 w-5" />}
+            />
+            <StatCard
+              label="Outstanding"
+              value={money(outstandingTotal)}
+              tone="amber"
+              icon={<ArrowUpRight className="h-5 w-5" />}
+            />
+            <StatCard
+              label="Monthly recurring"
+              value={money(recurringTotal)}
+              hint={`${activeSubscriptions.length} active`}
+              tone="purple"
+              icon={<RotateCcw className="h-5 w-5" />}
+            />
+            <StatCard
+              label="Tutor requests"
+              value={money(
+                submittedRequests.reduce((sum, item) => sum + num(item.total_amount), 0),
+              )}
+              hint={`${submittedRequests.length} need review`}
+              tone="blue"
+              icon={<WalletCards className="h-5 w-5" />}
+            />
+          </div>
+          <div className="grid gap-4 lg:grid-cols-[1.35fr_.65fr]">
+            <section className="surface p-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="font-extrabold">Revenue over time</h2>
+                  <p className="text-xs text-muted-foreground">Payments received</p>
+                </div>
+                <LayoutDashboard className="h-5 w-5 text-primary" />
+              </div>
+              {revenueSeries.length === 0 ? (
+                <Empty>No received payments to chart yet.</Empty>
+              ) : (
+                <div className="mt-6 flex h-44 items-end gap-3">
+                  {revenueSeries.map(([month, value]) => (
+                    <div key={month} className="flex flex-1 flex-col items-center gap-2">
+                      <span className="text-xs font-bold">{money(value)}</span>
+                      <div
+                        className="w-full rounded-t-xl bg-primary/80"
+                        style={{ height: `${Math.max(12, (value / revenueMax) * 120)}px` }}
+                      />
+                      <span className="text-[11px] text-muted-foreground">{month}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+            <section className="surface p-5">
+              <h2 className="font-extrabold">Quick actions</h2>
+              <div className="mt-4 grid gap-2">
+                <Button onClick={() => setFamilyInvoiceOpen(true)}>
+                  <Plus className="h-4 w-4" /> New invoice
+                </Button>
+                <Button variant="secondary" onClick={() => setSubscriptionOpen(true)}>
+                  <RotateCcw className="h-4 w-4" /> Add subscription
+                </Button>
+                <Button variant="secondary" onClick={() => openPayment("received")}>
+                  <Banknote className="h-4 w-4" /> Record payment
+                </Button>
+                <Button variant="ghost" asChild>
+                  <Link to="/admin/payment-requests">Review tutor requests</Link>
+                </Button>
+              </div>
+            </section>
+          </div>
+          <section className="surface p-5">
+            <h2 className="font-extrabold">Recent activity</h2>
+            <div className="mt-3 divide-y divide-border">
+              {recentActivity.map((item) => (
+                <div key={item.id} className="flex items-center gap-3 py-3">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-secondary text-primary">
+                    <CircleDollarSign className="h-4 w-4" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-bold">{item.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {item.type} · {prettyDate(String(item.date).slice(0, 10))}
+                    </p>
+                  </div>
+                  <Pill
+                    tone={item.status === "received" || item.status === "paid" ? "green" : "amber"}
+                  >
+                    {item.status}
+                  </Pill>
+                  <strong>{money(item.amount)}</strong>
+                </div>
+              ))}
+            </div>
+          </section>
+          <ZohoSyncPanel />
+        </div>
+      ) : null}
+
+      {view === "clients" ? (
+        <Section
+          id="payment-clients"
+          title="Clients"
+          subtitle={`${allParents.length} parent billing accounts`}
+          action={
+            <Button size="sm" variant="secondary" asChild>
+              <Link to="/admin/parents">
+                <UsersRound className="h-4 w-4" /> Manage contacts
+              </Link>
+            </Button>
+          }
+        >
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {allParents
+              .filter(
+                (parent) =>
+                  query === "" || fullName(parent).toLowerCase().includes(query.toLowerCase()),
+              )
+              .map((parent) => {
+                const childIds = (parentLinks.data ?? [])
+                  .filter((link) => link.parent_id === parent.id)
+                  .map((link) => link.student_id);
+                const clientSubscriptions = activeSubscriptions.filter(
+                  (item) => item.parent_id === parent.id,
+                );
+                const clientPayments = allPayments.filter(
+                  (item) => item.parent_id === parent.id && item.status === "received",
+                );
+                return (
+                  <article key={parent.id} className="rounded-2xl border border-border p-4">
+                    <div className="flex items-center gap-3">
+                      <Avatar
+                        initials={initialsOf(fullName(parent))}
+                        tone={avatarTone(fullName(parent))}
+                      />
+                      <div className="min-w-0">
+                        <h3 className="truncate font-bold">{fullName(parent)}</h3>
+                        <p className="truncate text-xs text-muted-foreground">
+                          {parent.email ?? parent.phone ?? "No contact details"}
                         </p>
                       </div>
                     </div>
-                    {invoice.status === "draft" ? (
-                      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3">
-                        <p className="text-xs text-muted-foreground">
-                          Approval records the internal decision only. It does not email or charge
-                          the parent.
-                        </p>
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          disabled={updateInvoice.isPending}
-                          onClick={() =>
-                            updateInvoice.mutate(
-                              {
-                                id: invoice.id,
-                                values: {
-                                  status: "approved",
-                                  approved_at: new Date().toISOString(),
-                                },
-                              },
-                              {
-                                onSuccess: () =>
-                                  toast.success("Draft approved. Nothing was emailed."),
-                              },
-                            )
-                          }
-                        >
-                          <Check className="h-4 w-4" /> Approve draft
-                        </Button>
+                    <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+                      <div className="rounded-xl bg-muted p-2">
+                        <strong className="block">{childIds.length}</strong>
+                        <span className="text-[10px] text-muted-foreground">Children</span>
                       </div>
-                    ) : null}
-                  </li>
+                      <div className="rounded-xl bg-muted p-2">
+                        <strong className="block">{clientSubscriptions.length}</strong>
+                        <span className="text-[10px] text-muted-foreground">Plans</span>
+                      </div>
+                      <div className="rounded-xl bg-muted p-2">
+                        <strong className="block">
+                          {money(clientPayments.reduce((sum, item) => sum + num(item.amount), 0))}
+                        </strong>
+                        <span className="text-[10px] text-muted-foreground">Paid</span>
+                      </div>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-1">
+                      {childIds.map((id) => (
+                        <Pill key={id} tone="neutral">
+                          {studentName(id)}
+                        </Pill>
+                      ))}
+                    </div>
+                  </article>
                 );
               })}
-          </ul>
-        )}
-      </Section>
+          </div>
+        </Section>
+      ) : null}
 
-      <Section
-        id="parent-subscriptions"
-        title="Subscriptions"
-        subtitle="Recurring plans agreed with parents"
-        action={
-          <Button size="sm" variant="secondary" onClick={() => setSubscriptionOpen(true)}>
-            <Plus className="h-4 w-4" /> Add
-          </Button>
-        }
-      >
-        {(subscriptions.data ?? []).length === 0 ? (
-          <Empty>No subscriptions yet. Add the first parent subscription.</Empty>
-        ) : (
-          <ul className="grid gap-2 lg:grid-cols-2">
-            {(subscriptions.data ?? []).map((item) => {
-              const name = parentName(item.parent_id);
-              return (
-                <li key={item.id} className="rounded-2xl border border-border p-3">
-                  <div className="flex items-center gap-3">
-                    <Avatar initials={initialsOf(name)} tone={avatarTone(name)} />
+      {view === "subscriptions" ? (
+        <Section
+          id="payment-subscriptions"
+          title="Subscriptions"
+          subtitle="Recurring plans agreed with parents"
+          action={
+            <Button size="sm" onClick={() => setSubscriptionOpen(true)}>
+              <Plus className="h-4 w-4" /> Add subscription
+            </Button>
+          }
+        >
+          {activeSubscriptions.length === 0 ? (
+            <Empty>No active subscriptions yet.</Empty>
+          ) : (
+            <div className="grid gap-3 lg:grid-cols-2">
+              {(subscriptions.data ?? []).map((item) => (
+                <article key={item.id} className="rounded-2xl border border-border p-4">
+                  <div className="flex items-start gap-3">
+                    <Avatar
+                      initials={initialsOf(parentName(item.parent_id))}
+                      tone={avatarTone(parentName(item.parent_id))}
+                    />
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-bold">{name}</p>
-                      <p className="truncate text-xs text-muted-foreground">
+                      <h3 className="font-bold">{parentName(item.parent_id)}</h3>
+                      <p className="text-xs text-muted-foreground">
                         {studentName(item.student_id)} · {item.plan_name ?? "Subscription"}
                       </p>
                     </div>
                     <Pill tone={item.status === "active" ? "green" : "neutral"}>{item.status}</Pill>
                   </div>
-                  <div className="mt-3 flex items-end justify-between gap-3 border-t border-border pt-3">
+                  <div className="mt-4 flex items-end justify-between border-t border-border pt-3">
                     <div>
-                      <p className="font-extrabold">
-                        {money(item.amount)} / {item.cadence.replace("_", " ")}
-                      </p>
+                      <strong className="text-lg">{money(item.amount)}</strong>
+                      <span className="text-xs text-muted-foreground">
+                        {" "}
+                        / {item.cadence.replace("_", " ")}
+                      </span>
                       <p className="text-xs text-muted-foreground">
                         {item.next_due_date
                           ? `Next due ${prettyDate(item.next_due_date)}`
                           : "No due date"}
                       </p>
                     </div>
-                    <div className="flex gap-1">
-                      {item.status === "active" ? (
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          onClick={() => setFamilyInvoiceOpen(true)}
-                        >
-                          Create invoice
-                        </Button>
-                      ) : null}
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() =>
-                          updateSubscription.mutate(
-                            {
-                              id: item.id,
-                              values: { status: item.status === "active" ? "paused" : "active" },
-                            },
-                            { onSuccess: () => toast.success("Subscription updated") },
-                          )
-                        }
-                      >
-                        {item.status === "active" ? (
-                          "Pause"
-                        ) : (
-                          <>
-                            <RotateCcw className="h-4 w-4" /> Resume
-                          </>
-                        )}
-                      </Button>
-                    </div>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() =>
+                        updateSubscription.mutate(
+                          {
+                            id: item.id,
+                            values: { status: item.status === "active" ? "paused" : "active" },
+                          },
+                          { onSuccess: () => toast.success("Subscription updated") },
+                        )
+                      }
+                    >
+                      {item.status === "active" ? "Pause" : "Resume"}
+                    </Button>
                   </div>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </Section>
+                </article>
+              ))}
+            </div>
+          )}
+        </Section>
+      ) : null}
 
-      <Section
-        id="parent-invoices"
-        title="Invoices and collections"
-        subtitle="Create an invoice, then record when payment is received"
-        action={
-          <div className="flex gap-2">
-            <Button size="sm" variant="secondary" onClick={() => setFiltersOpen((open) => !open)}>
-              <Filter className="h-4 w-4" /> Filters{" "}
-              <ChevronDown className={`h-3.5 w-3.5 ${filtersOpen ? "rotate-180" : ""}`} />
-            </Button>
-            <Button size="sm" onClick={() => openPayment("received")}>
-              <WalletCards className="h-4 w-4" /> Record
-            </Button>
-          </div>
-        }
-      >
-        {filtersOpen ? (
-          <div className="mb-4 grid gap-2 rounded-2xl bg-muted p-3 sm:grid-cols-[1fr_180px_auto]">
-            <Input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search parent, child or reference"
-              className="h-10 rounded-xl bg-card"
-            />
-            <select
-              value={status}
-              onChange={(event) => setStatus(event.target.value)}
-              className="h-10 rounded-xl border border-border bg-card px-3 text-sm font-medium"
-            >
-              <option value="all">All statuses</option>
-              <option value="due">Payment due</option>
-              <option value="overdue">Overdue</option>
-              <option value="received">Paid</option>
-            </select>
-            <Button
-              variant="ghost"
-              onClick={() => {
-                setQuery("");
-                setStatus("all");
-              }}
-            >
-              Clear
-            </Button>
-          </div>
-        ) : null}
-        {filteredPayments.length === 0 ? (
-          <Empty>No invoices or payments match this view.</Empty>
-        ) : (
-          <ul className="space-y-2">
-            {filteredPayments.map((item) => {
-              const name = parentName(item.parent_id);
-              return (
-                <li key={item.id} className="rounded-2xl border border-border p-3 sm:p-4">
-                  <div className="flex items-start gap-3">
-                    <Avatar initials={initialsOf(name)} tone={avatarTone(name)} />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="font-bold">{name}</p>
-                        <Pill tone={paymentTone(item.status)}>{paymentLabel(item.status)}</Pill>
-                      </div>
-                      <p className="mt-0.5 text-xs text-muted-foreground">
-                        {studentName(item.student_id)} · {item.reference ?? "No reference"}
-                      </p>
-                      <p className="mt-2 text-xs text-muted-foreground">
-                        {item.status === "received" ? "Paid" : "Due"}{" "}
-                        {prettyDate(
-                          item.status === "received"
-                            ? item.payment_date
-                            : (item.due_date ?? item.payment_date),
-                        )}
-                        {item.method ? ` · ${item.method.replace("_", " ")}` : ""}
-                      </p>
-                    </div>
-                    <p className="shrink-0 text-lg font-extrabold">{money(item.amount)}</p>
-                  </div>
-                  {item.status !== "received" ? (
-                    <div className="mt-3 flex justify-end gap-2 border-t border-border pt-3">
-                      {item.payment_link ? (
-                        <Button size="sm" variant="secondary" asChild>
-                          <a href={item.payment_link} target="_blank" rel="noreferrer">
-                            <ExternalLink className="h-4 w-4" /> Payment link
-                          </a>
-                        </Button>
-                      ) : null}
-                      <Button
-                        size="sm"
-                        onClick={() =>
-                          updatePayment.mutate(
-                            {
-                              id: item.id,
-                              values: {
-                                status: "received",
-                                payment_date: DEMO_DATE,
-                                paid_at: new Date().toISOString(),
-                              },
-                            },
-                            { onSuccess: () => toast.success("Invoice marked as paid") },
-                          )
-                        }
-                      >
-                        <Check className="h-4 w-4" /> Mark paid
-                      </Button>
-                    </div>
-                  ) : null}
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </Section>
-
-      <Section
-        id="payment-documents"
-        title="Documents"
-        subtitle="Editable childcare confirmations and invoices"
-      >
-        <button
-          type="button"
-          onClick={() => setDocumentOpen(true)}
-          className="flex w-full items-center gap-3 rounded-2xl border border-border p-4 text-left hover:bg-muted"
+      {view === "transactions" ? (
+        <Section
+          id="payment-transactions"
+          title="Transactions"
+          subtitle="Invoices, collections and payments received"
+          action={
+            <div className="flex gap-2">
+              <Button size="sm" variant="secondary" onClick={exportTransactions}>
+                <Download className="h-4 w-4" /> CSV
+              </Button>
+              <Button size="sm" onClick={() => openPayment("received")}>
+                <WalletCards className="h-4 w-4" /> Record payment
+              </Button>
+            </div>
+          }
         >
-          <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-secondary text-primary">
-            <FileText className="h-5 w-5" />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block font-bold">Create and preview a PDF</span>
-            <span className="block text-xs text-muted-foreground">
-              Choose a parent and student, edit every field, add a Stripe payment link, then
-              download.
+          {filtersOpen ? (
+            <div className="mb-4 flex flex-wrap gap-2 rounded-xl bg-muted p-3">
+              <select
+                value={status}
+                onChange={(event) => setStatus(event.target.value)}
+                className="h-10 rounded-xl border border-border bg-card px-3 text-sm"
+              >
+                <option value="all">All statuses</option>
+                <option value="due">Payment due</option>
+                <option value="overdue">Overdue</option>
+                <option value="received">Paid</option>
+              </select>
+              <Button variant="ghost" onClick={() => setStatus("all")}>
+                Clear
+              </Button>
+            </div>
+          ) : null}
+          {filteredPayments.length === 0 ? (
+            <Empty>No transactions match this view.</Empty>
+          ) : (
+            <div className="divide-y divide-border">
+              {filteredPayments.map((item) => (
+                <div key={item.id} className="flex flex-wrap items-center gap-3 py-3">
+                  <Avatar
+                    initials={initialsOf(parentName(item.parent_id))}
+                    tone={avatarTone(parentName(item.parent_id))}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="font-bold">{parentName(item.parent_id)}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {studentName(item.student_id)} · {item.reference ?? "No reference"}
+                    </p>
+                  </div>
+                  <Pill tone={paymentTone(item.status)}>{paymentLabel(item.status)}</Pill>
+                  <strong>{money(item.amount)}</strong>
+                  {item.status !== "received" ? (
+                    <Button
+                      size="sm"
+                      onClick={() =>
+                        updatePayment.mutate(
+                          {
+                            id: item.id,
+                            values: {
+                              status: "received",
+                              payment_date: DEMO_DATE,
+                              paid_at: new Date().toISOString(),
+                            },
+                          },
+                          { onSuccess: () => toast.success("Payment marked as received") },
+                        )
+                      }
+                    >
+                      <Check className="h-4 w-4" /> Mark paid
+                    </Button>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          )}
+        </Section>
+      ) : null}
+
+      {view === "tutor-requests" ? (
+        <Section
+          id="payment-tutor-requests"
+          title="Tutor payment requests"
+          subtitle="Review submitted claims and lesson evidence"
+          action={
+            <Button size="sm" asChild>
+              <Link to="/admin/payment-requests">Open full review</Link>
+            </Button>
+          }
+        >
+          {(paymentRequests.data ?? []).length === 0 ? (
+            <Empty>No tutor requests have been submitted.</Empty>
+          ) : (
+            <div className="divide-y divide-border">
+              {(paymentRequests.data ?? [])
+                .slice()
+                .reverse()
+                .map((request) => {
+                  const tutor = (tutors.data ?? []).find((item) => item.id === request.tutor_id);
+                  return (
+                    <div key={request.id} className="flex items-center gap-3 py-3">
+                      <Avatar
+                        initials={initialsOf(fullName(tutor))}
+                        tone={avatarTone(fullName(tutor))}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="font-bold">{fullName(tutor)}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {request.reference ?? "Payment request"} · {num(request.total_hours)}{" "}
+                          hours
+                        </p>
+                      </div>
+                      <Pill
+                        tone={
+                          request.status === "paid"
+                            ? "blue"
+                            : request.status === "approved"
+                              ? "green"
+                              : "amber"
+                        }
+                      >
+                        {request.status}
+                      </Pill>
+                      <strong>{money(request.total_amount)}</strong>
+                    </div>
+                  );
+                })}
+            </div>
+          )}
+        </Section>
+      ) : null}
+
+      {view === "documents" ? (
+        <Section
+          id="payment-documents"
+          title="Documents"
+          subtitle="Editable childcare confirmations and invoice PDFs"
+        >
+          <button
+            type="button"
+            onClick={() => setDocumentOpen(true)}
+            className="flex w-full items-center gap-3 rounded-2xl border border-border p-4 text-left hover:bg-muted"
+          >
+            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-secondary text-primary">
+              <FileText className="h-5 w-5" />
             </span>
-          </span>
-          <span className="text-sm font-bold text-primary">Create</span>
-        </button>
-      </Section>
+            <span className="min-w-0 flex-1">
+              <span className="block font-bold">Create and preview a PDF</span>
+              <span className="block text-xs text-muted-foreground">
+                Choose a parent and student, edit every field and download.
+              </span>
+            </span>
+            <span className="text-sm font-bold text-primary">Create</span>
+          </button>
+        </Section>
+      ) : null}
+
+      {view === "products" ? (
+        <Section
+          id="payment-products"
+          title="Products & services"
+          subtitle="Tuition, football and other billable services"
+        >
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {(billingPlans.data ?? []).map((plan) => (
+              <article key={plan.id} className="rounded-2xl border border-border p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-secondary text-primary">
+                    <PackageOpen className="h-5 w-5" />
+                  </span>
+                  <Pill tone={plan.active ? "green" : "neutral"}>
+                    {plan.active ? "Active" : "Inactive"}
+                  </Pill>
+                </div>
+                <h3 className="mt-3 font-bold">{plan.name}</h3>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {plan.description ?? "Billable ProgressTutors service"}
+                </p>
+                <p className="mt-4 text-xl font-extrabold">{money(plan.unit_amount)}</p>
+              </article>
+            ))}
+          </div>
+          {(billingPlans.data ?? []).length === 0 ? (
+            <Empty>No products or services have been added.</Empty>
+          ) : null}
+        </Section>
+      ) : null}
 
       <FormDialog
         open={subscriptionOpen}
