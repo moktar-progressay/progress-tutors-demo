@@ -1,9 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Pencil } from "lucide-react";
 import { Page } from "@/components/AppShell";
-import { Empty, PageHeader, Pill, Section, StatCard } from "@/components/kit";
+import { Avatar, Empty, PageHeader, Pill, Section, StatCard, avatarTone } from "@/components/kit";
 import { Button } from "@/components/ui/button";
-import { fullName, money, num, prettyDate, useTable } from "@/lib/db";
+import { fullName, initialsOf, money, num, prettyDate, useTable } from "@/lib/db";
 
 export const Route = createFileRoute("/_authenticated/admin/parents/$id")({
   head: () => ({
@@ -126,9 +126,14 @@ function ClientDetail() {
                 <Link
                   to="/admin/students/$id"
                   params={{ id: student.id }}
-                  className="flex items-center justify-between py-3 font-bold hover:text-primary"
+                  className="flex items-center gap-3 py-3 font-bold hover:text-primary"
                 >
-                  {fullName(student)}
+                  <Avatar
+                    initials={initialsOf(fullName(student))}
+                    tone={avatarTone(fullName(student))}
+                    size="sm"
+                  />
+                  <span className="min-w-0 flex-1 truncate">{fullName(student)}</span>
                   <span className="text-xs font-medium text-muted-foreground">
                     {student.year_group ?? "View record"}
                   </span>
