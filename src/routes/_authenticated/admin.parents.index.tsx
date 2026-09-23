@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Page } from "@/components/AppShell";
@@ -152,14 +152,18 @@ function ParentsPage() {
                   return (
                     <tr key={p.id} className="border-t border-border">
                       <td className="py-3 font-semibold">
-                        <div className="flex items-center gap-2">
+                        <Link
+                          to="/admin/parents/$id"
+                          params={{ id: p.id }}
+                          className="flex items-center gap-2 hover:text-primary"
+                        >
                           <Avatar
                             initials={initialsOf(fullName(p))}
                             tone={avatarTone(fullName(p))}
                             size="sm"
                           />
                           {fullName(p)}
-                        </div>
+                        </Link>
                       </td>
                       <td className="py-3 text-muted-foreground">
                         {p.email ?? "—"}
@@ -171,9 +175,19 @@ function ParentsPage() {
                             <span className="text-muted-foreground">None linked</span>
                           ) : (
                             children.map((c) => (
-                              <Pill key={c!.id} tone="purple">
+                              <Link
+                                key={c!.id}
+                                to="/admin/students/$id"
+                                params={{ id: c!.id }}
+                                className="inline-flex items-center gap-1 rounded-full bg-violet-50 py-0.5 pl-0.5 pr-2 text-xs font-semibold text-violet-700 hover:ring-1 hover:ring-violet-300"
+                              >
+                                <Avatar
+                                  initials={initialsOf(fullName(c!))}
+                                  tone={avatarTone(fullName(c!))}
+                                  size="sm"
+                                />
                                 {fullName(c!)}
-                              </Pill>
+                              </Link>
                             ))
                           )}
                         </div>
