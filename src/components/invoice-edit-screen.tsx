@@ -31,7 +31,7 @@ export type InvoiceEditValues = {
 
 type Props = {
   invoice: Row<"billing_invoices">;
-  item?: Row<"billing_invoice_items">;
+  item: Row<"billing_invoice_items"> | undefined;
   parents: ParentRow[];
   students: StudentRow[];
   plans: Row<"billing_plans">[];
