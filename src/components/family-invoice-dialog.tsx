@@ -173,7 +173,7 @@ export function FamilyInvoiceDialog({
     <FormDialog
       open={open}
       onOpenChange={onOpenChange}
-      title="Create family invoice draft"
+      title="Create invoice"
       description="Choose a parent once, then bill one or more linked children on the same invoice. Saving does not email or charge anyone."
       submitLabel="Save draft"
       busy={saving}
