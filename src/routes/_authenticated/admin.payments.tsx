@@ -18,6 +18,7 @@ import {
   Mail,
   MoreHorizontal,
   PackageOpen,
+  Pencil,
   Plus,
   Printer,
   RotateCcw,
@@ -31,6 +32,10 @@ import {
 import { useState } from "react";
 import { toast } from "sonner";
 import { Page } from "@/components/AppShell";
+import {
+  InvoiceEditScreen,
+  type InvoiceEditValues,
+} from "@/components/invoice-edit-screen";
 import { FamilyInvoiceDialog } from "@/components/family-invoice-dialog";
 import { PaymentDocumentDialog } from "@/components/payment-document-dialog";
 import { ZohoSyncPanel } from "@/components/zoho-sync-panel";
@@ -117,6 +122,8 @@ function ParentPayments() {
   const addPayment = useUpsert("client_payments", ["parents"]);
   const updatePayment = useUpdateRow("client_payments", ["parents"]);
   const updateInvoice = useUpdateRow("billing_invoices");
+  const updateInvoiceItem = useUpdateRow("billing_invoice_items");
+  const addInvoiceItem = useUpsert("billing_invoice_items");
   const deleteInvoice = useDeleteRow("billing_invoices");
   const deleteInvoiceItem = useDeleteRow("billing_invoice_items");
   const addProduct = useUpsert("billing_plans");
@@ -144,6 +151,7 @@ function ParentPayments() {
   const [subscriptionPendingDelete, setSubscriptionPendingDelete] =
     useState<Row<"client_subscriptions"> | null>(null);
   const [invoiceOpen, setInvoiceOpen] = useState(false);
+  const [invoiceEditing, setInvoiceEditing] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<Row<"billing_invoices"> | null>(null);
   const [invoicePendingDelete, setInvoicePendingDelete] = useState<Row<"billing_invoices"> | null>(
     null,
@@ -416,6 +424,85 @@ function ParentPayments() {
     return String(num(plan.amount) * num(weeklyHours) * cycles);
   }
 
+  if (invoiceEditing && selectedInvoice) {
+    const selectedItem = (invoiceItems.data ?? []).find(
+      (item) => item.invoice_id === selectedInvoice.id,
+    );
+
+    const saveFullInvoice = async (values: InvoiceEditValues) => {
+      try {
+        const subtotal = values.item.quantity * values.item.unit_price;
+        const taxTotal = subtotal * (values.item.tax_rate / 100);
+        const total = subtotal + taxTotal;
+        const invoiceValues = {
+          parent_id: values.parent_id,
+          issue_date: values.issue_date,
+          due_date: values.due_date,
+          status: values.status,
+          notes: values.notes,
+          subtotal,
+          tax_total: taxTotal,
+          total,
+          balance_due: values.status === "paid" ? 0 : total,
+          amount_paid: values.status === "paid" ? total : selectedInvoice.amount_paid,
+        };
+        await updateInvoice.mutateAsync({ id: selectedInvoice.id, values: invoiceValues });
+        const itemValues = {
+          student_id: values.item.student_id,
+          billing_plan_id: values.item.billing_plan_id,
+          description: values.item.description,
+          quantity: values.item.quantity,
+          unit_price: values.item.unit_price,
+          tax_rate: values.item.tax_rate,
+          line_subtotal: subtotal,
+          tax_amount: taxTotal,
+          line_total: total,
+        };
+        if (values.item.id) {
+          await updateInvoiceItem.mutateAsync({ id: values.item.id, values: itemValues });
+        } else {
+          await addInvoiceItem.mutateAsync({
+            invoice_id: selectedInvoice.id,
+            ...itemValues,
+          });
+        }
+        setSelectedInvoice({ ...selectedInvoice, ...invoiceValues });
+        setInvoiceEdit({
+          status: values.status,
+          due_date: values.due_date ?? "",
+          notes: values.notes ?? "",
+        });
+        setInvoiceEditing(false);
+        toast.success("Invoice updated");
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Could not update invoice");
+      }
+    };
+
+    return (
+      <Page className="p-0 sm:p-0">
+        <InvoiceEditScreen
+          invoice={selectedInvoice}
+          item={selectedItem}
+          parents={parents.data ?? []}
+          students={students.data ?? []}
+          plans={(billingPlans.data ?? []).filter((plan) => plan.active)}
+          busy={
+            updateInvoice.isPending ||
+            updateInvoiceItem.isPending ||
+            addInvoiceItem.isPending
+          }
+          onCancel={() => setInvoiceEditing(false)}
+          onDelete={() => {
+            setInvoicePendingDelete(selectedInvoice);
+            setInvoiceEditing(false);
+          }}
+          onSave={saveFullInvoice}
+        />
+      </Page>
+    );
+  }
+
   return (
     <Page className="pt-0 sm:pt-0">
       <div className="sticky top-[var(--app-header-height)] z-30 -mx-4 border-b border-border bg-background/95 px-4 py-2 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
@@ -622,6 +709,7 @@ function ParentPayments() {
             setSelectedInvoice(null);
           }}
           onNew={() => setFamilyInvoiceOpen(true)}
+          onEdit={() => setInvoiceEditing(true)}
           onDelete={() => {
             setInvoicePendingDelete(selectedInvoice);
             setInvoiceOpen(false);
@@ -2386,6 +2474,7 @@ function InvoiceSplitWorkspace({
   onSelect,
   onClose,
   onNew,
+  onEdit,
   onDelete,
   onSave,
   saving,
@@ -2401,6 +2490,7 @@ function InvoiceSplitWorkspace({
   onSelect: (invoice: Row<"billing_invoices">) => void;
   onClose: () => void;
   onNew: () => void;
+  onEdit: () => void;
   onDelete: () => void;
   onSave: () => Promise<void>;
   saving: boolean;
@@ -2499,6 +2589,9 @@ function InvoiceSplitWorkspace({
                   {clientName} · {money(selectedInvoice.total)}
                 </p>
               </div>
+              <Button variant="secondary" size="sm" onClick={onEdit}>
+                <Pencil className="h-4 w-4" /> Edit invoice
+              </Button>
               <Button
                 variant="secondary"
                 size="sm"
