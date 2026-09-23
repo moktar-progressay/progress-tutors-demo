@@ -4,10 +4,12 @@ import {
   BookOpenCheck,
   ClipboardCheck,
   CreditCard,
+  ChevronDown,
   Flame,
   GraduationCap,
   Home,
-  Sparkles,
+  LogOut,
+  Settings,
   Trophy,
   Users,
   Wallet,
@@ -17,7 +19,7 @@ import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useDemo } from "@/lib/demo-store";
 import { useCurrentAccess } from "@/lib/auth-scope";
-import { ORG, type Role } from "@/lib/demo-data";
+import type { Role } from "@/lib/demo-data";
 
 type ToPath = NonNullable<LinkProps["to"]>;
 
@@ -96,31 +98,6 @@ function useSignedInUser() {
 
 const ROLES: Role[] = ["admin", "tutor", "parent", "student"];
 
-function RoleSwitcher() {
-  const { role, setRole } = useDemo();
-  const navigate = useNavigate();
-  return (
-    <div className="flex items-center gap-1 rounded-full bg-white/15 p-1">
-      {ROLES.map((r) => (
-        <button
-          key={r}
-          type="button"
-          onClick={() => {
-            setRole(r);
-            navigate({ to: ROLE_HOME[r] });
-          }}
-          className={cn(
-            "rounded-full px-3 py-1.5 text-xs font-bold capitalize transition-colors sm:text-sm",
-            role === r ? "bg-white text-primary shadow-sm" : "text-white/85 hover:text-white",
-          )}
-        >
-          {r}
-        </button>
-      ))}
-    </div>
-  );
-}
-
 export function AppShell({ children }: { children: ReactNode }) {
   const { role, setRole } = useDemo();
   const access = useCurrentAccess();
@@ -132,6 +109,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const isPublic = pathname === "/" || pathname === "/auth";
   const headerRef = useRef<HTMLElement>(null);
   const [headerHeight, setHeaderHeight] = useState(0);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
 
   useEffect(() => {
     if (access.data?.role === "tutor" && role !== "tutor") setRole("tutor");
@@ -156,68 +134,90 @@ export function AppShell({ children }: { children: ReactNode }) {
     >
       {/* Sticky application header */}
       <header ref={headerRef} className="sticky top-0 z-40">
-        <div className="flex items-center justify-between border-b border-border bg-card px-4 py-3 lg:hidden">
-          <Link
-            to={ROLE_HOME[role]}
-            className="flex items-center gap-2"
-            aria-label="Go to dashboard"
-          >
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-xs font-black text-primary-foreground">
-              PT
-            </span>
-            <span className="text-sm font-extrabold">ProgressTutors</span>
-          </Link>
-          <button
-            type="button"
-            onClick={async () => {
-              await supabase.auth.signOut();
-              navigate({ to: "/auth" });
-            }}
-            className="flex h-8 items-center justify-center rounded-full bg-secondary px-3 text-[11px] font-bold text-primary"
-          >
-            {initials} · Sign out
-          </button>
-        </div>
-        <div className="bg-primary text-primary-foreground">
-          <div className="mx-auto flex max-w-[1500px] flex-wrap items-center justify-between gap-2 px-4 py-2">
-            <p className="flex items-center gap-2 text-[11px] font-semibold sm:text-xs">
-              <Sparkles className="h-3.5 w-3.5 shrink-0" />
-              Private workspace. You only see records available to your signed-in role.
+        <div className="relative bg-primary text-primary-foreground shadow-sm">
+          <div className="mx-auto flex h-14 max-w-[1500px] items-center justify-between gap-3 px-4 sm:px-6">
+            <Link
+              to={ROLE_HOME[role]}
+              className="flex min-w-0 items-center gap-2"
+              aria-label="Go to dashboard"
+            >
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-xs font-black text-primary">
+                PT
+              </span>
+              <span className="truncate text-sm font-extrabold sm:text-base">ProgressTutors</span>
+            </Link>
+            <p className="hidden text-xs font-semibold text-white/80 md:block">
+              Private workspace · signed-in records only
             </p>
-            <div className="flex items-center gap-2">
-              {access.data?.role === "admin" ? (
-                <>
-                  <span className="hidden text-[11px] font-semibold opacity-80 sm:inline">
-                    View as
-                  </span>
-                  <RoleSwitcher />
-                </>
-              ) : (
-                <span className="text-xs font-bold capitalize">{access.data?.role ?? role}</span>
-              )}
-            </div>
+            <button
+              type="button"
+              onClick={() => setAccountMenuOpen((open) => !open)}
+              className="flex h-9 items-center gap-1 rounded-full bg-white/15 px-2.5 text-xs font-bold hover:bg-white/25"
+              aria-expanded={accountMenuOpen}
+              aria-label="Open account settings"
+            >
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white text-[10px] text-primary">
+                {initials}
+              </span>
+              <ChevronDown className="h-3.5 w-3.5" />
+            </button>
           </div>
+          {accountMenuOpen ? (
+            <div className="absolute top-[calc(100%+0.5rem)] right-3 z-50 w-64 rounded-2xl border border-border bg-card p-3 text-foreground shadow-xl">
+              <div className="flex items-center gap-2 border-b border-border px-1 pb-3">
+                <Settings className="h-4 w-4 text-primary" />
+                <div className="min-w-0">
+                  <p className="truncate text-xs font-bold">{email || "Signed in"}</p>
+                  <p className="text-[11px] text-muted-foreground">Account settings</p>
+                </div>
+              </div>
+              {access.data?.role === "admin" ? (
+                <div className="py-3">
+                  <p className="px-1 text-[10px] font-bold tracking-wide text-muted-foreground uppercase">
+                    Switch view
+                  </p>
+                  <div className="mt-2 grid grid-cols-2 gap-1">
+                    {ROLES.map((item) => (
+                      <button
+                        key={item}
+                        type="button"
+                        onClick={() => {
+                          setRole(item);
+                          setAccountMenuOpen(false);
+                          navigate({ to: ROLE_HOME[item] });
+                        }}
+                        className={cn(
+                          "rounded-lg px-2 py-2 text-xs font-bold capitalize",
+                          role === item
+                            ? "bg-secondary text-primary"
+                            : "hover:bg-muted text-muted-foreground",
+                        )}
+                      >
+                        {item}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+              <button
+                type="button"
+                onClick={async () => {
+                  await supabase.auth.signOut();
+                  navigate({ to: "/auth" });
+                }}
+                className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-xs font-bold text-muted-foreground hover:bg-muted hover:text-foreground"
+              >
+                <LogOut className="h-4 w-4" /> Sign out
+              </button>
+            </div>
+          ) : null}
         </div>
       </header>
 
       <div className="mx-auto flex w-full min-w-0 max-w-[1500px]">
         {/* Desktop sidebar */}
         <aside className="sticky top-[var(--app-header-height)] hidden h-[calc(100vh-var(--app-header-height))] w-64 shrink-0 flex-col border-r border-border px-4 py-6 lg:flex">
-          <Link
-            to={ROLE_HOME[role]}
-            className="flex items-center gap-2 px-2"
-            aria-label="Go to dashboard"
-          >
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-sm font-black text-primary-foreground">
-              PT
-            </span>
-            <span>
-              <span className="block text-sm font-extrabold">ProgressTutors</span>
-              <span className="block text-[11px] text-muted-foreground">{ORG}</span>
-            </span>
-          </Link>
-
-          <nav className="mt-8 flex flex-1 flex-col gap-1">
+          <nav className="mt-1 flex flex-1 flex-col gap-1">
             {items.map((item) => (
               <Link
                 key={item.label}
