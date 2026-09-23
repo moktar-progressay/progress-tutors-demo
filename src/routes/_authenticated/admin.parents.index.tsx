@@ -2,11 +2,20 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Page } from "@/components/AppShell";
-import { Empty, PageHeader, Pill, Section, StatCard } from "@/components/kit";
+import { Avatar, Empty, PageHeader, Pill, Section, StatCard, avatarTone } from "@/components/kit";
 import { FormDialog, SelectField, TextAreaField, TextField } from "@/components/form-kit";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { fullName, money, num, useTable, useUpdateRow, useUpsert, type ParentRow } from "@/lib/db";
+import {
+  fullName,
+  initialsOf,
+  money,
+  num,
+  useTable,
+  useUpdateRow,
+  useUpsert,
+  type ParentRow,
+} from "@/lib/db";
 
 export const Route = createFileRoute("/_authenticated/admin/parents/")({
   head: () => ({
@@ -142,7 +151,16 @@ function ParentsPage() {
                     .filter(Boolean);
                   return (
                     <tr key={p.id} className="border-t border-border">
-                      <td className="py-3 font-semibold">{fullName(p)}</td>
+                      <td className="py-3 font-semibold">
+                        <div className="flex items-center gap-2">
+                          <Avatar
+                            initials={initialsOf(fullName(p))}
+                            tone={avatarTone(fullName(p))}
+                            size="sm"
+                          />
+                          {fullName(p)}
+                        </div>
+                      </td>
                       <td className="py-3 text-muted-foreground">
                         {p.email ?? "—"}
                         {p.phone ? ` · ${p.phone}` : ""}
