@@ -9,6 +9,7 @@ import {
   GraduationCap,
   Home,
   LogOut,
+  Menu,
   Settings,
   Trophy,
   Users,
@@ -110,6 +111,10 @@ export function AppShell({ children }: { children: ReactNode }) {
   const headerRef = useRef<HTMLElement>(null);
   const [headerHeight, setHeaderHeight] = useState(0);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const [sidebarExpanded, setSidebarExpanded] = useState(() => {
+    if (typeof window === "undefined") return true;
+    return window.localStorage.getItem("progress-tutors-sidebar") !== "collapsed";
+  });
 
   useEffect(() => {
     if (access.data?.role === "tutor" && role !== "tutor") setRole("tutor");
@@ -124,6 +129,13 @@ export function AppShell({ children }: { children: ReactNode }) {
     observer.observe(header);
     return () => observer.disconnect();
   }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      "progress-tutors-sidebar",
+      sidebarExpanded ? "expanded" : "collapsed",
+    );
+  }, [sidebarExpanded]);
 
   if (isPublic) return <>{children}</>;
 
@@ -216,45 +228,93 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <div className="mx-auto flex w-full min-w-0 max-w-[1500px]">
         {/* Desktop sidebar */}
-        <aside className="sticky top-[var(--app-header-height)] hidden h-[calc(100vh-var(--app-header-height))] w-64 shrink-0 flex-col border-r border-border px-4 py-6 lg:flex">
-          <nav className="mt-1 flex flex-1 flex-col gap-1">
+        <aside
+          className={cn(
+            "sticky top-[var(--app-header-height)] hidden h-[calc(100vh-var(--app-header-height))] shrink-0 flex-col border-r border-border py-4 transition-[width,padding] duration-200 lg:flex",
+            sidebarExpanded ? "w-64 px-4" : "w-16 px-2",
+          )}
+        >
+          <div
+            className={cn(
+              "mb-3 flex h-10 shrink-0 items-center",
+              sidebarExpanded ? "justify-between px-2" : "justify-center",
+            )}
+          >
+            {sidebarExpanded ? (
+              <span className="text-xs font-bold tracking-wide text-muted-foreground uppercase">
+                Menu
+              </span>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => setSidebarExpanded((expanded) => !expanded)}
+              className="flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground hover:bg-secondary hover:text-primary"
+              aria-label={sidebarExpanded ? "Collapse side menu" : "Open side menu"}
+              aria-expanded={sidebarExpanded}
+              title={sidebarExpanded ? "Collapse menu" : "Open menu"}
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+          </div>
+
+          <nav className="flex flex-1 flex-col gap-1">
             {items.map((item) => (
               <Link
                 key={item.label}
                 to={item.to}
-                className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-secondary hover:text-secondary-foreground"
+                className={cn(
+                  "flex h-11 items-center rounded-xl text-sm font-semibold text-muted-foreground transition-colors hover:bg-secondary hover:text-secondary-foreground",
+                  sidebarExpanded ? "gap-3 px-3" : "justify-center px-0",
+                )}
                 activeProps={{ className: "bg-secondary text-primary" }}
                 activeOptions={{ exact: false }}
+                aria-label={item.label}
+                title={!sidebarExpanded ? item.label : undefined}
               >
                 {item.icon}
-                {item.label}
+                <span className={sidebarExpanded ? "" : "sr-only"}>{item.label}</span>
               </Link>
             ))}
           </nav>
 
-          <div className="mt-4 rounded-2xl bg-secondary px-3 py-3">
-            <div className="flex items-center gap-3">
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
-                {initials}
-              </span>
-              <span className="min-w-0">
-                <span className="block truncate text-sm font-bold">{email || "Signed in"}</span>
-                <span className="block truncate text-[11px] text-muted-foreground">
-                  {ROLE_LABEL[role]}
+          {sidebarExpanded ? (
+            <div className="mt-4 rounded-2xl bg-secondary px-3 py-3">
+              <div className="flex items-center gap-3">
+                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+                  {initials}
                 </span>
-              </span>
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-bold">{email || "Signed in"}</span>
+                  <span className="block truncate text-[11px] text-muted-foreground">
+                    {ROLE_LABEL[role]}
+                  </span>
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={async () => {
+                  await supabase.auth.signOut();
+                  navigate({ to: "/auth" });
+                }}
+                className="mt-3 w-full rounded-xl bg-card px-3 py-2 text-xs font-bold text-foreground hover:bg-background"
+              >
+                Sign out
+              </button>
             </div>
+          ) : (
             <button
               type="button"
               onClick={async () => {
                 await supabase.auth.signOut();
                 navigate({ to: "/auth" });
               }}
-              className="mt-3 w-full rounded-xl bg-card px-3 py-2 text-xs font-bold text-foreground hover:bg-background"
+              className="mx-auto mt-4 flex h-10 w-10 items-center justify-center rounded-xl bg-secondary text-muted-foreground hover:text-primary"
+              aria-label="Sign out"
+              title="Sign out"
             >
-              Sign out
+              <LogOut className="h-4 w-4" />
             </button>
-          </div>
+          )}
         </aside>
 
         {/* Content */}
