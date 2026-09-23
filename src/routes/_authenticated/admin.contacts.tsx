@@ -67,7 +67,9 @@ function ContactsPage() {
         subtitle="Students, parents and tutors, connected in one searchable workspace."
         actions={
           <Button asChild>
-            <Link to={destination}>Manage {tab}</Link>
+            <Link to={destination} aria-label={`Manage ${tab}`}>
+              <Users className="h-4 w-4" /> Manage {tab}
+            </Link>
           </Button>
         }
       />
