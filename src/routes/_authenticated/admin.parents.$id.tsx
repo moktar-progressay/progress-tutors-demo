@@ -3,6 +3,12 @@ import { Pencil, Plus, Save, Search, X } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { Page } from "@/components/AppShell";
+import {
+  ClientBillingCreate,
+  type BillingCreateMode,
+  type NewInvoiceValues,
+  type NewSubscriptionValues,
+} from "@/components/client-billing-create";
 import { Avatar, Empty, Pill, avatarTone } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +20,7 @@ import {
   prettyDate,
   useTable,
   useUpdateRow,
+  useUpsert,
   type ParentRow,
 } from "@/lib/db";
 
@@ -39,10 +46,15 @@ function ClientDetail() {
   const invoices = useTable("billing_invoices", "created_at");
   const invoiceItems = useTable("billing_invoice_items");
   const payments = useTable("client_payments", "payment_date");
+  const billingPlans = useTable("billing_plans", "name");
   const update = useUpdateRow("parents");
+  const addSubscription = useUpsert("client_subscriptions");
+  const addInvoice = useUpsert("billing_invoices");
+  const addInvoiceItem = useUpsert("billing_invoice_items");
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState<ClientTab>("transactions");
   const [editing, setEditing] = useState(false);
+  const [createMode, setCreateMode] = useState<BillingCreateMode | null>(null);
 
   if (parents.isLoading) {
     return (
@@ -96,6 +108,86 @@ function ClientDetail() {
     (invoices.data ?? [])
       .filter((invoice) => invoice.parent_id === parentId)
       .reduce((sum, invoice) => sum + num(invoice.balance_due), 0);
+
+  if (createMode) {
+    const createSubscription = async (values: NewSubscriptionValues) => {
+      try {
+        await addSubscription.mutateAsync({
+          parent_id: client.id,
+          student_id: values.student_id,
+          pricing_plan_id: null,
+          programme_id:
+            (billingPlans.data ?? []).find((plan) => plan.id === values.billing_plan_id)
+              ?.programme_id ?? null,
+          plan_name: values.plan_name,
+          amount: values.amount,
+          cadence: values.cadence,
+          next_due_date: values.next_due_date,
+          notes: values.notes,
+          status: "active",
+        });
+        toast.success("Subscription created");
+        setCreateMode(null);
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Could not create subscription");
+      }
+    };
+
+    const createInvoice = async (values: NewInvoiceValues) => {
+      try {
+        const subtotal = values.item.quantity * values.item.unit_price;
+        const taxTotal = subtotal * (values.item.tax_rate / 100);
+        const total = subtotal + taxTotal;
+        const [invoice] = await addInvoice.mutateAsync({
+          parent_id: client.id,
+          issue_date: values.issue_date,
+          due_date: values.due_date,
+          notes: values.notes,
+          status: values.status,
+          source: "manual",
+          currency: "GBP",
+          subtotal,
+          tax_total: taxTotal,
+          total,
+          balance_due: total,
+        });
+        if (!invoice) throw new Error("The invoice could not be created");
+        await addInvoiceItem.mutateAsync({
+          invoice_id: invoice.id,
+          student_id: values.item.student_id,
+          billing_plan_id: values.item.billing_plan_id,
+          description: values.item.description,
+          quantity: values.item.quantity,
+          unit_price: values.item.unit_price,
+          tax_rate: values.item.tax_rate,
+          line_subtotal: subtotal,
+          tax_amount: taxTotal,
+          line_total: total,
+        });
+        toast.success(values.status === "draft" ? "Invoice draft saved" : "Invoice created");
+        setCreateMode(null);
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Could not create invoice");
+      }
+    };
+
+    return (
+      <Page className="p-0 sm:p-0">
+        <ClientBillingCreate
+          mode={createMode}
+          client={client}
+          students={children}
+          plans={(billingPlans.data ?? []).filter((plan) => plan.active)}
+          busy={
+            addSubscription.isPending || addInvoice.isPending || addInvoiceItem.isPending
+          }
+          onCancel={() => setCreateMode(null)}
+          onCreateSubscription={createSubscription}
+          onCreateInvoice={createInvoice}
+        />
+      </Page>
+    );
+  }
 
   if (editing) {
     return (
@@ -193,10 +285,11 @@ function ClientDetail() {
                 <Pencil className="h-4 w-4" />
                 <span className="hidden sm:inline">Edit</span>
               </Button>
-              <Button asChild className="hidden sm:inline-flex">
-                <Link to="/admin/payments">
-                  <Plus className="h-4 w-4" /> New transaction
-                </Link>
+              <Button
+                className="hidden sm:inline-flex"
+                onClick={() => setCreateMode("invoice")}
+              >
+                <Plus className="h-4 w-4" /> New invoice
               </Button>
             </div>
             <nav className="flex gap-6 overflow-x-auto px-4 sm:px-6" aria-label="Client record">
@@ -284,10 +377,12 @@ function ClientDetail() {
               <RecordPanel
                 title="Subscriptions"
                 action={
-                  <Button asChild size="sm" variant="ghost">
-                    <Link to="/admin/payments">
-                      <Plus className="h-4 w-4" /> New
-                    </Link>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setCreateMode("subscription")}
+                  >
+                    <Plus className="h-4 w-4" /> New
                   </Button>
                 }
               >
@@ -339,10 +434,8 @@ function ClientDetail() {
                 title="Invoices"
                 subtitle={`${clientInvoices.length} total`}
                 action={
-                  <Button asChild size="sm" variant="ghost">
-                    <Link to="/admin/payments">
-                      <Plus className="h-4 w-4" /> New
-                    </Link>
+                  <Button size="sm" variant="ghost" onClick={() => setCreateMode("invoice")}>
+                    <Plus className="h-4 w-4" /> New
                   </Button>
                 }
               >
