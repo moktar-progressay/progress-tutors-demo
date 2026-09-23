@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { Page } from "@/components/AppShell";
 import { FamilyInvoiceDialog } from "@/components/family-invoice-dialog";
 import { PaymentDocumentDialog } from "@/components/payment-document-dialog";
+import { ZohoSyncPanel } from "@/components/zoho-sync-panel";
 import { Avatar, Empty, PageHeader, Pill, Section, StatCard, avatarTone } from "@/components/kit";
 import { FormDialog, SelectField, TextAreaField, TextField } from "@/components/form-kit";
 import { Button } from "@/components/ui/button";
@@ -149,6 +150,8 @@ function ParentPayments() {
           </>
         }
       />
+
+      <ZohoSyncPanel />
 
       <div className="grid grid-cols-2 gap-2 rounded-2xl bg-muted p-1.5">
         <span className="rounded-xl bg-card px-3 py-2.5 text-center text-sm font-bold text-primary shadow-sm">
