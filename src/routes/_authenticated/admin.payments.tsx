@@ -11,8 +11,10 @@ import {
   Download,
   ExternalLink,
   FileText,
+  Grid2X2,
   LayoutDashboard,
   ListFilter,
+  List,
   MoreHorizontal,
   PackageOpen,
   Plus,
@@ -29,7 +31,13 @@ import { FamilyInvoiceDialog } from "@/components/family-invoice-dialog";
 import { PaymentDocumentDialog } from "@/components/payment-document-dialog";
 import { ZohoSyncPanel } from "@/components/zoho-sync-panel";
 import { Avatar, Empty, Pill, Section, StatCard, avatarTone } from "@/components/kit";
-import { FormDialog, SelectField, TextAreaField, TextField } from "@/components/form-kit";
+import {
+  ConfirmDeleteDialog,
+  FormDialog,
+  SelectField,
+  TextAreaField,
+  TextField,
+} from "@/components/form-kit";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -39,9 +47,11 @@ import {
   money,
   num,
   prettyDate,
+  useDeleteRow,
   useTable,
   useUpdateRow,
   useUpsert,
+  type Row,
 } from "@/lib/db";
 
 export const Route = createFileRoute("/_authenticated/admin/payments")({
@@ -99,9 +109,15 @@ function ParentPayments() {
   const tutors = useTable("tutors", "first_name");
   const addSubscription = useUpsert("client_subscriptions");
   const updateSubscription = useUpdateRow("client_subscriptions");
+  const deleteSubscription = useDeleteRow("client_subscriptions");
   const addPayment = useUpsert("client_payments", ["parents"]);
   const updatePayment = useUpdateRow("client_payments", ["parents"]);
   const updateInvoice = useUpdateRow("billing_invoices");
+  const deleteInvoice = useDeleteRow("billing_invoices");
+  const deleteInvoiceItem = useDeleteRow("billing_invoice_items");
+  const addProduct = useUpsert("billing_plans");
+  const updateProduct = useUpdateRow("billing_plans");
+  const deleteProduct = useDeleteRow("billing_plans");
 
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [view, setView] = useState<PaymentView>("invoices");
@@ -116,9 +132,32 @@ function ParentPayments() {
     "all",
   );
   const [moreOpen, setMoreOpen] = useState(false);
+  const [displayMode, setDisplayMode] = useState<"table" | "cards">("table");
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
   const [subscriptionOpen, setSubscriptionOpen] = useState(false);
+  const [editingSubscriptionId, setEditingSubscriptionId] = useState<string | null>(null);
+  const [subscriptionPendingDelete, setSubscriptionPendingDelete] =
+    useState<Row<"client_subscriptions"> | null>(null);
+  const [invoiceOpen, setInvoiceOpen] = useState(false);
+  const [selectedInvoice, setSelectedInvoice] = useState<Row<"billing_invoices"> | null>(null);
+  const [invoicePendingDelete, setInvoicePendingDelete] = useState<Row<"billing_invoices"> | null>(
+    null,
+  );
+  const [invoiceEdit, setInvoiceEdit] = useState({ status: "draft", due_date: "", notes: "" });
+  const [productOpen, setProductOpen] = useState(false);
+  const [editingProductId, setEditingProductId] = useState<string | null>(null);
+  const [productPendingDelete, setProductPendingDelete] = useState<Row<"billing_plans"> | null>(
+    null,
+  );
+  const [product, setProduct] = useState({
+    name: "",
+    description: "",
+    unit_amount: "",
+    billing_frequency: "monthly",
+    children_included: "1",
+    active: "true",
+  });
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [documentOpen, setDocumentOpen] = useState(false);
   const [familyInvoiceOpen, setFamilyInvoiceOpen] = useState(false);
@@ -159,6 +198,9 @@ function ParentPayments() {
   });
   const allInvoices = invoices.data ?? [];
   const allParents = parents.data ?? [];
+  const filteredClients = allParents.filter(
+    (parent) => query === "" || fullName(parent).toLowerCase().includes(query.toLowerCase()),
+  );
   const receivedTotal = allPayments
     .filter((item) => item.status === "received")
     .reduce((total, item) => total + num(item.amount), 0);
@@ -277,9 +319,75 @@ function ParentPayments() {
     setPaymentOpen(true);
   }
 
+  function openNewSubscription() {
+    setEditingSubscriptionId(null);
+    setSubscription({
+      parent_id: "",
+      student_id: "",
+      pricing_plan_id: "",
+      weekly_hours: "2",
+      amount: "",
+      cadence: "monthly",
+      next_due_date: DEMO_DATE,
+      notes: "",
+    });
+    setSubscriptionOpen(true);
+  }
+
+  function openSubscription(item: Row<"client_subscriptions">) {
+    setEditingSubscriptionId(item.id);
+    setSubscription({
+      parent_id: item.parent_id ?? "",
+      student_id: item.student_id ?? "",
+      pricing_plan_id: item.pricing_plan_id ?? "",
+      weekly_hours: "2",
+      amount: String(item.amount ?? ""),
+      cadence: item.cadence,
+      next_due_date: item.next_due_date ?? "",
+      notes: item.notes ?? "",
+    });
+    setSubscriptionOpen(true);
+  }
+
+  function openInvoice(item: Row<"billing_invoices">) {
+    setSelectedInvoice(item);
+    setInvoiceEdit({
+      status: item.status,
+      due_date: item.due_date ?? "",
+      notes: item.notes ?? "",
+    });
+    setInvoiceOpen(true);
+  }
+
+  function openNewProduct() {
+    setEditingProductId(null);
+    setProduct({
+      name: "",
+      description: "",
+      unit_amount: "",
+      billing_frequency: "monthly",
+      children_included: "1",
+      active: "true",
+    });
+    setProductOpen(true);
+  }
+
+  function openProduct(item: Row<"billing_plans">) {
+    setEditingProductId(item.id);
+    setProduct({
+      name: item.name,
+      description: item.description ?? "",
+      unit_amount: String(item.unit_amount),
+      billing_frequency: item.billing_frequency,
+      children_included: String(item.children_included),
+      active: String(item.active),
+    });
+    setProductOpen(true);
+  }
+
   function openPrimaryAction() {
     if (view === "subscriptions") {
-      setSubscriptionOpen(true);
+      openNewSubscription();
       return;
     }
     if (view === "transactions") {
@@ -288,6 +396,10 @@ function ParentPayments() {
     }
     if (view === "documents") {
       setDocumentOpen(true);
+      return;
+    }
+    if (view === "products") {
+      openNewProduct();
       return;
     }
     setFamilyInvoiceOpen(true);
@@ -327,7 +439,9 @@ function ParentPayments() {
                   ? "Record payment"
                   : view === "documents"
                     ? "Create document"
-                    : "Create invoice"
+                    : view === "products"
+                      ? "Add product"
+                      : "Create invoice"
             }
             onClick={openPrimaryAction}
           >
@@ -341,6 +455,28 @@ function ParentPayments() {
           >
             <MoreHorizontal className="h-5 w-5" />
           </Button>
+          <div className="hidden rounded-xl bg-muted p-1 md:flex" aria-label="Display mode">
+            <button
+              type="button"
+              onClick={() => setDisplayMode("table")}
+              className={`flex h-8 w-8 items-center justify-center rounded-lg ${
+                displayMode === "table" ? "bg-card text-primary shadow-sm" : "text-muted-foreground"
+              }`}
+              aria-label="Table view"
+            >
+              <List className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setDisplayMode("cards")}
+              className={`flex h-8 w-8 items-center justify-center rounded-lg ${
+                displayMode === "cards" ? "bg-card text-primary shadow-sm" : "text-muted-foreground"
+              }`}
+              aria-label="Card view"
+            >
+              <Grid2X2 className="h-4 w-4" />
+            </button>
+          </div>
           {moreOpen ? (
             <div className="absolute top-[calc(100%+0.5rem)] right-0 z-50 w-64 rounded-2xl border border-border bg-card p-2 shadow-xl">
               <p className="px-2 py-1 text-[10px] font-bold tracking-wide text-muted-foreground uppercase">
@@ -620,12 +756,22 @@ function ParentPayments() {
                           ? "Overdue"
                           : "Unpaid";
                   return (
-                    <article key={invoice.id} className="py-4 first:pt-1">
+                    <article
+                      key={invoice.id}
+                      className="cursor-pointer py-4 first:pt-1"
+                      onClick={() => openInvoice(invoice)}
+                    >
                       <div className="flex items-start gap-3">
+                        <Avatar
+                          initials={initialsOf(parentName(invoice.parent_id))}
+                          tone={avatarTone(parentName(invoice.parent_id))}
+                          size="sm"
+                        />
                         <div className="min-w-0 flex-1">
                           <Link
                             to="/admin/parents/$id"
                             params={{ id: invoice.parent_id }}
+                            onClick={(event) => event.stopPropagation()}
                             className="block truncate text-base font-extrabold hover:text-primary"
                           >
                             {parentName(invoice.parent_id)}
@@ -683,7 +829,62 @@ function ParentPayments() {
             ) : null}
           </div>
 
-          <div className="hidden overflow-hidden rounded-2xl border border-border bg-card shadow-sm md:block">
+          {displayMode === "cards" ? (
+            <div className="hidden gap-3 md:grid lg:grid-cols-2 xl:grid-cols-3">
+              {filteredInvoices.slice(0, invoiceLimit).map((invoice) => {
+                const children = Array.from(
+                  new Set(
+                    (invoiceItems.data ?? [])
+                      .filter((line) => line.invoice_id === invoice.id)
+                      .map((line) => line.student_id)
+                      .filter(Boolean),
+                  ),
+                );
+                return (
+                  <button
+                    key={invoice.id}
+                    type="button"
+                    onClick={() => openInvoice(invoice)}
+                    className="rounded-2xl border border-border bg-card p-4 text-left hover:bg-muted/45"
+                  >
+                    <div className="flex items-start gap-3">
+                      <Avatar
+                        initials={initialsOf(parentName(invoice.parent_id))}
+                        tone={avatarTone(parentName(invoice.parent_id))}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-bold">{parentName(invoice.parent_id)}</p>
+                        <p className="text-xs text-muted-foreground">{invoice.invoice_number}</p>
+                      </div>
+                      <Pill
+                        tone={
+                          invoice.status === "paid"
+                            ? "green"
+                            : invoice.status === "draft"
+                              ? "neutral"
+                              : "amber"
+                        }
+                      >
+                        {invoice.status}
+                      </Pill>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-1">
+                      {children.map((id) => (
+                        <Pill key={id} tone="neutral">
+                          {studentName(id)}
+                        </Pill>
+                      ))}
+                    </div>
+                    <p className="mt-4 text-xl font-extrabold">{money(invoice.total)}</p>
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
+
+          <div
+            className={`${displayMode === "cards" ? "hidden" : "md:block"} overflow-hidden rounded-2xl border border-border bg-card shadow-sm max-md:hidden`}
+          >
             {filteredInvoices.length === 0 ? (
               <Empty>No invoices match this view.</Empty>
             ) : (
@@ -723,8 +924,13 @@ function ParentPayments() {
                             <Link
                               to="/admin/parents/$id"
                               params={{ id: invoice.parent_id }}
-                              className="hover:text-primary hover:underline"
+                              className="flex items-center gap-2 hover:text-primary hover:underline"
                             >
+                              <Avatar
+                                initials={initialsOf(parentName(invoice.parent_id))}
+                                tone={avatarTone(parentName(invoice.parent_id))}
+                                size="sm"
+                              />
                               {parentName(invoice.parent_id)}
                             </Link>
                           </td>
@@ -763,7 +969,7 @@ function ParentPayments() {
                               <Button
                                 size="sm"
                                 variant="ghost"
-                                onClick={() => setDocumentOpen(true)}
+                                onClick={() => openInvoice(invoice)}
                               >
                                 View
                               </Button>
@@ -949,13 +1155,9 @@ function ParentPayments() {
             </Button>
           }
         >
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {allParents
-              .filter(
-                (parent) =>
-                  query === "" || fullName(parent).toLowerCase().includes(query.toLowerCase()),
-              )
-              .map((parent) => {
+          {displayMode === "cards" ? (
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {filteredClients.map((parent) => {
                 const childIds = (parentLinks.data ?? [])
                   .filter((link) => link.parent_id === parent.id)
                   .map((link) => link.student_id);
@@ -1011,7 +1213,82 @@ function ParentPayments() {
                   </article>
                 );
               })}
-          </div>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[820px] text-left text-sm">
+                <thead className="text-xs text-muted-foreground">
+                  <tr>
+                    <th className="pb-3 font-semibold">Client</th>
+                    <th className="pb-3 font-semibold">Students</th>
+                    <th className="pb-3 font-semibold">Subscriptions</th>
+                    <th className="pb-3 text-right font-semibold">Paid</th>
+                    <th className="pb-3 font-semibold">Status</th>
+                    <th className="pb-3 text-right font-semibold">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {filteredClients.map((parent) => {
+                    const childIds = (parentLinks.data ?? [])
+                      .filter((link) => link.parent_id === parent.id)
+                      .map((link) => link.student_id);
+                    const clientSubscriptions = activeSubscriptions.filter(
+                      (item) => item.parent_id === parent.id,
+                    );
+                    const paid = allPayments
+                      .filter((item) => item.parent_id === parent.id && item.status === "received")
+                      .reduce((sum, item) => sum + num(item.amount), 0);
+                    return (
+                      <tr key={parent.id} className="hover:bg-muted/45">
+                        <td className="py-3 pr-4">
+                          <Link
+                            to="/admin/parents/$id"
+                            params={{ id: parent.id }}
+                            className="flex items-center gap-3"
+                          >
+                            <Avatar
+                              initials={initialsOf(fullName(parent))}
+                              tone={avatarTone(fullName(parent))}
+                              size="sm"
+                            />
+                            <span>
+                              <span className="block font-bold">{fullName(parent)}</span>
+                              <span className="block text-xs text-muted-foreground">
+                                {parent.email ?? parent.phone ?? "No contact details"}
+                              </span>
+                            </span>
+                          </Link>
+                        </td>
+                        <td className="py-3">
+                          <div className="flex flex-wrap gap-1">
+                            {childIds.map((id) => (
+                              <Pill key={id} tone="neutral">
+                                {studentName(id)}
+                              </Pill>
+                            ))}
+                          </div>
+                        </td>
+                        <td className="py-3 font-bold">{clientSubscriptions.length}</td>
+                        <td className="py-3 text-right font-extrabold">{money(paid)}</td>
+                        <td className="py-3">
+                          <Pill tone={parent.status === "active" ? "green" : "neutral"}>
+                            {parent.status}
+                          </Pill>
+                        </td>
+                        <td className="py-3 text-right">
+                          <Button size="sm" variant="ghost" asChild>
+                            <Link to="/admin/parents/$id" params={{ id: parent.id }}>
+                              Open
+                            </Link>
+                          </Button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </Section>
       ) : null}
 
@@ -1024,8 +1301,17 @@ function ParentPayments() {
             ) : (
               <div className="divide-y divide-border">
                 {filteredSubscriptions.map((item) => (
-                  <article key={item.id} className="py-4 first:pt-1">
+                  <article
+                    key={item.id}
+                    className="cursor-pointer py-4 first:pt-1"
+                    onClick={() => openSubscription(item)}
+                  >
                     <div className="flex items-start gap-3">
+                      <Avatar
+                        initials={initialsOf(parentName(item.parent_id))}
+                        tone={avatarTone(parentName(item.parent_id))}
+                        size="sm"
+                      />
                       <div className="min-w-0 flex-1">
                         <Link
                           to="/admin/parents/$id"
@@ -1061,15 +1347,16 @@ function ParentPayments() {
                         </p>
                         <button
                           type="button"
-                          onClick={() =>
+                          onClick={(event) => {
+                            event.stopPropagation();
                             updateSubscription.mutate(
                               {
                                 id: item.id,
                                 values: { status: item.status === "active" ? "paused" : "active" },
                               },
                               { onSuccess: () => toast.success("Subscription updated") },
-                            )
-                          }
+                            );
+                          }}
                           className="mt-3 text-sm font-bold text-primary"
                         >
                           {item.status === "active" ? "Pause" : "Resume"}
@@ -1082,78 +1369,124 @@ function ParentPayments() {
             )}
           </div>
 
-          <div className="hidden md:block">
-            <Section
-              id="payment-subscriptions"
-              title="Subscriptions"
-              subtitle="Recurring plans agreed with clients"
-              action={
-                <Button size="sm" onClick={() => setSubscriptionOpen(true)}>
-                  <Plus className="h-4 w-4" /> Add subscription
-                </Button>
-              }
-            >
-              {filteredSubscriptions.length === 0 ? (
-                <Empty>No subscriptions match this view.</Empty>
-              ) : (
-                <div className="grid gap-3 lg:grid-cols-2">
-                  {filteredSubscriptions.map((item) => (
-                    <article key={item.id} className="rounded-2xl border border-border p-4">
-                      <div className="flex items-start gap-3">
-                        <Avatar
-                          initials={initialsOf(parentName(item.parent_id))}
-                          tone={avatarTone(parentName(item.parent_id))}
-                        />
-                        <div className="min-w-0 flex-1">
-                          <Link
-                            to="/admin/parents/$id"
-                            params={{ id: item.parent_id }}
-                            className="font-bold hover:text-primary hover:underline"
+          <div className="hidden space-y-4 md:block">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-xl font-extrabold">All subscriptions</h2>
+                <p className="text-sm text-muted-foreground">Recurring billing plans by client</p>
+              </div>
+              <Button size="sm" onClick={openNewSubscription}>
+                <Plus className="h-4 w-4" /> Add subscription
+              </Button>
+            </div>
+            <div className="grid grid-cols-4 gap-3">
+              <StatCard label="All" value={String((subscriptions.data ?? []).length)} tone="blue" />
+              <StatCard
+                label="Active"
+                value={String(
+                  (subscriptions.data ?? []).filter((item) => item.status === "active").length,
+                )}
+                tone="green"
+              />
+              <StatCard label="Monthly value" value={money(recurringTotal)} tone="purple" />
+              <StatCard
+                label="Cancelled"
+                value={String(
+                  (subscriptions.data ?? []).filter((item) => item.status === "cancelled").length,
+                )}
+                tone="amber"
+              />
+            </div>
+            {filteredSubscriptions.length === 0 ? (
+              <Empty>No subscriptions match this view.</Empty>
+            ) : displayMode === "cards" ? (
+              <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
+                {filteredSubscriptions.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => openSubscription(item)}
+                    className="rounded-2xl border border-border p-4 text-left hover:bg-muted/45"
+                  >
+                    <div className="flex items-start gap-3">
+                      <Avatar
+                        initials={initialsOf(parentName(item.parent_id))}
+                        tone={avatarTone(parentName(item.parent_id))}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-bold">{parentName(item.parent_id)}</p>
+                        <p className="truncate text-xs text-muted-foreground">
+                          {studentName(item.student_id)} · {item.plan_name ?? "Subscription"}
+                        </p>
+                      </div>
+                      <Pill tone={item.status === "active" ? "green" : "neutral"}>
+                        {item.status}
+                      </Pill>
+                    </div>
+                    <p className="mt-4 text-lg font-extrabold">{money(item.amount)}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {item.next_due_date
+                        ? `Next due ${prettyDate(item.next_due_date)}`
+                        : "No due date"}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="overflow-hidden rounded-2xl border border-border bg-card">
+                <table className="w-full min-w-[900px] text-left text-sm">
+                  <thead className="bg-muted/90 text-xs text-muted-foreground">
+                    <tr>
+                      <th className="px-4 py-3 font-semibold">Client</th>
+                      <th className="px-4 py-3 font-semibold">Student</th>
+                      <th className="px-4 py-3 font-semibold">Plan</th>
+                      <th className="px-4 py-3 font-semibold">Status</th>
+                      <th className="px-4 py-3 font-semibold">Next due</th>
+                      <th className="px-4 py-3 text-right font-semibold">Amount</th>
+                      <th className="px-4 py-3 text-right font-semibold">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {filteredSubscriptions.map((item) => (
+                      <tr key={item.id} className="hover:bg-muted/45">
+                        <td className="px-4 py-3">
+                          <button
+                            type="button"
+                            onClick={() => openSubscription(item)}
+                            className="flex items-center gap-2 text-left font-bold"
                           >
+                            <Avatar
+                              initials={initialsOf(parentName(item.parent_id))}
+                              tone={avatarTone(parentName(item.parent_id))}
+                              size="sm"
+                            />
                             {parentName(item.parent_id)}
-                          </Link>
-                          <p className="text-xs text-muted-foreground">
-                            {studentName(item.student_id)} · {item.plan_name ?? "Subscription"}
-                          </p>
-                        </div>
-                        <Pill tone={item.status === "active" ? "green" : "neutral"}>
-                          {item.status}
-                        </Pill>
-                      </div>
-                      <div className="mt-4 flex items-end justify-between border-t border-border pt-3">
-                        <div>
-                          <strong className="text-lg">{money(item.amount)}</strong>
-                          <span className="text-xs text-muted-foreground">
-                            {" "}
-                            / {item.cadence.replace("_", " ")}
-                          </span>
-                          <p className="text-xs text-muted-foreground">
-                            {item.next_due_date
-                              ? `Next due ${prettyDate(item.next_due_date)}`
-                              : "No due date"}
-                          </p>
-                        </div>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() =>
-                            updateSubscription.mutate(
-                              {
-                                id: item.id,
-                                values: { status: item.status === "active" ? "paused" : "active" },
-                              },
-                              { onSuccess: () => toast.success("Subscription updated") },
-                            )
-                          }
-                        >
-                          {item.status === "active" ? "Pause" : "Resume"}
-                        </Button>
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              )}
-            </Section>
+                          </button>
+                        </td>
+                        <td className="px-4 py-3">{studentName(item.student_id)}</td>
+                        <td className="px-4 py-3">{item.plan_name ?? "Subscription"}</td>
+                        <td className="px-4 py-3">
+                          <Pill tone={item.status === "active" ? "green" : "neutral"}>
+                            {item.status}
+                          </Pill>
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground">
+                          {item.next_due_date ? prettyDate(item.next_due_date) : "Not set"}
+                        </td>
+                        <td className="px-4 py-3 text-right font-extrabold">
+                          {money(item.amount)}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <Button size="sm" variant="ghost" onClick={() => openSubscription(item)}>
+                            Edit
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
       ) : null}
@@ -1319,29 +1652,93 @@ function ParentPayments() {
           id="payment-products"
           title="Products & services"
           subtitle="Tuition, football and other billable services"
+          action={
+            <Button size="sm" onClick={openNewProduct}>
+              <Plus className="h-4 w-4" /> Add product
+            </Button>
+          }
         >
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {(billingPlans.data ?? []).map((plan) => (
-              <article key={plan.id} className="rounded-2xl border border-border p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-secondary text-primary">
-                    <PackageOpen className="h-5 w-5" />
-                  </span>
-                  <Pill tone={plan.active ? "green" : "neutral"}>
-                    {plan.active ? "Active" : "Inactive"}
-                  </Pill>
-                </div>
-                <h3 className="mt-3 font-bold">{plan.name}</h3>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {plan.description ?? "Billable ProgressTutors service"}
-                </p>
-                <p className="mt-4 text-xl font-extrabold">{money(plan.unit_amount)}</p>
-              </article>
-            ))}
-          </div>
           {(billingPlans.data ?? []).length === 0 ? (
             <Empty>No products or services have been added.</Empty>
-          ) : null}
+          ) : displayMode === "cards" ? (
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {(billingPlans.data ?? []).map((plan) => (
+                <button
+                  key={plan.id}
+                  type="button"
+                  onClick={() => openProduct(plan)}
+                  className="rounded-2xl border border-border p-4 text-left hover:bg-muted/45"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-secondary text-primary">
+                      <PackageOpen className="h-5 w-5" />
+                    </span>
+                    <Pill tone={plan.active ? "green" : "neutral"}>
+                      {plan.active ? "Active" : "Inactive"}
+                    </Pill>
+                  </div>
+                  <h3 className="mt-3 font-bold">{plan.name}</h3>
+                  <p className="mt-1 truncate text-xs text-muted-foreground">
+                    {plan.description ?? "Billable ProgressTutors service"}
+                  </p>
+                  <p className="mt-4 text-xl font-extrabold">{money(plan.unit_amount)}</p>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[760px] text-left text-sm">
+                <thead className="text-xs text-muted-foreground">
+                  <tr>
+                    <th className="pb-3 font-semibold">Product or service</th>
+                    <th className="pb-3 font-semibold">Frequency</th>
+                    <th className="pb-3 font-semibold">Students</th>
+                    <th className="pb-3 font-semibold">Status</th>
+                    <th className="pb-3 text-right font-semibold">Price</th>
+                    <th className="pb-3 text-right font-semibold">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {(billingPlans.data ?? []).map((plan) => (
+                    <tr key={plan.id} className="hover:bg-muted/45">
+                      <td className="py-3 pr-4">
+                        <button
+                          type="button"
+                          onClick={() => openProduct(plan)}
+                          className="flex items-center gap-3 text-left"
+                        >
+                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-secondary text-primary">
+                            <PackageOpen className="h-4 w-4" />
+                          </span>
+                          <span>
+                            <span className="block font-bold">{plan.name}</span>
+                            <span className="block max-w-md truncate text-xs text-muted-foreground">
+                              {plan.description ?? "Billable ProgressTutors service"}
+                            </span>
+                          </span>
+                        </button>
+                      </td>
+                      <td className="py-3 capitalize">
+                        {plan.billing_frequency.replace("_", " ")}
+                      </td>
+                      <td className="py-3">{plan.children_included}</td>
+                      <td className="py-3">
+                        <Pill tone={plan.active ? "green" : "neutral"}>
+                          {plan.active ? "Active" : "Inactive"}
+                        </Pill>
+                      </td>
+                      <td className="py-3 text-right font-extrabold">{money(plan.unit_amount)}</td>
+                      <td className="py-3 text-right">
+                        <Button size="sm" variant="ghost" onClick={() => openProduct(plan)}>
+                          Edit
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </Section>
       ) : null}
 
@@ -1406,29 +1803,50 @@ function ParentPayments() {
       <FormDialog
         open={subscriptionOpen}
         onOpenChange={setSubscriptionOpen}
-        title="Add subscription"
+        title={editingSubscriptionId ? "Edit subscription" : "Add subscription"}
         description="Set the recurring amount and next billing date."
-        submitLabel="Add subscription"
-        busy={addSubscription.isPending}
+        submitLabel={editingSubscriptionId ? "Save changes" : "Add subscription"}
+        busy={addSubscription.isPending || updateSubscription.isPending}
+        dangerLabel={editingSubscriptionId ? "Delete" : undefined}
+        onDanger={
+          editingSubscriptionId
+            ? () => {
+                const current = (subscriptions.data ?? []).find(
+                  (item) => item.id === editingSubscriptionId,
+                );
+                if (current) setSubscriptionPendingDelete(current);
+                setSubscriptionOpen(false);
+              }
+            : undefined
+        }
         onSubmit={async () => {
           if (!subscription.parent_id || !subscription.amount) {
             toast.error("Choose a client and enter an amount");
             return;
           }
           const plan = (plans.data ?? []).find((item) => item.id === subscription.pricing_plan_id);
-          await addSubscription.mutateAsync({
+          const existing = (subscriptions.data ?? []).find(
+            (item) => item.id === editingSubscriptionId,
+          );
+          const values = {
             parent_id: subscription.parent_id,
             student_id: subscription.student_id || null,
             pricing_plan_id: subscription.pricing_plan_id || null,
             programme_id: plan?.programme_id ?? null,
-            plan_name: plan?.name ?? "Subscription",
+            plan_name: plan?.name ?? existing?.plan_name ?? "Subscription",
             amount: Number(subscription.amount),
             cadence: subscription.cadence,
             next_due_date: subscription.next_due_date || null,
             notes: subscription.notes || null,
-            status: "active",
-          });
-          toast.success("Subscription added");
+            status: existing?.status ?? "active",
+          };
+          if (editingSubscriptionId) {
+            await updateSubscription.mutateAsync({ id: editingSubscriptionId, values });
+            toast.success("Subscription updated");
+          } else {
+            await addSubscription.mutateAsync(values);
+            toast.success("Subscription added");
+          }
           setSubscriptionOpen(false);
         }}
       >
@@ -1537,6 +1955,191 @@ function ParentPayments() {
           label="Notes"
           value={subscription.notes}
           onChange={(value) => setSubscription({ ...subscription, notes: value })}
+        />
+      </FormDialog>
+
+      <FormDialog
+        open={invoiceOpen}
+        onOpenChange={setInvoiceOpen}
+        title={selectedInvoice ? `Invoice ${selectedInvoice.invoice_number}` : "Invoice"}
+        description={
+          selectedInvoice
+            ? `${parentName(selectedInvoice.parent_id)} · ${money(selectedInvoice.total)}`
+            : "Review and edit this invoice."
+        }
+        submitLabel="Save invoice"
+        busy={updateInvoice.isPending}
+        fullScreen
+        dangerLabel="Delete invoice"
+        onDanger={() => {
+          if (selectedInvoice) setInvoicePendingDelete(selectedInvoice);
+          setInvoiceOpen(false);
+        }}
+        onSubmit={async () => {
+          if (!selectedInvoice) return;
+          await updateInvoice.mutateAsync({
+            id: selectedInvoice.id,
+            values: {
+              status: invoiceEdit.status,
+              due_date: invoiceEdit.due_date || null,
+              notes: invoiceEdit.notes || null,
+            },
+          });
+          toast.success("Invoice updated");
+          setInvoiceOpen(false);
+        }}
+      >
+        {selectedInvoice ? (
+          <div className="grid gap-3 rounded-2xl bg-muted p-4 sm:grid-cols-3">
+            <div>
+              <p className="text-xs text-muted-foreground">Client</p>
+              <p className="font-bold">{parentName(selectedInvoice.parent_id)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Invoice total</p>
+              <p className="font-bold">{money(selectedInvoice.total)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Balance due</p>
+              <p className="font-bold">{money(selectedInvoice.balance_due)}</p>
+            </div>
+          </div>
+        ) : null}
+        <SelectField
+          label="Status"
+          value={invoiceEdit.status}
+          onChange={(value) => setInvoiceEdit({ ...invoiceEdit, status: value })}
+          options={[
+            { value: "draft", label: "Draft" },
+            { value: "approved", label: "Approved" },
+            { value: "sent", label: "Sent" },
+            { value: "paid", label: "Paid" },
+            { value: "void", label: "Void" },
+          ]}
+        />
+        <TextField
+          label="Due date"
+          type="date"
+          value={invoiceEdit.due_date}
+          onChange={(value) => setInvoiceEdit({ ...invoiceEdit, due_date: value })}
+        />
+        <TextAreaField
+          label="Notes"
+          value={invoiceEdit.notes}
+          onChange={(value) => setInvoiceEdit({ ...invoiceEdit, notes: value })}
+        />
+        {selectedInvoice ? (
+          <div className="overflow-x-auto rounded-2xl border border-border">
+            <table className="w-full min-w-[620px] text-left text-sm">
+              <thead className="bg-muted text-xs text-muted-foreground">
+                <tr>
+                  <th className="px-4 py-3">Student</th>
+                  <th className="px-4 py-3">Description</th>
+                  <th className="px-4 py-3 text-right">Qty</th>
+                  <th className="px-4 py-3 text-right">Rate</th>
+                  <th className="px-4 py-3 text-right">Amount</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {(invoiceItems.data ?? [])
+                  .filter((item) => item.invoice_id === selectedInvoice.id)
+                  .map((item) => (
+                    <tr key={item.id}>
+                      <td className="px-4 py-3">{studentName(item.student_id)}</td>
+                      <td className="px-4 py-3">{item.description}</td>
+                      <td className="px-4 py-3 text-right">{item.quantity}</td>
+                      <td className="px-4 py-3 text-right">{money(item.unit_price)}</td>
+                      <td className="px-4 py-3 text-right font-bold">{money(item.line_total)}</td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+        ) : null}
+      </FormDialog>
+
+      <FormDialog
+        open={productOpen}
+        onOpenChange={setProductOpen}
+        title={editingProductId ? "Edit product or service" : "Add product or service"}
+        submitLabel={editingProductId ? "Save changes" : "Add product"}
+        busy={addProduct.isPending || updateProduct.isPending}
+        dangerLabel={editingProductId ? "Delete" : undefined}
+        onDanger={
+          editingProductId
+            ? () => {
+                const current = (billingPlans.data ?? []).find(
+                  (item) => item.id === editingProductId,
+                );
+                if (current) setProductPendingDelete(current);
+                setProductOpen(false);
+              }
+            : undefined
+        }
+        onSubmit={async () => {
+          if (!product.name.trim() || !product.unit_amount) {
+            toast.error("Enter a name and price");
+            return;
+          }
+          const values = {
+            name: product.name.trim(),
+            description: product.description || null,
+            unit_amount: Number(product.unit_amount),
+            billing_frequency: product.billing_frequency,
+            children_included: Number(product.children_included || 1),
+            active: product.active === "true",
+            currency: "GBP",
+            source: "manual",
+          };
+          if (editingProductId) await updateProduct.mutateAsync({ id: editingProductId, values });
+          else await addProduct.mutateAsync(values);
+          toast.success(editingProductId ? "Product updated" : "Product added");
+          setProductOpen(false);
+        }}
+      >
+        <TextField
+          label="Name"
+          value={product.name}
+          onChange={(value) => setProduct({ ...product, name: value })}
+          required
+        />
+        <TextField
+          label="Price (£)"
+          type="number"
+          value={product.unit_amount}
+          onChange={(value) => setProduct({ ...product, unit_amount: value })}
+          required
+        />
+        <SelectField
+          label="Billing frequency"
+          value={product.billing_frequency}
+          onChange={(value) => setProduct({ ...product, billing_frequency: value })}
+          options={[
+            { value: "one_off", label: "One off" },
+            { value: "weekly", label: "Weekly" },
+            { value: "monthly", label: "Monthly" },
+            { value: "termly", label: "Termly" },
+          ]}
+        />
+        <TextField
+          label="Students included"
+          type="number"
+          value={product.children_included}
+          onChange={(value) => setProduct({ ...product, children_included: value })}
+        />
+        <SelectField
+          label="Status"
+          value={product.active}
+          onChange={(value) => setProduct({ ...product, active: value })}
+          options={[
+            { value: "true", label: "Active" },
+            { value: "false", label: "Inactive" },
+          ]}
+        />
+        <TextAreaField
+          label="Description"
+          value={product.description}
+          onChange={(value) => setProduct({ ...product, description: value })}
         />
       </FormDialog>
 
@@ -1662,6 +2265,64 @@ function ParentPayments() {
           onChange={(value) => setPayment({ ...payment, note: value })}
         />
       </FormDialog>
+      <ConfirmDeleteDialog
+        open={Boolean(subscriptionPendingDelete)}
+        onOpenChange={(open) => !open && setSubscriptionPendingDelete(null)}
+        title="Delete this subscription?"
+        description="This permanently removes the recurring plan. Existing invoices remain unchanged."
+        confirmLabel="Delete subscription"
+        busy={deleteSubscription.isPending}
+        onConfirm={async () => {
+          if (!subscriptionPendingDelete) return;
+          try {
+            await deleteSubscription.mutateAsync(subscriptionPendingDelete.id);
+            setSubscriptionPendingDelete(null);
+            toast.success("Subscription deleted");
+          } catch (error) {
+            toast.error(error instanceof Error ? error.message : "Could not delete subscription");
+          }
+        }}
+      />
+      <ConfirmDeleteDialog
+        open={Boolean(invoicePendingDelete)}
+        onOpenChange={(open) => !open && setInvoicePendingDelete(null)}
+        title="Delete this invoice?"
+        description="This permanently deletes the invoice and all of its line items."
+        confirmLabel="Delete invoice"
+        busy={deleteInvoice.isPending || deleteInvoiceItem.isPending}
+        onConfirm={async () => {
+          if (!invoicePendingDelete) return;
+          try {
+            const lines = (invoiceItems.data ?? []).filter(
+              (item) => item.invoice_id === invoicePendingDelete.id,
+            );
+            for (const line of lines) await deleteInvoiceItem.mutateAsync(line.id);
+            await deleteInvoice.mutateAsync(invoicePendingDelete.id);
+            setInvoicePendingDelete(null);
+            toast.success("Invoice deleted");
+          } catch (error) {
+            toast.error(error instanceof Error ? error.message : "Could not delete invoice");
+          }
+        }}
+      />
+      <ConfirmDeleteDialog
+        open={Boolean(productPendingDelete)}
+        onOpenChange={(open) => !open && setProductPendingDelete(null)}
+        title="Delete this product or service?"
+        description="This removes it from the billing catalogue."
+        confirmLabel="Delete product"
+        busy={deleteProduct.isPending}
+        onConfirm={async () => {
+          if (!productPendingDelete) return;
+          try {
+            await deleteProduct.mutateAsync(productPendingDelete.id);
+            setProductPendingDelete(null);
+            toast.success("Product deleted");
+          } catch (error) {
+            toast.error(error instanceof Error ? error.message : "Could not delete product");
+          }
+        }}
+      />
       <PaymentDocumentDialog
         open={documentOpen}
         onOpenChange={setDocumentOpen}
