@@ -814,9 +814,20 @@ function ParentPayments() {
                           {children.length ? (
                             <div className="mt-2 flex flex-wrap gap-1">
                               {children.map((studentId) => (
-                                <Pill key={studentId} tone="neutral">
+                                <Link
+                                  key={studentId}
+                                  to="/admin/students/$id"
+                                  params={{ id: studentId }}
+                                  onClick={(event) => event.stopPropagation()}
+                                  className="flex items-center gap-1 rounded-full bg-muted pr-2 text-xs font-semibold hover:text-primary"
+                                >
+                                  <Avatar
+                                    initials={initialsOf(studentName(studentId))}
+                                    tone={avatarTone(studentName(studentId))}
+                                    size="sm"
+                                  />
                                   {studentName(studentId)}
-                                </Pill>
+                                </Link>
                               ))}
                             </div>
                           ) : null}
@@ -975,9 +986,19 @@ function ParentPayments() {
                           <td className="px-4 py-3">
                             <div className="flex flex-wrap gap-1">
                               {children.slice(0, 2).map((id) => (
-                                <Pill key={id} tone="neutral">
+                                <Link
+                                  key={id}
+                                  to="/admin/students/$id"
+                                  params={{ id }}
+                                  className="flex items-center gap-1 rounded-full bg-muted pr-2 text-xs font-semibold hover:text-primary"
+                                >
+                                  <Avatar
+                                    initials={initialsOf(studentName(id))}
+                                    tone={avatarTone(studentName(id))}
+                                    size="sm"
+                                  />
                                   {studentName(id)}
-                                </Pill>
+                                </Link>
                               ))}
                               {children.length > 2 ? (
                                 <Pill tone="neutral">+{children.length - 2}</Pill>
@@ -1345,22 +1366,47 @@ function ParentPayments() {
                     onClick={() => openSubscription(item)}
                   >
                     <div className="flex items-start gap-3">
-                      <Avatar
-                        initials={initialsOf(parentName(item.parent_id))}
-                        tone={avatarTone(parentName(item.parent_id))}
-                        size="sm"
-                      />
+                      <Link
+                        to="/admin/parents/$id"
+                        params={{ id: item.parent_id }}
+                        onClick={(event) => event.stopPropagation()}
+                        aria-label={`Open ${parentName(item.parent_id)}'s page`}
+                      >
+                        <Avatar
+                          initials={initialsOf(parentName(item.parent_id))}
+                          tone={avatarTone(parentName(item.parent_id))}
+                          size="sm"
+                        />
+                      </Link>
                       <div className="min-w-0 flex-1">
                         <Link
                           to="/admin/parents/$id"
                           params={{ id: item.parent_id }}
+                          onClick={(event) => event.stopPropagation()}
                           className="block truncate text-base font-extrabold hover:text-primary"
                         >
                           {parentName(item.parent_id)}
                         </Link>
-                        <p className="mt-1 truncate text-sm text-muted-foreground">
-                          {studentName(item.student_id)} · {item.plan_name ?? "Subscription"}
-                        </p>
+                        <div className="mt-1 flex min-w-0 items-center gap-1.5 text-sm text-muted-foreground">
+                          {item.student_id ? (
+                            <Link
+                              to="/admin/students/$id"
+                              params={{ id: item.student_id }}
+                              onClick={(event) => event.stopPropagation()}
+                              className="flex min-w-0 items-center gap-1.5 hover:text-primary hover:underline"
+                            >
+                              <Avatar
+                                initials={initialsOf(studentName(item.student_id))}
+                                tone={avatarTone(studentName(item.student_id))}
+                                size="sm"
+                              />
+                              <span className="truncate">{studentName(item.student_id)}</span>
+                            </Link>
+                          ) : (
+                            <span>No student linked</span>
+                          )}
+                          <span>· {item.plan_name ?? "Subscription"}</span>
+                        </div>
                         <p className="mt-2 text-xs text-muted-foreground">
                           {item.next_due_date
                             ? `Next due ${prettyDate(item.next_due_date)}`
@@ -1440,34 +1486,63 @@ function ParentPayments() {
             ) : displayMode === "cards" ? (
               <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
                 {filteredSubscriptions.map((item) => (
-                  <button
+                  <article
                     key={item.id}
-                    type="button"
-                    onClick={() => openSubscription(item)}
                     className="rounded-2xl border border-border p-4 text-left hover:bg-muted/45"
                   >
                     <div className="flex items-start gap-3">
-                      <Avatar
-                        initials={initialsOf(parentName(item.parent_id))}
-                        tone={avatarTone(parentName(item.parent_id))}
-                      />
+                      <Link to="/admin/parents/$id" params={{ id: item.parent_id }}>
+                        <Avatar
+                          initials={initialsOf(parentName(item.parent_id))}
+                          tone={avatarTone(parentName(item.parent_id))}
+                        />
+                      </Link>
                       <div className="min-w-0 flex-1">
-                        <p className="truncate font-bold">{parentName(item.parent_id)}</p>
-                        <p className="truncate text-xs text-muted-foreground">
-                          {studentName(item.student_id)} · {item.plan_name ?? "Subscription"}
-                        </p>
+                        <Link
+                          to="/admin/parents/$id"
+                          params={{ id: item.parent_id }}
+                          className="block truncate font-bold hover:text-primary hover:underline"
+                        >
+                          {parentName(item.parent_id)}
+                        </Link>
+                        <div className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
+                          {item.student_id ? (
+                            <Link
+                              to="/admin/students/$id"
+                              params={{ id: item.student_id }}
+                              className="flex min-w-0 items-center gap-1.5 hover:text-primary hover:underline"
+                            >
+                              <Avatar
+                                initials={initialsOf(studentName(item.student_id))}
+                                tone={avatarTone(studentName(item.student_id))}
+                                size="sm"
+                              />
+                              <span className="truncate">{studentName(item.student_id)}</span>
+                            </Link>
+                          ) : (
+                            <span>No student linked</span>
+                          )}
+                          <span>· {item.plan_name ?? "Subscription"}</span>
+                        </div>
                       </div>
                       <Pill tone={item.status === "active" ? "green" : "neutral"}>
                         {item.status}
                       </Pill>
                     </div>
-                    <p className="mt-4 text-lg font-extrabold">{money(item.amount)}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {item.next_due_date
-                        ? `Next due ${prettyDate(item.next_due_date)}`
-                        : "No due date"}
-                    </p>
-                  </button>
+                    <div className="mt-4 flex items-end justify-between gap-3">
+                      <div>
+                        <p className="text-lg font-extrabold">{money(item.amount)}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {item.next_due_date
+                            ? `Next due ${prettyDate(item.next_due_date)}`
+                            : "No due date"}
+                        </p>
+                      </div>
+                      <Button size="sm" variant="ghost" onClick={() => openSubscription(item)}>
+                        Edit
+                      </Button>
+                    </div>
+                  </article>
                 ))}
               </div>
             ) : (
@@ -1488,10 +1563,10 @@ function ParentPayments() {
                     {filteredSubscriptions.map((item) => (
                       <tr key={item.id} className="hover:bg-muted/45">
                         <td className="px-4 py-3">
-                          <button
-                            type="button"
-                            onClick={() => openSubscription(item)}
-                            className="flex items-center gap-2 text-left font-bold"
+                          <Link
+                            to="/admin/parents/$id"
+                            params={{ id: item.parent_id }}
+                            className="flex items-center gap-2 text-left font-bold hover:text-primary hover:underline"
                           >
                             <Avatar
                               initials={initialsOf(parentName(item.parent_id))}
@@ -1499,9 +1574,26 @@ function ParentPayments() {
                               size="sm"
                             />
                             {parentName(item.parent_id)}
-                          </button>
+                          </Link>
                         </td>
-                        <td className="px-4 py-3">{studentName(item.student_id)}</td>
+                        <td className="px-4 py-3">
+                          {item.student_id ? (
+                            <Link
+                              to="/admin/students/$id"
+                              params={{ id: item.student_id }}
+                              className="flex items-center gap-2 font-semibold hover:text-primary hover:underline"
+                            >
+                              <Avatar
+                                initials={initialsOf(studentName(item.student_id))}
+                                tone={avatarTone(studentName(item.student_id))}
+                                size="sm"
+                              />
+                              {studentName(item.student_id)}
+                            </Link>
+                          ) : (
+                            <span className="text-muted-foreground">No student linked</span>
+                          )}
+                        </td>
                         <td className="px-4 py-3">{item.plan_name ?? "Subscription"}</td>
                         <td className="px-4 py-3">
                           <Pill tone={item.status === "active" ? "green" : "neutral"}>
@@ -2335,39 +2427,54 @@ function InvoiceSplitWorkspace({
             {invoices.map((invoice) => {
               const isSelected = invoice.id === selectedInvoice.id;
               return (
-                <button
+                <div
                   key={invoice.id}
-                  type="button"
-                  onClick={() => onSelect(invoice)}
-                  className={`w-full px-4 py-3 text-left transition-colors ${
+                  className={`px-4 py-3 transition-colors ${
                     isSelected ? "bg-secondary" : "hover:bg-muted/60"
                   }`}
                 >
                   <div className="flex items-start gap-2">
-                    <Avatar
-                      initials={initialsOf(parentName(invoice.parent_id))}
-                      tone={avatarTone(parentName(invoice.parent_id))}
-                      size="sm"
-                    />
+                    <Link
+                      to="/admin/parents/$id"
+                      params={{ id: invoice.parent_id }}
+                      aria-label={`Open ${parentName(invoice.parent_id)}'s page`}
+                    >
+                      <Avatar
+                        initials={initialsOf(parentName(invoice.parent_id))}
+                        tone={avatarTone(parentName(invoice.parent_id))}
+                        size="sm"
+                      />
+                    </Link>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-start justify-between gap-2">
-                        <p className="truncate text-sm font-bold">
+                        <Link
+                          to="/admin/parents/$id"
+                          params={{ id: invoice.parent_id }}
+                          className="truncate text-sm font-bold hover:text-primary hover:underline"
+                        >
                           {parentName(invoice.parent_id)}
-                        </p>
+                        </Link>
                         <p className="shrink-0 text-sm font-extrabold">{money(invoice.total)}</p>
                       </div>
-                      <p className="mt-0.5 text-xs text-muted-foreground">
-                        {invoice.invoice_number} ·{" "}
-                        {prettyDate(invoice.issue_date ?? invoice.created_at.slice(0, 10))}
-                      </p>
-                      <p
-                        className={`mt-1 text-[10px] font-extrabold uppercase ${invoice.status === "paid" ? "text-emerald-600" : invoice.status === "draft" ? "text-muted-foreground" : "text-amber-600"}`}
+                      <button
+                        type="button"
+                        onClick={() => onSelect(invoice)}
+                        className="mt-0.5 block w-full text-left"
+                        aria-label={`Open invoice ${invoice.invoice_number}`}
                       >
-                        {invoice.status}
-                      </p>
+                        <span className="block text-xs font-semibold text-primary hover:underline">
+                          {invoice.invoice_number} ·{" "}
+                          {prettyDate(invoice.issue_date ?? invoice.created_at.slice(0, 10))}
+                        </span>
+                        <span
+                          className={`mt-1 block text-[10px] font-extrabold uppercase ${invoice.status === "paid" ? "text-emerald-600" : invoice.status === "draft" ? "text-muted-foreground" : "text-amber-600"}`}
+                        >
+                          {invoice.status}
+                        </span>
+                      </button>
                     </div>
                   </div>
-                </button>
+                </div>
               );
             })}
           </div>
@@ -2516,14 +2623,29 @@ function InvoiceSplitWorkspace({
                   <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
                     Bill to
                   </p>
-                  <Link
-                    to="/admin/parents/$id"
-                    params={{ id: selectedInvoice.parent_id }}
-                    className="mt-2 block font-bold text-primary hover:underline"
-                  >
-                    {clientName}
-                  </Link>
-                  <p className="text-sm text-slate-500">{clientEmail}</p>
+                  <div className="mt-2 flex items-center gap-3">
+                    <Link
+                      to="/admin/parents/$id"
+                      params={{ id: selectedInvoice.parent_id }}
+                      aria-label={`Open ${clientName}'s page`}
+                    >
+                      <Avatar
+                        initials={initialsOf(clientName)}
+                        tone={avatarTone(clientName)}
+                        size="sm"
+                      />
+                    </Link>
+                    <div className="min-w-0">
+                      <Link
+                        to="/admin/parents/$id"
+                        params={{ id: selectedInvoice.parent_id }}
+                        className="block truncate font-bold text-primary hover:underline"
+                      >
+                        {clientName}
+                      </Link>
+                      <p className="truncate text-sm text-slate-500">{clientEmail}</p>
+                    </div>
+                  </div>
                 </div>
                 <dl className="grid grid-cols-2 gap-x-5 gap-y-2 text-sm sm:justify-self-end">
                   <dt className="text-slate-500">Invoice date</dt>
@@ -2556,8 +2678,35 @@ function InvoiceSplitWorkspace({
                       lines.map((item) => (
                         <tr key={item.id}>
                           <td className="px-4 py-4">
-                            <p className="font-semibold">{studentName(item.student_id)}</p>
-                            <p className="text-xs text-slate-500">{item.description}</p>
+                            <div className="flex items-center gap-2">
+                              {item.student_id ? (
+                                <Link
+                                  to="/admin/students/$id"
+                                  params={{ id: item.student_id }}
+                                  aria-label={`Open ${studentName(item.student_id)}'s page`}
+                                >
+                                  <Avatar
+                                    initials={initialsOf(studentName(item.student_id))}
+                                    tone={avatarTone(studentName(item.student_id))}
+                                    size="sm"
+                                  />
+                                </Link>
+                              ) : null}
+                              <div className="min-w-0">
+                                {item.student_id ? (
+                                  <Link
+                                    to="/admin/students/$id"
+                                    params={{ id: item.student_id }}
+                                    className="block truncate font-semibold hover:text-primary hover:underline"
+                                  >
+                                    {studentName(item.student_id)}
+                                  </Link>
+                                ) : (
+                                  <p className="font-semibold">No student linked</p>
+                                )}
+                                <p className="text-xs text-slate-500">{item.description}</p>
+                              </div>
+                            </div>
                           </td>
                           <td className="px-4 py-4 text-right">{item.quantity}</td>
                           <td className="px-4 py-4 text-right">{money(item.unit_price)}</td>
