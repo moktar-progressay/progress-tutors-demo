@@ -1,8 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { Activity, BookOpenCheck, ClipboardCheck } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Page } from "@/components/AppShell";
-import { Empty, PageHeader, Pill, Section, StatCard } from "@/components/kit";
+import { Avatar, avatarTone, Empty, PageHeader, Pill, Section, StatCard } from "@/components/kit";
 import {
   ConfirmDeleteDialog,
   FormDialog,
@@ -11,7 +12,15 @@ import {
   TextField,
 } from "@/components/form-kit";
 import { Button } from "@/components/ui/button";
-import { fullName, prettyDate, useTable, useUpsert, useDeleteRow, useUpdateRow } from "@/lib/db";
+import {
+  fullName,
+  initialsOf,
+  prettyDate,
+  useDeleteRow,
+  useTable,
+  useUpdateRow,
+  useUpsert,
+} from "@/lib/db";
 
 export const Route = createFileRoute("/_authenticated/admin/students/$id")({
   head: () => ({
@@ -96,6 +105,36 @@ function StudentDetail() {
   );
   const classList = classes.data ?? [];
   const available = classList.filter((c) => !myEnrolments.some((e) => e.class_id === c.id));
+  const studentActivity = [
+    ...myAttendance.map((item) => ({
+      id: `attendance-${item.id}`,
+      label: `Attendance marked ${item.status}`,
+      detail:
+        item.note ?? (item.minutes_late ? `${item.minutes_late} minutes late` : "Lesson register"),
+      date: item.recorded_at,
+      icon: ClipboardCheck,
+    })),
+    ...(progress.data ?? [])
+      .filter((item) => item.student_id === id)
+      .map((item) => ({
+        id: `progress-${item.id}`,
+        label: `${item.subject ?? "General"} progress recorded`,
+        detail: item.score === null ? item.status : `Score ${item.score} · ${item.status}`,
+        date: item.record_date,
+        icon: Activity,
+      })),
+    ...(homework.data ?? [])
+      .filter((item) => item.student_id === id)
+      .map((item) => ({
+        id: `homework-${item.id}`,
+        label: item.title,
+        detail: `Homework · ${item.status}`,
+        date: item.created_at,
+        icon: BookOpenCheck,
+      })),
+  ]
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    .slice(0, 10);
 
   return (
     <Page>
@@ -132,7 +171,24 @@ function StudentDetail() {
         <dl className="grid gap-3 text-sm sm:grid-cols-2">
           <div>
             <dt className="text-xs text-muted-foreground">Parent / guardian</dt>
-            <dd className="font-semibold">{parent ? fullName(parent) : "Not linked"}</dd>
+            <dd className="mt-1 font-semibold">
+              {parent ? (
+                <Link
+                  to="/admin/parents/$id"
+                  params={{ id: parent.id }}
+                  className="inline-flex items-center gap-2 rounded-lg hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <Avatar
+                    initials={initialsOf(fullName(parent))}
+                    tone={avatarTone(fullName(parent))}
+                    size="sm"
+                  />
+                  <span className="underline-offset-4 hover:underline">{fullName(parent)}</span>
+                </Link>
+              ) : (
+                "Not linked"
+              )}
+            </dd>
           </div>
           <div>
             <dt className="text-xs text-muted-foreground">Student email</dt>
@@ -149,6 +205,40 @@ function StudentDetail() {
             </dd>
           </div>
         </dl>
+      </Section>
+
+      <Section
+        id="sd-activity"
+        title="Recent activity"
+        subtitle="Attendance, progress and homework"
+      >
+        {studentActivity.length === 0 ? (
+          <Empty>No activity recorded yet.</Empty>
+        ) : (
+          <ul className="divide-y divide-border">
+            {studentActivity.map((item) => {
+              const Icon = item.icon;
+              return (
+                <li key={item.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-primary">
+                    <Icon className="h-4 w-4" aria-hidden="true" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-bold capitalize">
+                      {item.label}
+                    </span>
+                    <span className="block truncate text-xs text-muted-foreground">
+                      {item.detail}
+                    </span>
+                  </span>
+                  <time className="shrink-0 text-xs text-muted-foreground">
+                    {prettyDate(item.date)}
+                  </time>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </Section>
 
       <Section

@@ -14,7 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FilterDialog } from "@/components/filter-dialog";
-import { Filter } from "lucide-react";
+import { ChevronRight, Filter } from "lucide-react";
 import {
   fullName,
   initialsOf,
@@ -315,77 +315,110 @@ function StudentsPage() {
         ) : filtered.length === 0 ? (
           <Empty>No students yet. Add one, or import your existing CSV.</Empty>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] text-sm">
-              <thead>
-                <tr className="text-left text-xs text-muted-foreground">
-                  {["Student", "Year", "Parent / guardian", "Classes", "Status", ""].map((h) => (
-                    <th key={h} className="pb-2 font-semibold">
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((s) => {
-                  const name = fullName(s);
-                  const link = (links.data ?? []).find((l) => l.student_id === s.id);
-                  const parent = (parents.data ?? []).find((p) => p.id === link?.parent_id);
-                  const myClasses = enrolList
-                    .filter((e) => e.student_id === s.id && e.status === "active")
-                    .map((e) => classList.find((c) => c.id === e.class_id))
-                    .filter(Boolean);
-                  return (
-                    <tr key={s.id} className="border-t border-border">
-                      <td className="py-3">
-                        <div className="flex items-center gap-2">
-                          <Avatar initials={initialsOf(name)} size="sm" tone="purple" />
-                          <Link
-                            to="/admin/students/$id"
-                            params={{ id: s.id }}
-                            className="font-semibold hover:text-primary"
+          <>
+            <div className="divide-y divide-border md:hidden">
+              {filtered.map((student) => {
+                const name = fullName(student);
+                const link = (links.data ?? []).find((item) => item.student_id === student.id);
+                const parent = (parents.data ?? []).find((item) => item.id === link?.parent_id);
+                const lessonCount = enrolList.filter(
+                  (item) => item.student_id === student.id && item.status === "active",
+                ).length;
+                return (
+                  <Link
+                    key={student.id}
+                    to="/admin/students/$id"
+                    params={{ id: student.id }}
+                    className="flex items-center gap-3 py-3.5"
+                  >
+                    <Avatar initials={initialsOf(name)} size="sm" tone="purple" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-bold">{name}</span>
+                      <span className="block truncate text-xs text-muted-foreground">
+                        {parent ? fullName(parent) : "No parent linked"} · {lessonCount}{" "}
+                        {lessonCount === 1 ? "lesson" : "lessons"}
+                      </span>
+                    </span>
+                    <Pill tone={student.status === "active" ? "green" : "neutral"}>
+                      {student.status}
+                    </Pill>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  </Link>
+                );
+              })}
+            </div>
+            <div className="hidden overflow-x-auto md:block">
+              <table className="w-full min-w-[720px] text-sm">
+                <thead>
+                  <tr className="text-left text-xs text-muted-foreground">
+                    {["Student", "Year", "Parent / guardian", "Classes", "Status", ""].map((h) => (
+                      <th key={h} className="pb-2 font-semibold">
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((s) => {
+                    const name = fullName(s);
+                    const link = (links.data ?? []).find((l) => l.student_id === s.id);
+                    const parent = (parents.data ?? []).find((p) => p.id === link?.parent_id);
+                    const myClasses = enrolList
+                      .filter((e) => e.student_id === s.id && e.status === "active")
+                      .map((e) => classList.find((c) => c.id === e.class_id))
+                      .filter(Boolean);
+                    return (
+                      <tr key={s.id} className="border-t border-border">
+                        <td className="py-3">
+                          <div className="flex items-center gap-2">
+                            <Avatar initials={initialsOf(name)} size="sm" tone="purple" />
+                            <Link
+                              to="/admin/students/$id"
+                              params={{ id: s.id }}
+                              className="font-semibold hover:text-primary"
+                            >
+                              {name}
+                            </Link>
+                          </div>
+                        </td>
+                        <td className="py-3">{s.year_group ?? "—"}</td>
+                        <td className="py-3">{parent ? fullName(parent) : "—"}</td>
+                        <td className="py-3">
+                          <div className="flex flex-wrap gap-1">
+                            {myClasses.length === 0 ? (
+                              <Pill tone="amber">Unassigned</Pill>
+                            ) : (
+                              myClasses.map((c) => (
+                                <Pill key={c!.id} tone="blue">
+                                  {c!.name}
+                                </Pill>
+                              ))
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-3 capitalize">{s.status}</td>
+                        <td className="py-3 text-right whitespace-nowrap">
+                          <Button size="sm" variant="ghost" onClick={() => openEdit(s)}>
+                            Edit
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={() => archive(s)}>
+                            {s.status === "archived" ? "Restore" : "Archive"}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => setStudentPendingDelete(s)}
                           >
-                            {name}
-                          </Link>
-                        </div>
-                      </td>
-                      <td className="py-3">{s.year_group ?? "—"}</td>
-                      <td className="py-3">{parent ? fullName(parent) : "—"}</td>
-                      <td className="py-3">
-                        <div className="flex flex-wrap gap-1">
-                          {myClasses.length === 0 ? (
-                            <Pill tone="amber">Unassigned</Pill>
-                          ) : (
-                            myClasses.map((c) => (
-                              <Pill key={c!.id} tone="blue">
-                                {c!.name}
-                              </Pill>
-                            ))
-                          )}
-                        </div>
-                      </td>
-                      <td className="py-3 capitalize">{s.status}</td>
-                      <td className="py-3 text-right whitespace-nowrap">
-                        <Button size="sm" variant="ghost" onClick={() => openEdit(s)}>
-                          Edit
-                        </Button>
-                        <Button size="sm" variant="ghost" onClick={() => archive(s)}>
-                          {s.status === "archived" ? "Restore" : "Archive"}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          onClick={() => setStudentPendingDelete(s)}
-                        >
-                          Delete
-                        </Button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                            Delete
+                          </Button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
         <p className="mt-3 text-xs text-muted-foreground">
           Medical, allergy and emergency details are kept on the student's own page, not on this

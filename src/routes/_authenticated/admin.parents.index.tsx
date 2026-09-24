@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { ChevronRight } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Page } from "@/components/AppShell";
@@ -132,82 +133,115 @@ function ParentsPage() {
         {rows.length === 0 ? (
           <Empty>No parent or guardian records yet.</Empty>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[680px] text-sm">
-              <thead>
-                <tr className="text-left text-xs text-muted-foreground">
-                  {["Parent", "Contact", "Children", "Billing", ""].map((h) => (
-                    <th key={h} className="pb-2 font-semibold">
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((p) => {
-                  const children = (links.data ?? [])
-                    .filter((l) => l.parent_id === p.id)
-                    .map((l) => (students.data ?? []).find((s) => s.id === l.student_id))
-                    .filter(Boolean);
-                  return (
-                    <tr key={p.id} className="border-t border-border">
-                      <td className="py-3 font-semibold">
-                        <Link
-                          to="/admin/parents/$id"
-                          params={{ id: p.id }}
-                          className="flex items-center gap-2 hover:text-primary"
-                        >
-                          <Avatar
-                            initials={initialsOf(fullName(p))}
-                            tone={avatarTone(fullName(p))}
-                            size="sm"
-                          />
-                          {fullName(p)}
-                        </Link>
-                      </td>
-                      <td className="py-3 text-muted-foreground">
-                        {p.email ?? "—"}
-                        {p.phone ? ` · ${p.phone}` : ""}
-                      </td>
-                      <td className="py-3">
-                        <div className="flex flex-wrap gap-1">
-                          {children.length === 0 ? (
-                            <span className="text-muted-foreground">None linked</span>
-                          ) : (
-                            children.map((c) => (
-                              <Link
-                                key={c!.id}
-                                to="/admin/students/$id"
-                                params={{ id: c!.id }}
-                                className="inline-flex items-center gap-1 rounded-full bg-violet-50 py-0.5 pl-0.5 pr-2 text-xs font-semibold text-violet-700 hover:ring-1 hover:ring-violet-300"
-                              >
-                                <Avatar
-                                  initials={initialsOf(fullName(c!))}
-                                  tone={avatarTone(fullName(c!))}
-                                  size="sm"
-                                />
-                                {fullName(c!)}
-                              </Link>
-                            ))
-                          )}
-                        </div>
-                      </td>
-                      <td className="py-3">
-                        <Pill tone={p.billing_status === "active" ? "green" : "amber"}>
-                          {p.billing_status}
-                        </Pill>
-                      </td>
-                      <td className="py-3 text-right">
-                        <Button size="sm" variant="ghost" onClick={() => openEdit(p)}>
-                          Edit
-                        </Button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <>
+            <div className="divide-y divide-border md:hidden">
+              {rows.map((parent) => {
+                const childCount = (links.data ?? []).filter(
+                  (link) => link.parent_id === parent.id,
+                ).length;
+                return (
+                  <Link
+                    key={parent.id}
+                    to="/admin/parents/$id"
+                    params={{ id: parent.id }}
+                    className="flex items-center gap-3 py-3.5"
+                  >
+                    <Avatar
+                      initials={initialsOf(fullName(parent))}
+                      tone={avatarTone(fullName(parent))}
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-bold">{fullName(parent)}</span>
+                      <span className="block truncate text-xs text-muted-foreground">
+                        {parent.email ?? parent.phone ?? "No contact details"} · {childCount}{" "}
+                        {childCount === 1 ? "student" : "students"}
+                      </span>
+                    </span>
+                    <Pill tone={parent.billing_status === "active" ? "green" : "amber"}>
+                      {parent.billing_status}
+                    </Pill>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  </Link>
+                );
+              })}
+            </div>
+            <div className="hidden overflow-x-auto md:block">
+              <table className="w-full min-w-[680px] text-sm">
+                <thead>
+                  <tr className="text-left text-xs text-muted-foreground">
+                    {["Parent", "Contact", "Children", "Billing", ""].map((h) => (
+                      <th key={h} className="pb-2 font-semibold">
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((p) => {
+                    const children = (links.data ?? [])
+                      .filter((l) => l.parent_id === p.id)
+                      .map((l) => (students.data ?? []).find((s) => s.id === l.student_id))
+                      .filter(Boolean);
+                    return (
+                      <tr key={p.id} className="border-t border-border">
+                        <td className="py-3 font-semibold">
+                          <Link
+                            to="/admin/parents/$id"
+                            params={{ id: p.id }}
+                            className="flex items-center gap-2 hover:text-primary"
+                          >
+                            <Avatar
+                              initials={initialsOf(fullName(p))}
+                              tone={avatarTone(fullName(p))}
+                              size="sm"
+                            />
+                            {fullName(p)}
+                          </Link>
+                        </td>
+                        <td className="py-3 text-muted-foreground">
+                          {p.email ?? "—"}
+                          {p.phone ? ` · ${p.phone}` : ""}
+                        </td>
+                        <td className="py-3">
+                          <div className="flex flex-wrap gap-1">
+                            {children.length === 0 ? (
+                              <span className="text-muted-foreground">None linked</span>
+                            ) : (
+                              children.map((c) => (
+                                <Link
+                                  key={c!.id}
+                                  to="/admin/students/$id"
+                                  params={{ id: c!.id }}
+                                  className="inline-flex items-center gap-1 rounded-full bg-violet-50 py-0.5 pl-0.5 pr-2 text-xs font-semibold text-violet-700 hover:ring-1 hover:ring-violet-300"
+                                >
+                                  <Avatar
+                                    initials={initialsOf(fullName(c!))}
+                                    tone={avatarTone(fullName(c!))}
+                                    size="sm"
+                                  />
+                                  {fullName(c!)}
+                                </Link>
+                              ))
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-3">
+                          <Pill tone={p.billing_status === "active" ? "green" : "amber"}>
+                            {p.billing_status}
+                          </Pill>
+                        </td>
+                        <td className="py-3 text-right">
+                          <Button size="sm" variant="ghost" onClick={() => openEdit(p)}>
+                            Edit
+                          </Button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </Section>
 

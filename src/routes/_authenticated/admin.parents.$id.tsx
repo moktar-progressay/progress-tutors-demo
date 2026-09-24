@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Pencil, Plus, Save, Search, X } from "lucide-react";
+import { Activity, Pencil, Plus, Save, Search, Trash2, X } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { Page } from "@/components/AppShell";
@@ -10,6 +10,7 @@ import {
   type NewSubscriptionValues,
 } from "@/components/client-billing-create";
 import { Avatar, Empty, Pill, avatarTone } from "@/components/kit";
+import { ConfirmDeleteDialog, FormDialog, SelectField } from "@/components/form-kit";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -19,6 +20,7 @@ import {
   num,
   prettyDate,
   useTable,
+  useDeleteRow,
   useUpdateRow,
   useUpsert,
   type ParentRow,
@@ -51,10 +53,18 @@ function ClientDetail() {
   const addSubscription = useUpsert("client_subscriptions");
   const addInvoice = useUpsert("billing_invoices");
   const addInvoiceItem = useUpsert("billing_invoice_items");
+  const addStudentLink = useUpsert("parent_students", ["students"]);
+  const removeStudentLink = useDeleteRow("parent_students", ["students"]);
   const [query, setQuery] = useState("");
-  const [tab, setTab] = useState<ClientTab>("transactions");
+  const [tab, setTab] = useState<ClientTab>("overview");
   const [editing, setEditing] = useState(false);
   const [createMode, setCreateMode] = useState<BillingCreateMode | null>(null);
+  const [studentDialogOpen, setStudentDialogOpen] = useState(false);
+  const [chosenStudentId, setChosenStudentId] = useState("");
+  const [linkPendingDelete, setLinkPendingDelete] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
 
   if (parents.isLoading) {
     return (
@@ -78,6 +88,9 @@ function ClientDetail() {
     .filter((link) => link.parent_id === id)
     .map((link) => link.student_id);
   const children = (students.data ?? []).filter((student) => childIds.includes(student.id));
+  const availableStudents = (students.data ?? []).filter(
+    (student) => !childIds.includes(student.id),
+  );
   const clientSubscriptions = (subscriptions.data ?? []).filter((item) => item.parent_id === id);
   const clientInvoices = (invoices.data ?? [])
     .filter((item) => item.parent_id === id)
@@ -108,6 +121,28 @@ function ClientDetail() {
     (invoices.data ?? [])
       .filter((invoice) => invoice.parent_id === parentId)
       .reduce((sum, invoice) => sum + num(invoice.balance_due), 0);
+  const recentActivity = [
+    ...clientInvoices.map((invoice) => ({
+      id: `invoice-${invoice.id}`,
+      label: `Invoice ${invoice.invoice_number}`,
+      detail: `${money(invoice.total)} · ${invoice.status}`,
+      date: invoice.issue_date ?? invoice.created_at.slice(0, 10),
+    })),
+    ...clientPayments.map((payment) => ({
+      id: `payment-${payment.id}`,
+      label: "Payment recorded",
+      detail: `${money(payment.amount)} · ${payment.status}`,
+      date: payment.payment_date,
+    })),
+    ...clientSubscriptions.map((subscription) => ({
+      id: `subscription-${subscription.id}`,
+      label: subscription.plan_name ?? "Subscription created",
+      detail: `${money(subscription.amount)} · ${subscription.status}`,
+      date: subscription.created_at.slice(0, 10),
+    })),
+  ]
+    .sort((a, b) => String(b.date).localeCompare(String(a.date)))
+    .slice(0, 8);
 
   if (createMode) {
     const createSubscription = async (values: NewSubscriptionValues) => {
@@ -178,9 +213,7 @@ function ClientDetail() {
           client={client}
           students={children}
           plans={(billingPlans.data ?? []).filter((plan) => plan.active)}
-          busy={
-            addSubscription.isPending || addInvoice.isPending || addInvoiceItem.isPending
-          }
+          busy={addSubscription.isPending || addInvoice.isPending || addInvoiceItem.isPending}
           onCancel={() => setCreateMode(null)}
           onCreateSubscription={createSubscription}
           onCreateInvoice={createInvoice}
@@ -285,10 +318,7 @@ function ClientDetail() {
                 <Pencil className="h-4 w-4" />
                 <span className="hidden sm:inline">Edit</span>
               </Button>
-              <Button
-                className="hidden sm:inline-flex"
-                onClick={() => setCreateMode("invoice")}
-              >
+              <Button className="hidden sm:inline-flex" onClick={() => setCreateMode("invoice")}>
                 <Plus className="h-4 w-4" /> New invoice
               </Button>
             </div>
@@ -340,30 +370,87 @@ function ClientDetail() {
                   </Detail>
                 </dl>
               </RecordPanel>
-              <RecordPanel title="Students" subtitle={`${children.length} linked`}>
+              <RecordPanel
+                title="Students"
+                subtitle={`${children.length} linked`}
+                action={
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => {
+                      setChosenStudentId("");
+                      setStudentDialogOpen(true);
+                    }}
+                  >
+                    <Plus className="h-4 w-4" /> Link student
+                  </Button>
+                }
+              >
                 {children.length === 0 ? (
                   <Empty>No students are linked to this client.</Empty>
                 ) : (
                   <div className="divide-y divide-border">
-                    {children.map((student) => (
-                      <Link
-                        key={student.id}
-                        to="/admin/students/$id"
-                        params={{ id: student.id }}
-                        className="flex items-center gap-3 py-3 hover:text-primary"
-                      >
-                        <Avatar
-                          initials={initialsOf(fullName(student))}
-                          tone={avatarTone(fullName(student))}
-                          size="sm"
-                        />
-                        <span className="min-w-0 flex-1 truncate font-bold">
-                          {fullName(student)}
+                    {children.map((student) => {
+                      const link = (links.data ?? []).find(
+                        (item) => item.parent_id === id && item.student_id === student.id,
+                      );
+                      return (
+                        <div key={student.id} className="flex items-center gap-2 py-3">
+                          <Link
+                            to="/admin/students/$id"
+                            params={{ id: student.id }}
+                            className="flex min-w-0 flex-1 items-center gap-3 hover:text-primary"
+                          >
+                            <Avatar
+                              initials={initialsOf(fullName(student))}
+                              tone={avatarTone(fullName(student))}
+                              size="sm"
+                            />
+                            <span className="min-w-0 flex-1 truncate font-bold">
+                              {fullName(student)}
+                            </span>
+                            <span className="hidden text-xs text-muted-foreground sm:inline">
+                              {student.year_group ?? "View record"}
+                            </span>
+                          </Link>
+                          {link ? (
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              aria-label={`Unlink ${fullName(student)}`}
+                              onClick={() =>
+                                setLinkPendingDelete({ id: link.id, name: fullName(student) })
+                              }
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          ) : null}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </RecordPanel>
+              <RecordPanel title="Recent activity" subtitle="Latest billing and account activity">
+                {recentActivity.length === 0 ? (
+                  <Empty>No activity recorded for this client.</Empty>
+                ) : (
+                  <div className="divide-y divide-border">
+                    {recentActivity.map((item) => (
+                      <div key={item.id} className="flex items-center gap-3 py-3">
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-secondary text-primary">
+                          <Activity className="h-4 w-4" />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-bold">{item.label}</span>
+                          <span className="block truncate text-xs text-muted-foreground">
+                            {item.detail}
+                          </span>
                         </span>
                         <span className="text-xs text-muted-foreground">
-                          {student.year_group ?? "View record"}
+                          {prettyDate(String(item.date).slice(0, 10))}
                         </span>
-                      </Link>
+                      </div>
                     ))}
                   </div>
                 )}
@@ -377,11 +464,7 @@ function ClientDetail() {
               <RecordPanel
                 title="Subscriptions"
                 action={
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => setCreateMode("subscription")}
-                  >
+                  <Button size="sm" variant="ghost" onClick={() => setCreateMode("subscription")}>
                     <Plus className="h-4 w-4" /> New
                   </Button>
                 }
@@ -530,6 +613,68 @@ function ClientDetail() {
           )}
         </main>
       </div>
+
+      <FormDialog
+        open={studentDialogOpen}
+        onOpenChange={setStudentDialogOpen}
+        title="Link student"
+        description={`Add an existing student to ${fullName(client)}'s account.`}
+        submitLabel="Link student"
+        busy={addStudentLink.isPending}
+        onSubmit={async () => {
+          if (!chosenStudentId) {
+            toast.error("Choose a student");
+            return;
+          }
+          try {
+            await addStudentLink.mutateAsync({
+              parent_id: client.id,
+              student_id: chosenStudentId,
+              is_primary: !(links.data ?? []).some((link) => link.student_id === chosenStudentId),
+            });
+            toast.success("Student linked to client");
+            setStudentDialogOpen(false);
+            setChosenStudentId("");
+          } catch (error) {
+            toast.error(error instanceof Error ? error.message : "Could not link the student");
+          }
+        }}
+      >
+        <SelectField
+          label="Student"
+          value={chosenStudentId}
+          onChange={setChosenStudentId}
+          options={[
+            { value: "", label: "Choose a student" },
+            ...availableStudents.map((student) => ({
+              value: student.id,
+              label: fullName(student),
+            })),
+          ]}
+          full
+        />
+      </FormDialog>
+
+      <ConfirmDeleteDialog
+        open={Boolean(linkPendingDelete)}
+        onOpenChange={(open) => {
+          if (!open && !removeStudentLink.isPending) setLinkPendingDelete(null);
+        }}
+        title={`Unlink ${linkPendingDelete?.name ?? "this student"}?`}
+        description="This removes the student from this client account. It does not delete the student record."
+        confirmLabel="Unlink student"
+        busy={removeStudentLink.isPending}
+        onConfirm={async () => {
+          if (!linkPendingDelete) return;
+          try {
+            await removeStudentLink.mutateAsync(linkPendingDelete.id);
+            toast.success("Student unlinked from client");
+            setLinkPendingDelete(null);
+          } catch (error) {
+            toast.error(error instanceof Error ? error.message : "Could not unlink the student");
+          }
+        }}
+      />
     </Page>
   );
 }

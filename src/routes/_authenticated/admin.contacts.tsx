@@ -131,34 +131,48 @@ function ContactsPage() {
                     ).length
                   : 0;
               const Icon = isStudent ? GraduationCap : isParent ? UserRound : Users;
+              const content = (
+                <>
+                  <Avatar
+                    initials={initialsOf(name)}
+                    tone={isStudent ? "pink" : isParent ? "blue" : "green"}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-bold">{name}</p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {record.email ?? record.phone ?? "No contact details"}
+                    </p>
+                  </div>
+                  <div className="hidden items-center gap-2 sm:flex">
+                    <Icon className="h-4 w-4 text-muted-foreground" />
+                    <Pill tone="neutral">
+                      {isParent
+                        ? `${childCount} ${childCount === 1 ? "child" : "children"}`
+                        : `${lessonCount} ${lessonCount === 1 ? "lesson" : "lessons"}`}
+                    </Pill>
+                    <Pill tone={record.status === "active" ? "green" : "neutral"}>
+                      {record.status}
+                    </Pill>
+                  </div>
+                </>
+              );
+              const className =
+                "flex items-center gap-3 px-4 py-3.5 transition-colors hover:bg-muted/60";
               return (
                 <li key={record.id}>
-                  <Link
-                    to={destination}
-                    className="flex items-center gap-3 px-4 py-3.5 transition-colors hover:bg-muted/60"
-                  >
-                    <Avatar
-                      initials={initialsOf(name)}
-                      tone={isStudent ? "pink" : isParent ? "blue" : "green"}
-                    />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-bold">{name}</p>
-                      <p className="truncate text-xs text-muted-foreground">
-                        {record.email ?? record.phone ?? "No contact details"}
-                      </p>
-                    </div>
-                    <div className="hidden items-center gap-2 sm:flex">
-                      <Icon className="h-4 w-4 text-muted-foreground" />
-                      <Pill tone="neutral">
-                        {isParent
-                          ? `${childCount} ${childCount === 1 ? "child" : "children"}`
-                          : `${lessonCount} ${lessonCount === 1 ? "lesson" : "lessons"}`}
-                      </Pill>
-                      <Pill tone={record.status === "active" ? "green" : "neutral"}>
-                        {record.status}
-                      </Pill>
-                    </div>
-                  </Link>
+                  {isStudent ? (
+                    <Link to="/admin/students/$id" params={{ id: record.id }} className={className}>
+                      {content}
+                    </Link>
+                  ) : isParent ? (
+                    <Link to="/admin/parents/$id" params={{ id: record.id }} className={className}>
+                      {content}
+                    </Link>
+                  ) : (
+                    <Link to="/admin/tutors/$id" params={{ id: record.id }} className={className}>
+                      {content}
+                    </Link>
+                  )}
                 </li>
               );
             })}
