@@ -296,9 +296,10 @@ export function ClassWorkspace({
   const presentForDate = marksForDate.filter((item) =>
     ["present", "late"].includes(item.status),
   ).length;
-  const attendancePercentage = marksForDate.length
-    ? Math.round((presentForDate / marksForDate.length) * 100)
-    : null;
+  const attendancePercentage =
+    marksForDate.length && activeRoster.length
+      ? Math.round((presentForDate / activeRoster.length) * 100)
+      : null;
 
   const markAttendance = async (studentIdValue: string, status: "present" | "absent") => {
     try {
@@ -457,7 +458,7 @@ export function ClassWorkspace({
         <SummaryCard
           label="Attendance"
           hint={
-            marksForDate.length ? `${presentForDate}/${marksForDate.length} present` : "Not marked"
+            marksForDate.length ? `${presentForDate}/${activeRoster.length} present` : "Not marked"
           }
         >
           <AttendanceProgress percentage={attendancePercentage} compact />
@@ -466,8 +467,8 @@ export function ClassWorkspace({
           <Users className="h-5 w-5 text-emerald-600" />
         </SummaryCard>
         <SummaryCard
-          label="Seats"
-          value={String(Math.max(Number(edit.capacity) - activeRoster.length, 0))}
+          label="Seats filled"
+          value={`${Number(edit.capacity) ? Math.round((activeRoster.length / Number(edit.capacity)) * 100) : 0}%`}
           hint={`${activeRoster.length}/${Number(edit.capacity) || 0} filled`}
         >
           <CalendarDays className="h-5 w-5 text-blue-600" />
