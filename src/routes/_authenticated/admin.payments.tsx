@@ -46,6 +46,10 @@ import { FilterDialog } from "@/components/filter-dialog";
 import { InvoiceEditScreen, type InvoiceEditValues } from "@/components/invoice-edit-screen";
 import { FamilyInvoiceDialog } from "@/components/family-invoice-dialog";
 import { PaymentDocumentDialog } from "@/components/payment-document-dialog";
+import {
+  TutorPaymentRequestDialog,
+  type TutorPaymentRequestValues,
+} from "@/components/tutor-payment-request-dialog";
 import { ZohoSyncPanel } from "@/components/zoho-sync-panel";
 import { Avatar, Empty, Pill, Section, StatCard, avatarTone } from "@/components/kit";
 import {
@@ -124,6 +128,9 @@ function ParentPayments() {
   const invoices = useTable("billing_invoices", "created_at");
   const invoiceItems = useTable("billing_invoice_items", "sort_order");
   const paymentRequests = useTable("payment_requests", "submitted_at");
+  const paymentRequestItems = useTable("payment_request_items");
+  const tutorEarnings = useTable("tutor_earnings", "earning_date");
+  const classes = useTable("classes", "name");
   const tutors = useTable("tutors", "first_name");
   const addSubscription = useUpsert("client_subscriptions");
   const updateSubscription = useUpdateRow("client_subscriptions");
@@ -135,6 +142,12 @@ function ParentPayments() {
   const addInvoiceItem = useUpsert("billing_invoice_items");
   const deleteInvoice = useDeleteRow("billing_invoices");
   const deleteInvoiceItem = useDeleteRow("billing_invoice_items");
+  const addTutor = useUpsert("tutors");
+  const addPaymentRequest = useUpsert("payment_requests", ["tutor_earnings"]);
+  const updatePaymentRequest = useUpdateRow("payment_requests", ["tutor_earnings"]);
+  const addPaymentRequestItems = useUpsert("payment_request_items", ["payment_requests"]);
+  const deletePaymentRequestItem = useDeleteRow("payment_request_items", ["payment_requests"]);
+  const updateTutorEarning = useUpdateRow("tutor_earnings", ["payment_requests"]);
   const addProduct = useUpsert("billing_plans");
   const updateProduct = useUpdateRow("billing_plans");
   const deleteProduct = useDeleteRow("billing_plans");
@@ -186,6 +199,7 @@ function ParentPayments() {
   });
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [documentOpen, setDocumentOpen] = useState(false);
+  const [tutorRequestOpen, setTutorRequestOpen] = useState(false);
   const [familyInvoiceOpen, setFamilyInvoiceOpen] = useState(false);
   const [paymentMode, setPaymentMode] = useState<PaymentMode>("invoice");
   const [subscription, setSubscription] = useState({
@@ -464,6 +478,10 @@ function ParentPayments() {
       setDocumentOpen(true);
       return;
     }
+    if (view === "tutor-requests") {
+      setTutorRequestOpen(true);
+      return;
+    }
     if (view === "products") {
       openNewProduct();
       return;
@@ -476,6 +494,69 @@ function ParentPayments() {
     if (!plan) return "";
     const cycles = cadence === "monthly" ? 4 : cadence === "termly" ? 12 : 1;
     return String(num(plan.amount) * num(weeklyHours) * cycles);
+  }
+
+  async function saveTutorPaymentRequest(values: TutorPaymentRequestValues) {
+    const totalHours = values.lines.reduce((total, line) => total + num(line.hours), 0);
+    const totalAmount = values.lines.reduce((total, line) => total + num(line.amount), 0);
+    const requestValues = {
+      tutor_id: values.tutorId,
+      reference: values.reference || `PR-${Date.now().toString().slice(-6)}`,
+      status: values.status,
+      total_hours: totalHours,
+      total_amount: totalAmount,
+      admin_note: values.notes || null,
+      submitted_at: new Date().toISOString(),
+      decided_at: null,
+    };
+
+    let request: Row<"payment_requests"> | undefined;
+    if (values.requestId) {
+      const existingItems = (paymentRequestItems.data ?? []).filter(
+        (item) => item.payment_request_id === values.requestId,
+      );
+      const selectedEarningIds = new Set(
+        values.lines.map((line) => line.earningId).filter((id): id is string => Boolean(id)),
+      );
+      for (const item of existingItems) {
+        if (item.tutor_earning_id && !selectedEarningIds.has(item.tutor_earning_id)) {
+          await updateTutorEarning.mutateAsync({
+            id: item.tutor_earning_id,
+            values: { status: "eligible", payment_request_id: null },
+          });
+        }
+        await deletePaymentRequestItem.mutateAsync(item.id);
+      }
+      request = await updatePaymentRequest.mutateAsync({
+        id: values.requestId,
+        values: requestValues,
+      });
+    } else {
+      [request] = await addPaymentRequest.mutateAsync(requestValues);
+    }
+    if (!request) throw new Error("The payment request could not be saved");
+
+    await addPaymentRequestItems.mutateAsync(
+      values.lines.map((line) => ({
+        payment_request_id: request.id,
+        tutor_earning_id: line.earningId,
+        session_id: line.sessionId,
+        hours: num(line.hours),
+        amount: num(line.amount),
+        description: line.description || "Teaching session",
+      })),
+    );
+    await Promise.all(
+      values.lines
+        .filter((line): line is typeof line & { earningId: string } => Boolean(line.earningId))
+        .map((line) =>
+          updateTutorEarning.mutateAsync({
+            id: line.earningId,
+            values: { status: "claimed", payment_request_id: request.id },
+          }),
+        ),
+    );
+    return request;
   }
 
   if (invoiceEditing && selectedInvoice) {
@@ -580,9 +661,11 @@ function ParentPayments() {
                   ? "Record payment"
                   : view === "documents"
                     ? "Create document"
-                    : view === "products"
-                      ? "Add product"
-                      : "Create invoice"
+                    : view === "tutor-requests"
+                      ? "Create tutor payment request"
+                      : view === "products"
+                        ? "Add product"
+                        : "Create invoice"
             }
             onClick={openPrimaryAction}
           >
@@ -1808,9 +1891,14 @@ function ParentPayments() {
           title="Tutor payment requests"
           subtitle="Review submitted claims and lesson evidence"
           action={
-            <Button size="sm" asChild>
-              <Link to="/admin/payment-requests">Open full review</Link>
-            </Button>
+            <div className="flex gap-2">
+              <Button size="sm" variant="secondary" onClick={() => setTutorRequestOpen(true)}>
+                <Plus className="h-4 w-4" /> New request
+              </Button>
+              <Button size="sm" asChild>
+                <Link to="/admin/payment-requests">Open full review</Link>
+              </Button>
+            </div>
           }
         >
           {(paymentRequests.data ?? []).length === 0 ? (
@@ -1859,24 +1947,42 @@ function ParentPayments() {
         <Section
           id="payment-documents"
           title="Documents"
-          subtitle="Editable childcare confirmations and invoice PDFs"
+          subtitle="Create invoices, childcare confirmations and tutor payment requests"
         >
-          <button
-            type="button"
-            onClick={() => setDocumentOpen(true)}
-            className="flex w-full items-center gap-3 rounded-2xl border border-border p-4 text-left hover:bg-muted"
-          >
-            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-secondary text-primary">
-              <FileText className="h-5 w-5" />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block font-bold">Create and preview a PDF</span>
-              <span className="block text-xs text-muted-foreground">
-                Choose a client and student, edit every field and download.
+          <div className="grid gap-3 md:grid-cols-2">
+            <button
+              type="button"
+              onClick={() => setDocumentOpen(true)}
+              className="flex w-full items-center gap-3 rounded-2xl border border-border p-4 text-left hover:bg-muted"
+            >
+              <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-secondary text-primary">
+                <FileText className="h-5 w-5" />
               </span>
-            </span>
-            <span className="text-sm font-bold text-primary">Create</span>
-          </button>
+              <span className="min-w-0 flex-1">
+                <span className="block font-bold">Client document</span>
+                <span className="block text-xs text-muted-foreground">
+                  Create an invoice or childcare confirmation PDF.
+                </span>
+              </span>
+              <span className="text-sm font-bold text-primary">Create</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setTutorRequestOpen(true)}
+              className="flex w-full items-center gap-3 rounded-2xl border border-border p-4 text-left hover:bg-muted"
+            >
+              <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
+                <WalletCards className="h-5 w-5" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block font-bold">Tutor payment request</span>
+                <span className="block text-xs text-muted-foreground">
+                  Load worked hours, edit, save, export or submit.
+                </span>
+              </span>
+              <span className="text-sm font-bold text-primary">Create</span>
+            </button>
+          </div>
         </Section>
       ) : null}
 
@@ -2523,9 +2629,39 @@ function ParentPayments() {
       <PaymentDocumentDialog
         open={documentOpen}
         onOpenChange={setDocumentOpen}
+        onCreateTutorRequest={() => setTutorRequestOpen(true)}
         parents={parents.data ?? []}
         students={students.data ?? []}
         links={parentLinks.data ?? []}
+      />
+      <TutorPaymentRequestDialog
+        open={tutorRequestOpen}
+        onOpenChange={setTutorRequestOpen}
+        tutors={tutors.data ?? []}
+        earnings={tutorEarnings.data ?? []}
+        classes={classes.data ?? []}
+        busy={
+          addTutor.isPending ||
+          addPaymentRequest.isPending ||
+          updatePaymentRequest.isPending ||
+          addPaymentRequestItems.isPending ||
+          deletePaymentRequestItem.isPending ||
+          updateTutorEarning.isPending
+        }
+        onAddTutor={async (values) => {
+          const [created] = await addTutor.mutateAsync({
+            first_name: values.firstName,
+            last_name: values.lastName || null,
+            email: values.email || null,
+            hourly_rate: values.hourlyRate || null,
+            status: "active",
+            subjects: [],
+            levels: [],
+          });
+          if (!created) throw new Error("The tutor could not be added");
+          return created;
+        }}
+        onSave={saveTutorPaymentRequest}
       />
       <FamilyInvoiceDialog
         open={familyInvoiceOpen}

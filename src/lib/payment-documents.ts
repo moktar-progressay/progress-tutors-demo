@@ -1,4 +1,4 @@
-export type PaymentDocumentType = "childcare" | "invoice";
+export type PaymentDocumentType = "childcare" | "invoice" | "payment_request";
 
 export interface PaymentDocumentData {
   type: PaymentDocumentType;
@@ -58,7 +58,17 @@ function makeContent(data: PaymentDocumentData) {
 
   commands.push("0.94 0.18 0.45 rg 0 790 595 52 re f");
   commands.push("1 1 1 rg");
-  text(data.type === "invoice" ? "INVOICE" : "CHILDCARE PAYMENT CONFIRMATION", 42, 807, 20, true);
+  text(
+    data.type === "invoice"
+      ? "INVOICE"
+      : data.type === "payment_request"
+        ? "TUTOR PAYMENT REQUEST"
+        : "CHILDCARE PAYMENT CONFIRMATION",
+    42,
+    807,
+    20,
+    true,
+  );
   commands.push("0 0 0 rg");
   text("Progressay Impact CIC", 42, 758, 10, true);
   text("196 Freston Road", 42, 744);
@@ -98,6 +108,29 @@ function makeContent(data: PaymentDocumentData) {
       text("Notes", 42, 450, 10, true);
       wrap(data.notes, 42, 433, 78, 9, 13);
     }
+  } else if (data.type === "payment_request") {
+    text(`Request: ${data.reference || "Draft"}`, 42, 675, 13, true);
+    text(`Tutor: ${data.parentName || "Tutor name"}`, 42, 642, 11, true);
+    text(data.parentEmail || "Tutor email", 42, 626, 10);
+    text("Teaching period", 42, 588, 10, true);
+    text(`${displayDate(data.fromDate)} - ${displayDate(data.untilDate)}`, 42, 570, 10);
+    commands.push("0.96 0.96 0.97 rg");
+    box(42, 492, 511, 48, true);
+    commands.push("0 0 0 rg");
+    text("Service", 52, 521, 9, true);
+    text("Hours", 360, 521, 9, true);
+    text("Amount", 475, 521, 9, true);
+    text(data.service || "Teaching services", 52, 501, 10);
+    text(data.hours || "0", 360, 501, 10);
+    text(data.total || "£0", 475, 501, 10, true);
+    line(380, 457, 553, 457);
+    text("Total", 400, 433, 12, true);
+    text(data.total || "£0", 495, 433, 14, true);
+    if (data.notes) {
+      text("Notes", 42, 433, 10, true);
+      wrap(data.notes, 42, 416, 64, 9, 13);
+    }
+    text("Submitted by tutor for review and approval.", 42, 340, 9);
   } else {
     text(`Reference: ${data.reference || "URN: 2801807"}`, 330, 674, 11, true);
     text(`Dear ${data.parentName || "Parent"},`, 42, 674, 11);
@@ -166,7 +199,13 @@ export function downloadPaymentDocument(data: PaymentDocumentData) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `${data.type === "invoice" ? "invoice" : "childcare-confirmation"}-${(data.reference || "draft").replace(/[^a-z0-9]+/gi, "-").toLowerCase()}.pdf`;
+  const prefix =
+    data.type === "invoice"
+      ? "invoice"
+      : data.type === "payment_request"
+        ? "tutor-payment-request"
+        : "childcare-confirmation";
+  link.download = `${prefix}-${(data.reference || "draft").replace(/[^a-z0-9]+/gi, "-").toLowerCase()}.pdf`;
   link.click();
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
