@@ -1,17 +1,23 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { format } from "date-fns";
-import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Check, Copy, Filter, Plus, Save, Search, Trash2, X } from "lucide-react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  ArrowLeft,
+  CalendarDays,
+  Check,
+  Copy,
+  Filter,
+  Plus,
+  Save,
+  Search,
+  Trash2,
+  Users,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Page } from "@/components/AppShell";
-import { Avatar, avatarTone, Empty, GoProgressLink, PageHeader, Pill } from "@/components/kit";
-import {
-  ConfirmDeleteDialog,
-  FormDialog,
-  SelectField,
-  TextAreaField,
-  TextField,
-} from "@/components/form-kit";
+import { Avatar, avatarTone, Empty, PageHeader } from "@/components/kit";
+import { ConfirmDeleteDialog, SelectField, TextField } from "@/components/form-kit";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LessonTimeRangePicker } from "@/components/lesson-time-range-picker";
@@ -28,7 +34,6 @@ import {
   fullName,
   hhmm,
   initialsOf,
-  money,
   prettyDate,
   useTable,
   useDeleteRow,
@@ -50,8 +55,20 @@ export const Route = createFileRoute("/_authenticated/admin/classes/$id")({
   component: ClassProfile,
 });
 
-const TABS = ["Overview", "Students", "Lesson Reviews", "Payments", "GoProgress", "Notes"] as const;
-type Tab = (typeof TABS)[number];
+const SUBJECT_OPTIONS = [
+  "English",
+  "Maths",
+  "Science",
+  "Biology",
+  "Chemistry",
+  "Physics",
+  "Computing",
+  "History",
+  "Geography",
+  "French",
+  "Spanish",
+  "Football",
+];
 
 function ClassProfile() {
   const { id } = Route.useParams();
@@ -84,9 +101,6 @@ export function ClassWorkspace({
   const enrolments = useTable("class_enrolments");
   const sessions = useTable("sessions", "session_date");
   const attendance = useTable("student_attendance");
-  const reviews = useTable("lesson_reviews", "submitted_at");
-  const subscriptions = useTable("client_subscriptions");
-  const payments = useTable("client_payments", "payment_date");
   const updateClass = useUpdateRow("classes");
   const deleteClass = useDeleteRow("classes");
   const addEnrolment = useUpsert("class_enrolments");
@@ -95,7 +109,6 @@ export function ClassWorkspace({
   const addAttendance = useUpsert("student_attendance");
   const updateAttendance = useUpdateRow("student_attendance");
 
-  const [tab, setTab] = useState<Tab>("Students");
   const [lessonPickerOpen, setLessonPickerOpen] = useState(false);
   const [lessonSearch, setLessonSearch] = useState("");
   const [enrolOpen, setEnrolOpen] = useState(false);
@@ -103,13 +116,6 @@ export function ClassWorkspace({
   const [studentSearch, setStudentSearch] = useState("");
   const [studentSchool, setStudentSchool] = useState("all");
   const [studentYear, setStudentYear] = useState("all");
-  const [editOpen, setEditOpen] = useState(false);
-  const [editStudentIds, setEditStudentIds] = useState<string[]>([]);
-  const [editStudentSearch, setEditStudentSearch] = useState("");
-  const [studentPendingRemoval, setStudentPendingRemoval] = useState<{
-    enrolmentId: string;
-    studentName: string;
-  } | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [attendanceDate, setAttendanceDate] = useState(
     () => requestedDate ?? format(new Date(), "yyyy-MM-dd"),
@@ -195,22 +201,12 @@ export function ClassWorkspace({
       </Page>
     );
 
-  const site = (sites.data ?? []).find((item) => item.id === c.site_id);
   const tutor = (tutors.data ?? []).find((item) => item.id === c.tutor_id);
   const roster = (enrolments.data ?? []).filter((item) => item.class_id === c.id);
   const activeRoster = roster.filter((item) => item.status === "active");
   const classSessions = (sessions.data ?? []).filter((item) => item.class_id === c.id);
   const sessionIds = new Set(classSessions.map((item) => item.id));
   const classAttendance = (attendance.data ?? []).filter((item) => sessionIds.has(item.session_id));
-  const classReviews = (reviews.data ?? []).filter((item) => sessionIds.has(item.session_id));
-  const classSubscriptions = (subscriptions.data ?? []).filter((item) => item.class_id === c.id);
-  const subscriptionIds = new Set(classSubscriptions.map((item) => item.id));
-  const classPayments = (payments.data ?? []).filter(
-    (item) => item.subscription_id && subscriptionIds.has(item.subscription_id),
-  );
-  const received = classPayments
-    .filter((item) => item.status === "received")
-    .reduce((total, item) => total + Number(item.amount), 0);
   const manageableStudents = (students.data ?? []).filter(
     (student) =>
       student.status === "active" || activeRoster.some((item) => item.student_id === student.id),
@@ -241,21 +237,15 @@ export function ClassWorkspace({
       (studentYear === "all" || student.year_group === studentYear)
     );
   });
-  const editableStudents = (students.data ?? []).filter((student) => {
-    const isCurrentlyEnrolled = activeRoster.some((item) => item.student_id === student.id);
-    const query = editStudentSearch.trim().toLowerCase();
-    const haystack = [fullName(student), student.email, student.school, student.year_group]
-      .filter(Boolean)
-      .join(" ")
-      .toLowerCase();
-    return (
-      (student.status === "active" || isCurrentlyEnrolled) && (!query || haystack.includes(query))
-    );
-  });
-  const nextSession = [...classSessions]
-    .filter((item) => !["completed", "cancelled"].includes(item.status))
-    .sort((a, b) => a.session_date.localeCompare(b.session_date))[0];
   const attendanceSession = classSessions.find((item) => item.session_date === attendanceDate);
+  const subjectOptions = Array.from(
+    new Set([
+      ...SUBJECT_OPTIONS,
+      ...rows
+        .map((item) => item.subject?.trim())
+        .filter((value): value is string => Boolean(value)),
+    ]),
+  ).sort((a, b) => a.localeCompare(b, "en-GB"));
 
   const classLabel = (item: typeof c) => {
     const classSite = (sites.data ?? []).find((value) => value.id === item.site_id);
@@ -379,38 +369,10 @@ export function ClassWorkspace({
       toast.error(error instanceof Error ? error.message : "Could not update the lesson");
     }
   };
-  const openEdit = () => {
-    setEdit({
-      name: c.name,
-      start_date: c.start_date ?? DEMO_DATE,
-      start_time: hhmm(c.start_time),
-      end_time: hhmm(c.end_time),
-      recurrence: c.recurrence ?? "weekly",
-      end_date: c.end_date ?? "",
-      delivery_mode: c.delivery_mode,
-      site_id: c.site_id ?? "",
-      venue_name: c.venue_name ?? "",
-      online_url: c.online_url ?? "",
-      tutor_id: c.tutor_id ?? "",
-      subject: c.subject ?? "",
-      level: c.level ?? "",
-      room: c.room ?? "",
-      capacity: String(c.capacity),
-      session_rate: c.session_rate === null ? "" : String(c.session_rate),
-      price_per_session: c.price_per_session === null ? "" : String(c.price_per_session),
-      card_colour: c.card_colour ?? "pink",
-      active: c.active ? "active" : "archived",
-      notes: c.notes ?? "",
-      goprogress_course_url: c.goprogress_course_url ?? "",
-    });
-    setEditStudentIds(activeRoster.map((item) => item.student_id));
-    setEditStudentSearch("");
-    setEditOpen(true);
-  };
 
   return (
-    <Page className={embedded ? "space-y-5 px-3 py-3 sm:px-5 sm:py-4" : "space-y-5"}>
-      <section className="sticky top-0 z-20 rounded-2xl border border-border bg-card/95 p-3 shadow-sm backdrop-blur sm:p-4">
+    <Page className={embedded ? "space-y-3 px-3 py-3 pb-24 sm:px-5 sm:py-4" : "space-y-3 pb-24"}>
+      <section className="sticky top-0 z-20 rounded-2xl border border-border bg-card/95 p-2.5 shadow-sm backdrop-blur sm:p-3">
         <div className="flex min-w-0 items-center gap-2">
           {embedded ? (
             <Button size="icon" variant="ghost" aria-label="Close lesson" onClick={onClose}>
@@ -427,27 +389,21 @@ export function ClassWorkspace({
             value={edit.name}
             onChange={(event) => setEdit({ ...edit, name: event.target.value })}
             aria-label="Lesson name"
-            className="min-w-0 flex-1 border-0 bg-transparent px-2 text-base font-extrabold shadow-none focus-visible:ring-0 sm:text-xl"
+            className="min-w-0 flex-1 border-0 bg-transparent px-1 text-base font-extrabold shadow-none focus-visible:ring-0 sm:text-xl"
           />
           {embedded ? null : (
             <Button
-              size="sm"
+              size="icon"
               variant="secondary"
               onClick={() => {
                 setLessonSearch("");
                 setLessonPickerOpen(true);
               }}
+              aria-label="Change lesson"
             >
               <Filter className="h-4 w-4" />
-              <span className="hidden sm:inline">Change lesson</span>
             </Button>
           )}
-          {onClone ? (
-            <Button size="icon" variant="secondary" onClick={onClone} aria-label="Clone lesson">
-              <Copy className="h-4 w-4" />
-              <span className="hidden sm:inline">Clone</span>
-            </Button>
-          ) : null}
           <Button
             size="icon"
             variant="ghost"
@@ -457,16 +413,42 @@ export function ClassWorkspace({
           >
             <Trash2 className="h-4 w-4" />
           </Button>
-          <Button onClick={saveLesson} disabled={updateClass.isPending}>
+          <Button
+            size="icon"
+            onClick={saveLesson}
+            disabled={updateClass.isPending}
+            aria-label="Save lesson"
+          >
             <Save className="h-4 w-4" />
-            <span className="hidden sm:inline">{updateClass.isPending ? "Saving…" : "Save"}</span>
           </Button>
         </div>
       </section>
 
-      <section className="overflow-hidden rounded-3xl border border-border bg-card">
-        <div className="grid gap-5 p-4 sm:p-6 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
-          <div className="grid gap-4 sm:grid-cols-2">
+      <section className="grid grid-cols-3 gap-2" aria-label="Lesson summary">
+        <SummaryCard
+          label="Attendance"
+          hint={
+            marksForDate.length ? `${presentForDate}/${marksForDate.length} present` : "Not marked"
+          }
+        >
+          <AttendanceProgress percentage={attendancePercentage} compact />
+        </SummaryCard>
+        <SummaryCard label="Students" value={String(activeRoster.length)} hint="Enrolled">
+          <Users className="h-5 w-5 text-emerald-600" />
+        </SummaryCard>
+        <SummaryCard
+          label="Seats"
+          value={String(Math.max(Number(edit.capacity) - activeRoster.length, 0))}
+          hint={`${activeRoster.length}/${Number(edit.capacity) || 0} filled`}
+        >
+          <CalendarDays className="h-5 w-5 text-blue-600" />
+        </SummaryCard>
+      </section>
+
+      <div className="grid gap-3 lg:grid-cols-2">
+        <section className="rounded-2xl border border-border bg-card p-4">
+          <h2 className="mb-3 text-sm font-extrabold">Date &amp; time</h2>
+          <div className="grid gap-3 sm:grid-cols-2">
             <TextField
               label="Start date"
               type="date"
@@ -495,6 +477,26 @@ export function ClassWorkspace({
                 onChange={(end_date) => setEdit({ ...edit, end_date })}
               />
             ) : null}
+          </div>
+        </section>
+
+        <section className="rounded-2xl border border-border bg-card p-4">
+          <h2 className="mb-3 text-sm font-extrabold">Lesson details</h2>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <SelectField
+              label="Subject"
+              value={edit.subject}
+              onChange={(subject) => setEdit({ ...edit, subject })}
+              options={[
+                { value: "", label: "Select subject" },
+                ...subjectOptions.map((subject) => ({ value: subject, label: subject })),
+              ]}
+            />
+            <TextField
+              label="Level"
+              value={edit.level}
+              onChange={(level) => setEdit({ ...edit, level })}
+            />
             <SelectField
               label="Delivery"
               value={edit.delivery_mode}
@@ -507,7 +509,7 @@ export function ClassWorkspace({
             />
             {edit.delivery_mode === "online" ? (
               <TextField
-                label="Online meeting link"
+                label="Meeting link"
                 value={edit.online_url}
                 onChange={(online_url) => setEdit({ ...edit, online_url })}
               />
@@ -522,148 +524,86 @@ export function ClassWorkspace({
                 ]}
               />
             )}
-            <SelectField
-              label="Tutor"
-              value={edit.tutor_id}
-              onChange={(tutor_id) => setEdit({ ...edit, tutor_id })}
-              options={[
-                { value: "", label: "Not assigned" },
-                ...(tutors.data ?? []).map((item) => ({ value: item.id, label: fullName(item) })),
-              ]}
-            />
             <TextField
               label="Room"
               value={edit.room}
               onChange={(room) => setEdit({ ...edit, room })}
             />
-            <TextField
-              label="Subject"
-              value={edit.subject}
-              onChange={(subject) => setEdit({ ...edit, subject })}
-            />
-            <TextField
-              label="Level"
-              value={edit.level}
-              onChange={(level) => setEdit({ ...edit, level })}
-            />
           </div>
-          <aside className="space-y-4 rounded-2xl bg-muted/35 p-4">
-            <div className="flex items-center gap-3">
-              <Avatar
-                initials={initialsOf(fullName(tutor))}
-                tone={avatarTone(fullName(tutor))}
-                size="lg"
+        </section>
+
+        <section className="rounded-2xl border border-border bg-card p-4 lg:col-span-2">
+          <h2 className="mb-3 text-sm font-extrabold">Tutor</h2>
+          <div className="flex items-end gap-3">
+            <Avatar
+              initials={initialsOf(fullName(tutor))}
+              tone={avatarTone(fullName(tutor))}
+              size="lg"
+            />
+            <div className="min-w-0 flex-1">
+              <SelectField
+                label="Assigned tutor"
+                value={edit.tutor_id}
+                onChange={(tutor_id) => setEdit({ ...edit, tutor_id })}
+                options={[
+                  { value: "", label: "Not assigned" },
+                  ...(tutors.data ?? []).map((item) => ({ value: item.id, label: fullName(item) })),
+                ]}
               />
-              <div className="min-w-0">
-                <p className="truncate text-sm font-bold">
-                  {tutor ? fullName(tutor) : "Tutor not assigned"}
-                </p>
-                <p className="text-xs text-muted-foreground">Tutor</p>
-              </div>
             </div>
+          </div>
+        </section>
+      </div>
+
+      <section className="rounded-2xl border border-border bg-card p-4 sm:p-5">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-bold">Attendance &amp; students</h2>
+            <p className="text-xs text-muted-foreground">
+              Mark attendance and manage the lesson roster in one place.
+            </p>
+          </div>
+          <div className="grid w-full grid-cols-2 items-end gap-2 sm:w-auto sm:grid-cols-[11rem_8rem_auto]">
+            <label className="flex flex-col gap-1 text-xs font-semibold text-muted-foreground">
+              Attendance for
+              <input
+                type="date"
+                value={attendanceDate}
+                onChange={(event) => setAttendanceDate(event.target.value)}
+                className="h-9 rounded-xl border border-border bg-card px-3 text-sm font-semibold text-foreground"
+              />
+            </label>
             <TextField
               label="Capacity"
               type="number"
               value={edit.capacity}
               onChange={(capacity) => setEdit({ ...edit, capacity })}
             />
-          </aside>
-        </div>
-        <div className="overflow-x-auto border-t border-border px-3">
-          <div className="flex min-w-max gap-1">
-            {TABS.map((item) => (
-              <button
-                key={item}
-                type="button"
-                onClick={() => setTab(item)}
-                className={`border-b-2 px-3 py-3 text-sm font-semibold ${tab === item ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
-              >
-                {item}
-              </button>
-            ))}
+            <Button
+              className="col-span-2 sm:col-span-1"
+              onClick={() => {
+                setSelectedStudentIds(activeRoster.map((item) => item.student_id));
+                setStudentSearch("");
+                setStudentSchool("all");
+                setStudentYear("all");
+                setEnrolOpen(true);
+              }}
+            >
+              <Plus className="h-4 w-4" /> Manage students
+            </Button>
           </div>
         </div>
-      </section>
-
-      {tab === "Overview" ? (
-        <div className="grid gap-4 lg:grid-cols-3">
-          <section className="rounded-2xl border border-border bg-card p-5 lg:col-span-2">
-            <h2 className="text-lg font-bold">Lesson overview</h2>
-            <dl className="mt-4 grid gap-4 text-sm sm:grid-cols-2">
-              <Info label="Subject" value={c.subject ?? "Not set"} />
-              <Info label="Age group" value={c.age_group ?? "Not set"} />
-              <Info label="Delivery" value={c.delivery_mode.replace("_", " ")} />
-            </dl>
-          </section>
-          <aside className="rounded-2xl border border-border bg-card p-5">
-            <h2 className="font-bold">Next lesson</h2>
-            {nextSession ? (
-              <>
-                <p className="mt-3 text-sm font-bold">{prettyDate(nextSession.session_date)}</p>
-                <p className="text-sm text-muted-foreground">
-                  {hhmm(nextSession.start_time)}–{hhmm(nextSession.end_time)}
-                </p>
-                <Button className="mt-4 w-full" onClick={() => setTab("Students")}>
-                  View students
-                </Button>
-              </>
-            ) : (
-              <p className="mt-3 text-sm text-muted-foreground">No upcoming lesson.</p>
-            )}
-            <p className="mt-4 border-t border-border pt-4 text-xs text-muted-foreground">
-              {Math.max(c.capacity - activeRoster.length, 0)} spaces available
-            </p>
-          </aside>
-        </div>
-      ) : null}
-
-      {tab === "Students" ? (
-        <section className="rounded-2xl border border-border bg-card p-4 sm:p-5">
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <AttendanceProgress percentage={attendancePercentage} />
-              <div>
-                <h2 className="text-lg font-bold">Attendance ({activeRoster.length} students)</h2>
-                <p className="text-xs text-muted-foreground">
-                  {marksForDate.length
-                    ? `${presentForDate} present from ${marksForDate.length} marked`
-                    : "No attendance marked for this date"}
-                </p>
-              </div>
-            </div>
-            <div className="flex flex-wrap items-end gap-2">
-              <label className="flex min-w-[210px] flex-col gap-1 text-xs font-semibold text-muted-foreground">
-                Attendance for
-                <input
-                  type="date"
-                  value={attendanceDate}
-                  onChange={(event) => setAttendanceDate(event.target.value)}
-                  className="h-9 rounded-xl border border-border bg-card px-3 text-sm font-semibold text-foreground"
-                />
-              </label>
-              <Button
-                onClick={() => {
-                  setSelectedStudentIds(activeRoster.map((item) => item.student_id));
-                  setStudentSearch("");
-                  setStudentSchool("all");
-                  setStudentYear("all");
-                  setEnrolOpen(true);
-                }}
-              >
-                <Plus className="h-4 w-4" /> Manage students
-              </Button>
-            </div>
-          </div>
-          <div className="relative mt-4">
+        <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+          <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={attendanceSearch}
               onChange={(event) => setAttendanceSearch(event.target.value)}
-              placeholder="Search students by name, year, school or parent"
-              className="h-11 rounded-xl pl-9"
+              placeholder="Search students, parents, year or school"
+              className="h-10 rounded-xl pl-9"
             />
           </div>
-          <div className="mt-3 flex gap-2 overflow-x-auto pb-1" aria-label="Attendance filters">
+          <div className="flex gap-1 overflow-x-auto" aria-label="Attendance filters">
             {(
               [
                 ["all", "All"],
@@ -684,187 +624,86 @@ export function ClassWorkspace({
               </Button>
             ))}
           </div>
-          {activeRoster.length === 0 ? (
-            <div className="mt-4">
-              <Empty>No students enrolled yet.</Empty>
-            </div>
-          ) : attendanceRoster.length === 0 ? (
-            <div className="mt-4">
-              <Empty>No students match your search.</Empty>
-            </div>
-          ) : (
-            <div className="mt-4 overflow-x-auto rounded-xl border border-border">
-              <table className="w-full min-w-[320px] table-fixed text-left text-sm">
-                <thead className="border-b border-border bg-muted/50 text-xs text-muted-foreground">
-                  <tr>
-                    <th className="w-[52%] px-2 py-3 sm:px-3">Student name</th>
-                    <th className="w-[24%] px-1 py-3 text-center">Present</th>
-                    <th className="w-[24%] px-1 py-3 text-center">Absent</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {attendanceRoster.map((item) => {
-                    const student = (students.data ?? []).find(
-                      (value) => value.id === item.student_id,
-                    );
-                    const currentAttendance = currentAttendanceFor(item.student_id);
-                    const saving =
-                      addSession.isPending || addAttendance.isPending || updateAttendance.isPending;
-                    return (
-                      <tr key={item.id}>
-                        <td className="px-2 py-3 sm:px-3">
-                          <div className="flex min-w-0 items-center gap-1">
-                            <Link
-                              to="/admin/students/$id"
-                              params={{ id: item.student_id }}
-                              className="flex min-w-0 flex-1 items-center gap-2 font-bold hover:text-primary"
-                            >
-                              <Avatar
-                                initials={initialsOf(fullName(student))}
-                                tone={avatarTone(fullName(student))}
-                                size="sm"
-                              />
-                              <span className="min-w-0 break-words leading-tight">
-                                {fullName(student)}
-                              </span>
-                            </Link>
-                          </div>
-                        </td>
-                        <td className="px-1 py-3 text-center">
-                          <AttendanceChoiceButton
-                            type="present"
-                            selected={currentAttendance?.status === "present"}
-                            disabled={saving}
-                            onClick={() => markAttendance(item.student_id, "present")}
+        </div>
+        {activeRoster.length === 0 ? (
+          <div className="mt-4">
+            <Empty>No students enrolled yet.</Empty>
+          </div>
+        ) : attendanceRoster.length === 0 ? (
+          <div className="mt-4">
+            <Empty>No students match your search.</Empty>
+          </div>
+        ) : (
+          <div className="mt-3 overflow-x-auto rounded-xl border border-border">
+            <table className="w-full min-w-[320px] table-fixed text-left text-sm">
+              <thead className="border-b border-border bg-muted/50 text-xs text-muted-foreground">
+                <tr>
+                  <th className="w-[52%] px-2 py-2.5 sm:px-3">Student</th>
+                  <th className="w-[24%] px-1 py-2.5 text-center">Present</th>
+                  <th className="w-[24%] px-1 py-2.5 text-center">Absent</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {attendanceRoster.map((item) => {
+                  const student = (students.data ?? []).find(
+                    (value) => value.id === item.student_id,
+                  );
+                  const currentAttendance = currentAttendanceFor(item.student_id);
+                  const saving =
+                    addSession.isPending || addAttendance.isPending || updateAttendance.isPending;
+                  return (
+                    <tr key={item.id}>
+                      <td className="px-2 py-2.5 sm:px-3">
+                        <Link
+                          to="/admin/students/$id"
+                          params={{ id: item.student_id }}
+                          className="flex min-w-0 items-center gap-2 font-bold hover:text-primary"
+                        >
+                          <Avatar
+                            initials={initialsOf(fullName(student))}
+                            tone={avatarTone(fullName(student))}
+                            size="sm"
                           />
-                        </td>
-                        <td className="px-1 py-3 text-center">
-                          <AttendanceChoiceButton
-                            type="absent"
-                            selected={currentAttendance?.status === "absent"}
-                            disabled={saving}
-                            onClick={() => markAttendance(item.student_id, "absent")}
-                          />
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
-      ) : null}
-
-      {tab === "Lesson Reviews" ? (
-        <section className="rounded-2xl border border-border bg-card p-5">
-          <h2 className="text-lg font-bold">Lesson Reviews</h2>
-          {classReviews.length === 0 ? (
-            <div className="mt-4">
-              <Empty>No lesson reviews submitted.</Empty>
-            </div>
-          ) : (
-            <div className="mt-4 divide-y divide-border">
-              {classReviews.map((review) => {
-                const session = classSessions.find((item) => item.id === review.session_id);
-                const reviewTutor = (tutors.data ?? []).find((item) => item.id === review.tutor_id);
-                return (
-                  <article key={review.id} className="py-4">
-                    <div className="flex justify-between gap-2">
-                      <p className="font-bold">
-                        {session ? prettyDate(session.session_date) : "Lesson"}
-                      </p>
-                      <p className="text-xs text-muted-foreground">{fullName(reviewTutor)}</p>
-                    </div>
-                    {review.covered ? (
-                      <p className="mt-2 text-sm">
-                        <strong>Covered:</strong> {review.covered}
-                      </p>
-                    ) : null}
-                    {review.progress_note ? (
-                      <p className="mt-1 text-sm text-muted-foreground">{review.progress_note}</p>
-                    ) : null}
-                    {review.next_steps ? (
-                      <p className="mt-1 text-sm">
-                        <strong>Next:</strong> {review.next_steps}
-                      </p>
-                    ) : null}
-                  </article>
-                );
-              })}
-            </div>
-          )}
-        </section>
-      ) : null}
-
-      {tab === "Payments" ? (
-        <section className="rounded-2xl border border-border bg-card p-5">
-          <div className="flex flex-wrap items-end justify-between gap-2">
-            <div>
-              <h2 className="text-lg font-bold">Lesson payments</h2>
-              <p className="text-xs text-muted-foreground">
-                Subscriptions and payments linked to this lesson
-              </p>
-            </div>
-            <p className="text-2xl font-extrabold text-primary">{money(received)} received</p>
+                          <span className="min-w-0 truncate">{fullName(student)}</span>
+                        </Link>
+                      </td>
+                      <td className="px-1 py-2.5 text-center">
+                        <AttendanceChoiceButton
+                          type="present"
+                          selected={currentAttendance?.status === "present"}
+                          disabled={saving}
+                          onClick={() => markAttendance(item.student_id, "present")}
+                        />
+                      </td>
+                      <td className="px-1 py-2.5 text-center">
+                        <AttendanceChoiceButton
+                          type="absent"
+                          selected={currentAttendance?.status === "absent"}
+                          disabled={saving}
+                          onClick={() => markAttendance(item.student_id, "absent")}
+                        />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
-          <div className="mt-5 grid gap-4 lg:grid-cols-2">
-            <div>
-              <h3 className="text-sm font-bold">Subscriptions</h3>
-              {classSubscriptions.map((item) => (
-                <div
-                  key={item.id}
-                  className="mt-2 flex justify-between border-b border-border py-2 text-sm"
-                >
-                  <span>
-                    {item.plan_name ?? "Class plan"} · {item.cadence}
-                  </span>
-                  <b>{money(item.amount)}</b>
-                </div>
-              ))}
-            </div>
-            <div>
-              <h3 className="text-sm font-bold">Recent payments</h3>
-              {classPayments.slice(0, 8).map((item) => (
-                <div
-                  key={item.id}
-                  className="mt-2 flex justify-between border-b border-border py-2 text-sm"
-                >
-                  <span>{prettyDate(item.payment_date)}</span>
-                  <b>
-                    {money(item.amount)} · {item.status}
-                  </b>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-      ) : null}
+        )}
+      </section>
 
-      {tab === "GoProgress" ? (
-        <section className="rounded-2xl border border-border bg-card p-5">
-          <h2 className="text-lg font-bold">GoProgress</h2>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Connect this class to its course, students and lesson records.
-          </p>
-          <div className="mt-4 flex flex-wrap items-center gap-3">
-            <Pill tone={c.goprogress_course_url ? "green" : "amber"}>
-              {c.goprogress_course_url ? "Connected" : "Not connected"}
-            </Pill>
-            <GoProgressLink label={c.goprogress_course_url ? "Open course" : "GoProgress"} />
-            <p className="text-xs text-muted-foreground">Edit the course URL above, then save.</p>
-          </div>
-        </section>
-      ) : null}
-
-      {tab === "Notes" ? (
-        <Notes
-          initial={c.notes ?? ""}
-          save={async (notes) => {
-            await updateClass.mutateAsync({ id: c.id, values: { notes } });
-          }}
-        />
-      ) : null}
+      <footer className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-card/95 p-3 shadow-[0_-8px_30px_rgba(0,0,0,0.08)] backdrop-blur sm:left-auto sm:right-5 sm:bottom-5 sm:w-auto sm:rounded-2xl sm:border">
+        <div className="mx-auto flex max-w-xl gap-2 sm:w-[28rem]">
+          <Button className="flex-1" variant="secondary" onClick={onClone} disabled={!onClone}>
+            <Copy className="h-4 w-4" /> Clone lesson
+          </Button>
+          <Button className="flex-1" asChild>
+            <Link to="/admin/classes/$id" params={{ id: c.id }} search={{ date: attendanceDate }}>
+              See lesson
+            </Link>
+          </Button>
+        </div>
+      </footer>
 
       <Dialog open={lessonPickerOpen} onOpenChange={setLessonPickerOpen}>
         <DialogContent className="flex max-h-[82vh] flex-col p-0 sm:max-w-xl">
@@ -1067,294 +906,6 @@ export function ClassWorkspace({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      <FormDialog
-        open={editOpen}
-        onOpenChange={setEditOpen}
-        wide
-        title="Edit lesson"
-        busy={updateClass.isPending || addEnrolment.isPending || updateEnrolment.isPending}
-        dangerLabel="Delete"
-        dangerBusy={deleteClass.isPending}
-        onDanger={() => setDeleteOpen(true)}
-        onSubmit={async () => {
-          try {
-            await updateClass.mutateAsync({
-              id: c.id,
-              values: {
-                name: edit.name.trim(),
-                start_date: edit.start_date,
-                weekday: weekdayOf(edit.start_date),
-                start_time: edit.start_time,
-                end_time: edit.end_time,
-                recurrence: edit.recurrence,
-                end_date: edit.recurrence === "once" ? edit.start_date : edit.end_date || null,
-                delivery_mode: edit.delivery_mode,
-                site_id: edit.delivery_mode === "online" ? null : edit.site_id || null,
-                venue_name: edit.delivery_mode === "online" ? null : edit.venue_name.trim() || null,
-                online_url: edit.delivery_mode === "online" ? edit.online_url.trim() || null : null,
-                tutor_id: edit.tutor_id || null,
-                subject: edit.subject.trim() || null,
-                level: edit.level.trim() || null,
-                room: edit.room.trim() || null,
-                capacity: Number(edit.capacity) || 0,
-                session_rate: edit.session_rate ? Number(edit.session_rate) : null,
-                price_per_session: edit.price_per_session ? Number(edit.price_per_session) : null,
-                card_colour: edit.card_colour,
-                active: edit.active === "active",
-                notes: edit.notes.trim() || null,
-                goprogress_course_url: edit.goprogress_course_url.trim() || null,
-              },
-            });
-
-            const selected = new Set(editStudentIds);
-            const existingByStudent = new Map(roster.map((item) => [item.student_id, item]));
-            const toReactivate = roster.filter(
-              (item) => selected.has(item.student_id) && item.status !== "active",
-            );
-            const toRemove = roster.filter(
-              (item) => item.status === "active" && !selected.has(item.student_id),
-            );
-            const toAdd = editStudentIds.filter((studentId) => !existingByStudent.has(studentId));
-
-            await Promise.all([
-              ...toReactivate.map((item) =>
-                updateEnrolment.mutateAsync({
-                  id: item.id,
-                  values: { status: "active", end_date: null },
-                }),
-              ),
-              ...toRemove.map((item) =>
-                updateEnrolment.mutateAsync({
-                  id: item.id,
-                  values: { status: "inactive", end_date: edit.start_date },
-                }),
-              ),
-            ]);
-            if (toAdd.length > 0) {
-              await addEnrolment.mutateAsync(
-                toAdd.map((studentId) => ({
-                  class_id: c.id,
-                  student_id: studentId,
-                  status: "active",
-                })),
-              );
-            }
-
-            toast.success("Lesson and students updated");
-            setEditOpen(false);
-          } catch (error) {
-            toast.error(error instanceof Error ? error.message : "Could not update the lesson");
-          }
-        }}
-      >
-        <TextField
-          full
-          required
-          label="Lesson name"
-          value={edit.name}
-          onChange={(name) => setEdit({ ...edit, name })}
-        />
-        <TextField
-          label="Start date"
-          type="date"
-          value={edit.start_date}
-          onChange={(start_date) => setEdit({ ...edit, start_date })}
-        />
-        <SelectField
-          label="Repeats"
-          value={edit.recurrence}
-          onChange={(recurrence) => setEdit({ ...edit, recurrence })}
-          options={[
-            { value: "once", label: "Does not repeat" },
-            { value: "weekly", label: "Every week" },
-          ]}
-        />
-        <LessonTimeRangePicker
-          start={edit.start_time}
-          end={edit.end_time}
-          onChange={(start_time, end_time) => setEdit({ ...edit, start_time, end_time })}
-        />
-        {edit.recurrence === "weekly" ? (
-          <TextField
-            label="Repeat until"
-            type="date"
-            value={edit.end_date}
-            onChange={(end_date) => setEdit({ ...edit, end_date })}
-          />
-        ) : null}
-        <SelectField
-          label="Delivery"
-          value={edit.delivery_mode}
-          onChange={(delivery_mode) => setEdit({ ...edit, delivery_mode })}
-          options={[
-            { value: "in_person", label: "Face-to-face" },
-            { value: "online", label: "Online" },
-            { value: "hybrid", label: "Hybrid" },
-          ]}
-        />
-        {edit.delivery_mode === "online" ? (
-          <TextField
-            label="Online meeting link"
-            value={edit.online_url}
-            onChange={(online_url) => setEdit({ ...edit, online_url })}
-          />
-        ) : (
-          <SelectField
-            label="Location"
-            value={edit.site_id}
-            onChange={(site_id) => setEdit({ ...edit, site_id })}
-            options={[
-              { value: "", label: "Venue to confirm" },
-              ...(sites.data ?? []).map((item) => ({ value: item.id, label: item.name })),
-            ]}
-          />
-        )}
-        <TextField
-          label="Venue name"
-          value={edit.venue_name}
-          onChange={(venue_name) => setEdit({ ...edit, venue_name })}
-        />
-        <SelectField
-          label="Tutor"
-          value={edit.tutor_id}
-          onChange={(tutor_id) => setEdit({ ...edit, tutor_id })}
-          options={[
-            { value: "", label: "Not assigned" },
-            ...(tutors.data ?? []).map((item) => ({ value: item.id, label: fullName(item) })),
-          ]}
-        />
-        <TextField
-          label="Subject"
-          value={edit.subject}
-          onChange={(subject) => setEdit({ ...edit, subject })}
-        />
-        <TextField
-          label="Level"
-          value={edit.level}
-          onChange={(level) => setEdit({ ...edit, level })}
-        />
-        <TextField label="Room" value={edit.room} onChange={(room) => setEdit({ ...edit, room })} />
-        <TextField
-          label="Capacity"
-          type="number"
-          value={edit.capacity}
-          onChange={(capacity) => setEdit({ ...edit, capacity })}
-        />
-        <TextField
-          label="Client price per lesson (£)"
-          type="number"
-          value={edit.price_per_session}
-          onChange={(price_per_session) => setEdit({ ...edit, price_per_session })}
-        />
-        <TextField
-          label="Tutor pay per lesson (£)"
-          type="number"
-          value={edit.session_rate}
-          onChange={(session_rate) => setEdit({ ...edit, session_rate })}
-        />
-        <SelectField
-          label="Card colour"
-          value={edit.card_colour}
-          onChange={(card_colour) => setEdit({ ...edit, card_colour })}
-          options={[
-            { value: "pink", label: "Pink" },
-            { value: "blue", label: "Blue" },
-            { value: "green", label: "Green" },
-            { value: "amber", label: "Amber" },
-            { value: "violet", label: "Violet" },
-            { value: "teal", label: "Teal" },
-          ]}
-        />
-        <SelectField
-          label="Status"
-          value={edit.active}
-          onChange={(activeValue) => setEdit({ ...edit, active: activeValue })}
-          options={[
-            { value: "active", label: "Active" },
-            { value: "archived", label: "Archived" },
-          ]}
-        />
-        <TextField
-          label="GoProgress course URL"
-          value={edit.goprogress_course_url}
-          onChange={(goprogress_course_url) => setEdit({ ...edit, goprogress_course_url })}
-        />
-        <TextAreaField
-          label="Notes"
-          value={edit.notes}
-          onChange={(notes) => setEdit({ ...edit, notes })}
-        />
-        <div className="space-y-2 border-t border-border pt-4 sm:col-span-2">
-          <p className="text-xs font-semibold text-muted-foreground">
-            Students ({editStudentIds.length} selected)
-          </p>
-          <Input
-            value={editStudentSearch}
-            onChange={(event) => setEditStudentSearch(event.target.value)}
-            placeholder="Search students by name, school or year"
-            className="h-10 rounded-xl"
-          />
-          <div className="max-h-52 divide-y divide-border overflow-y-auto rounded-xl border border-border">
-            {editableStudents.map((student) => (
-              <label
-                key={student.id}
-                className="flex cursor-pointer items-center gap-3 px-3 py-2 hover:bg-muted"
-              >
-                <input
-                  type="checkbox"
-                  checked={editStudentIds.includes(student.id)}
-                  onChange={() =>
-                    setEditStudentIds((current) =>
-                      current.includes(student.id)
-                        ? current.filter((studentId) => studentId !== student.id)
-                        : [...current, student.id],
-                    )
-                  }
-                  className="h-4 w-4 accent-[var(--color-primary)]"
-                />
-                <Avatar
-                  initials={initialsOf(fullName(student))}
-                  size="sm"
-                  tone={avatarTone(fullName(student))}
-                />
-                <span className="min-w-0">
-                  <span className="block truncate text-sm font-bold">{fullName(student)}</span>
-                  <span className="block truncate text-xs text-muted-foreground">
-                    {[student.year_group, student.school].filter(Boolean).join(" · ") ||
-                      "No extra details"}
-                  </span>
-                </span>
-              </label>
-            ))}
-          </div>
-        </div>
-      </FormDialog>
-      <ConfirmDeleteDialog
-        open={Boolean(studentPendingRemoval)}
-        onOpenChange={(open) => {
-          if (!open && !updateEnrolment.isPending) setStudentPendingRemoval(null);
-        }}
-        title="Remove this student from the lesson?"
-        description={`${studentPendingRemoval?.studentName ?? "This student"} will be removed from this class. Their student record will remain available.`}
-        confirmLabel="Remove student"
-        busy={updateEnrolment.isPending}
-        onConfirm={async () => {
-          if (!studentPendingRemoval) return;
-          try {
-            await updateEnrolment.mutateAsync({
-              id: studentPendingRemoval.enrolmentId,
-              values: {
-                status: "inactive",
-                end_date: new Date().toISOString().slice(0, 10),
-              },
-            });
-            toast.success(`${studentPendingRemoval.studentName} removed from the lesson`);
-            setStudentPendingRemoval(null);
-          } catch (error) {
-            toast.error(error instanceof Error ? error.message : "Could not remove the student");
-          }
-        }}
-      />
       <ConfirmDeleteDialog
         open={deleteOpen}
         onOpenChange={(nextOpen) => {
@@ -1369,7 +920,6 @@ export function ClassWorkspace({
             await deleteClass.mutateAsync(c.id);
             toast.success("Lesson deleted");
             setDeleteOpen(false);
-            setEditOpen(false);
             if (embedded) onClose?.();
             else navigate({ to: "/admin/classes" });
           } catch (error) {
@@ -1381,11 +931,42 @@ export function ClassWorkspace({
   );
 }
 
-function AttendanceProgress({ percentage }: { percentage: number | null }) {
+function SummaryCard({
+  label,
+  value,
+  hint,
+  children,
+}: {
+  label: string;
+  value?: string;
+  hint: string;
+  children: ReactNode;
+}) {
+  return (
+    <article className="flex min-w-0 items-center justify-between gap-2 rounded-2xl border border-border bg-card p-3">
+      <div className="min-w-0">
+        {value ? <p className="text-xl font-extrabold leading-none sm:text-2xl">{value}</p> : null}
+        <p className="mt-1 truncate text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+          {label}
+        </p>
+        <p className="truncate text-[10px] text-muted-foreground">{hint}</p>
+      </div>
+      {children}
+    </article>
+  );
+}
+
+function AttendanceProgress({
+  percentage,
+  compact = false,
+}: {
+  percentage: number | null;
+  compact?: boolean;
+}) {
   const safePercentage = Math.max(0, Math.min(100, percentage ?? 0));
   return (
     <span
-      className="relative inline-grid h-16 w-16 shrink-0 place-items-center rounded-full"
+      className={`relative inline-grid shrink-0 place-items-center rounded-full ${compact ? "h-12 w-12" : "h-16 w-16"}`}
       style={{
         background: `conic-gradient(var(--primary) ${safePercentage * 3.6}deg, var(--muted) 0deg)`,
       }}
@@ -1431,35 +1012,5 @@ function AttendanceChoiceButton({
       {isPresent ? <Check className="h-3.5 w-3.5" /> : <X className="h-3.5 w-3.5" />}
       <span>{isPresent ? "Present" : "Absent"}</span>
     </Button>
-  );
-}
-
-function Info({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <dt className="text-xs text-muted-foreground">{label}</dt>
-      <dd className="font-semibold capitalize">{value}</dd>
-    </div>
-  );
-}
-
-function Notes({ initial, save }: { initial: string; save: (notes: string) => Promise<void> }) {
-  const [value, setValue] = useState(initial);
-  return (
-    <section className="rounded-2xl border border-border bg-card p-5">
-      <h2 className="text-lg font-bold">Lesson notes</h2>
-      <div className="mt-4">
-        <TextAreaField label="Internal notes" value={value} onChange={setValue} />
-      </div>
-      <Button
-        className="mt-4"
-        onClick={async () => {
-          await save(value);
-          toast.success("Notes saved");
-        }}
-      >
-        Save notes
-      </Button>
-    </section>
   );
 }
