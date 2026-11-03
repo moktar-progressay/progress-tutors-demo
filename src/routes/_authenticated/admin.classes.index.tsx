@@ -373,10 +373,12 @@ function SchedulePage() {
       ["present", "late", "absent", "excused"].includes(mark.status),
     );
     const present = marked.filter((mark) => ["present", "late"].includes(mark.status)).length;
+    const total = countFor(lesson);
     return {
       marked: marked.length,
       present,
-      percentage: marked.length ? Math.round((present / marked.length) * 100) : null,
+      total,
+      percentage: marked.length && total ? Math.round((present / total) * 100) : null,
     };
   };
   const summaryDates =
@@ -416,9 +418,21 @@ function SchedulePage() {
   const summaryPresentMarks = summaryAttendanceMarks.filter((mark) =>
     ["present", "late"].includes(mark.status),
   ).length;
-  const summaryAttendancePercentage = summaryAttendanceMarks.length
-    ? Math.round((summaryPresentMarks / summaryAttendanceMarks.length) * 100)
-    : null;
+  const summaryExpectedStudents =
+    view === "list"
+      ? summaryLessons.reduce((total, lesson) => total + countFor(lesson), 0)
+      : summaryDates.reduce(
+          (total, date) =>
+            total +
+            filtered
+              .filter((lesson) => lessonRunsOn(lesson, date))
+              .reduce((dateTotal, lesson) => dateTotal + countFor(lesson), 0),
+          0,
+        );
+  const summaryAttendancePercentage =
+    summaryAttendanceMarks.length && summaryExpectedStudents
+      ? Math.round((summaryPresentMarks / summaryExpectedStudents) * 100)
+      : null;
   const colourFor = (lesson: ClassRow) => {
     if (lesson.card_colour && lesson.card_colour in CARD_COLOURS)
       return CARD_COLOURS[lesson.card_colour as CardColour];
@@ -1179,7 +1193,7 @@ function SchedulePage() {
           value={summaryAttendancePercentage === null ? "—" : `${summaryAttendancePercentage}%`}
           hint={
             summaryAttendanceMarks.length
-              ? `${summaryPresentMarks} / ${summaryAttendanceMarks.length} present`
+              ? `${summaryPresentMarks} / ${summaryExpectedStudents} present`
               : "Not marked"
           }
           tone="blue"
