@@ -375,7 +375,7 @@ export function ClassWorkspace({
   };
 
   return (
-    <Page className={embedded ? "space-y-3 px-3 py-3 pb-24 sm:px-5 sm:py-4" : "space-y-3 pb-24"}>
+    <Page className={embedded ? "space-y-3 px-3 py-3 sm:px-5 sm:py-4" : "space-y-3"}>
       <section className="sticky top-0 z-20 rounded-2xl border border-border bg-card/95 p-2.5 shadow-sm backdrop-blur sm:p-3">
         <div className="flex min-w-0 items-center gap-2">
           {embedded ? (
@@ -739,7 +739,7 @@ export function ClassWorkspace({
         )}
       </section>
 
-      <footer className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-card/95 p-3 shadow-[0_-8px_30px_rgba(0,0,0,0.08)] backdrop-blur sm:left-auto sm:right-5 sm:bottom-5 sm:w-auto sm:rounded-2xl sm:border">
+      <footer className="rounded-2xl border border-border bg-card p-3 shadow-sm">
         <div className="mx-auto flex max-w-xl gap-2 sm:w-[28rem]">
           <Button className="flex-1" variant="secondary" onClick={onClone} disabled={!onClone}>
             <Copy className="h-4 w-4" /> Clone lesson
