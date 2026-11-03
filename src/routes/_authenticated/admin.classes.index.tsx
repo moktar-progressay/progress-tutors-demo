@@ -17,7 +17,6 @@ import {
 } from "date-fns";
 import {
   CalendarDays,
-  Check,
   ChevronLeft,
   ChevronRight,
   Clock3,
@@ -27,13 +26,11 @@ import {
   GraduationCap,
   MapPin,
   Minus,
-  Pencil,
   Plus,
   Search,
   Trash2,
   Users,
   Video,
-  X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -189,6 +186,45 @@ function lessonRunsOn(lesson: ClassRow, date: Date) {
   return lesson.weekday === format(date, "EEEE");
 }
 
+function AttendanceRing({
+  percentage,
+  size = "md",
+  inverted = false,
+}: {
+  percentage: number | null;
+  size?: "sm" | "md" | "lg";
+  inverted?: boolean;
+}) {
+  const dimension = size === "sm" ? 32 : size === "lg" ? 64 : 44;
+  const safePercentage = Math.max(0, Math.min(100, percentage ?? 0));
+  const track = inverted ? "rgba(255,255,255,.28)" : "var(--muted)";
+  const progress = inverted ? "rgba(255,255,255,.96)" : "var(--primary)";
+
+  return (
+    <span
+      className="relative inline-grid shrink-0 place-items-center rounded-full"
+      style={{
+        width: dimension,
+        height: dimension,
+        background: `conic-gradient(${progress} ${safePercentage * 3.6}deg, ${track} 0deg)`,
+      }}
+      role="img"
+      aria-label={percentage === null ? "Attendance not marked" : `${percentage}% attendance`}
+      title={percentage === null ? "Attendance not marked" : `${percentage}% attendance`}
+    >
+      <span
+        className={cn(
+          "absolute inset-[4px] grid place-items-center rounded-full font-extrabold",
+          inverted ? "bg-black/25 text-white" : "bg-card text-foreground",
+          size === "sm" ? "text-[8px]" : size === "lg" ? "text-xs" : "text-[9px]",
+        )}
+      >
+        {percentage === null ? "—" : `${percentage}%`}
+      </span>
+    </span>
+  );
+}
+
 function SchedulePage() {
   const { add, date: requestedDate, view: requestedView } = Route.useSearch();
   const lessons = useTable("classes", "start_time");
@@ -203,9 +239,6 @@ function SchedulePage() {
   const deleteLesson = useDeleteRow("classes");
   const addEnrolments = useUpsert("class_enrolments", ["classes"]);
   const updateEnrolment = useUpdateRow("class_enrolments", ["classes"]);
-  const addSession = useUpsert("sessions", ["student_attendance"]);
-  const addAttendance = useUpsert("student_attendance");
-  const updateAttendance = useUpdateRow("student_attendance");
 
   const [view, setView] = useState<CalendarView>(requestedView ?? "day");
   const [calendarZoom, setCalendarZoom] = useState(1.25);
@@ -221,7 +254,6 @@ function SchedulePage() {
   const [cloningId, setCloningId] = useState<string | null>(null);
   const [detail, setDetail] = useState<ClassRow | null>(null);
   const [detailDate, setDetailDate] = useState(currentDateIso);
-  const [attendanceSearch, setAttendanceSearch] = useState("");
   const [lessonPendingDelete, setLessonPendingDelete] = useState<ClassRow | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const dragRef = useRef<{
@@ -324,6 +356,28 @@ function SchedulePage() {
     );
     return (students.data ?? []).filter((student) => ids.has(student.id));
   };
+  const attendanceSummaryFor = (lesson: ClassRow, date?: Date | string) => {
+    const requestedDate =
+      typeof date === "string" ? date : date ? format(date, "yyyy-MM-dd") : undefined;
+    const lessonSessions = (sessions.data ?? [])
+      .filter((session) => session.class_id === lesson.id)
+      .sort((a, b) => b.session_date.localeCompare(a.session_date));
+    const session = requestedDate
+      ? lessonSessions.find((item) => item.session_date === requestedDate)
+      : lessonSessions[0];
+    const marks = session
+      ? (attendance.data ?? []).filter((mark) => mark.session_id === session.id)
+      : [];
+    const marked = marks.filter((mark) =>
+      ["present", "late", "absent", "excused"].includes(mark.status),
+    );
+    const present = marked.filter((mark) => ["present", "late"].includes(mark.status)).length;
+    return {
+      marked: marked.length,
+      present,
+      percentage: marked.length ? Math.round((present / marked.length) * 100) : null,
+    };
+  };
   const summaryDates =
     view === "day" ? [anchor] : view === "week" ? weekDays : view === "month" ? monthDays : [];
   const summaryLessons =
@@ -349,57 +403,6 @@ function SchedulePage() {
   const summaryOccupancy = summaryCapacity
     ? Math.round((summarySeatsTaken / summaryCapacity) * 100)
     : 0;
-  const detailSession = detail
-    ? (sessions.data ?? []).find(
-        (session) => session.class_id === detail.id && session.session_date === detailDate,
-      )
-    : undefined;
-  const detailAttendance = detailSession
-    ? (attendance.data ?? []).filter((mark) => mark.session_id === detailSession.id)
-    : [];
-  const attendanceStudents = detail
-    ? studentsFor(detail).filter((student) => {
-        const query = attendanceSearch.trim().toLowerCase();
-        return !query || fullName(student).toLowerCase().includes(query);
-      })
-    : [];
-
-  async function markQuickAttendance(studentId: string, status: "present" | "absent") {
-    if (!detail) return;
-    try {
-      let session = detailSession;
-      if (!session) {
-        const created = await addSession.mutateAsync({
-          class_id: detail.id,
-          schedule_block_id: detail.schedule_block_id,
-          site_id: detail.site_id,
-          tutor_id: detail.tutor_id,
-          session_date: detailDate,
-          start_time: detail.start_time,
-          end_time: detail.end_time,
-          status: "scheduled",
-          agreed_amount: detail.session_rate,
-        });
-        session = created[0];
-      }
-      if (!session) throw new Error("Could not open this attendance register");
-      const existing = (attendance.data ?? []).find(
-        (mark) => mark.session_id === session.id && mark.student_id === studentId,
-      );
-      if (existing) {
-        await updateAttendance.mutateAsync({ id: existing.id, values: { status } });
-      } else {
-        await addAttendance.mutateAsync({
-          session_id: session.id,
-          student_id: studentId,
-          status,
-        });
-      }
-      toast.success(`Attendance marked ${status}`);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not save attendance");
-    }
-  }
   const colourFor = (lesson: ClassRow) => {
     if (lesson.card_colour && lesson.card_colour in CARD_COLOURS)
       return CARD_COLOURS[lesson.card_colour as CardColour];
@@ -810,7 +813,11 @@ function SchedulePage() {
   const renderCard = (lesson: ClassRow, compact = false, occurrenceDate?: Date) => {
     const tutor = tutorFor(lesson);
     const enrolled = countFor(lesson);
-    const filled = lesson.capacity > 0 ? Math.min(100, (enrolled / lesson.capacity) * 100) : 0;
+    const occurrenceIso = format(
+      occurrenceDate ?? parseISO(lesson.start_date ?? selectedDate),
+      "yyyy-MM-dd",
+    );
+    const attendanceSummary = attendanceSummaryFor(lesson, occurrenceIso);
     return (
       <button
         key={lesson.id}
@@ -821,10 +828,7 @@ function SchedulePage() {
             event.preventDefault();
             return;
           }
-          setDetailDate(
-            format(occurrenceDate ?? parseISO(lesson.start_date ?? selectedDate), "yyyy-MM-dd"),
-          );
-          setAttendanceSearch("");
+          setDetailDate(occurrenceIso);
           setDetail(lesson);
         }}
         className={cn(
@@ -854,28 +858,29 @@ function SchedulePage() {
                 : "Face-to-face"}
           </span>
         </div>
-        {!compact ? (
-          <div className="mt-auto min-w-0 pt-1">
-            <div className="mb-1 h-1 overflow-hidden rounded-full bg-black/20">
-              <div
-                className="h-full rounded-full bg-white/90 transition-[width]"
-                style={{ width: `${filled}%` }}
-              />
-            </div>
-            <div className="flex min-w-0 items-end justify-between gap-1">
-              <span className="flex min-w-0 items-center" title={fullName(tutor)}>
-                <Avatar
-                  initials={initialsOf(fullName(tutor))}
-                  tone={avatarTone(fullName(tutor))}
-                  size="sm"
-                />
-              </span>
-              <span className="shrink-0 whitespace-nowrap rounded-full bg-black/20 px-1.5 py-0.5 text-[9px] font-extrabold leading-none">
-                {enrolled}/{lesson.capacity} seats
-              </span>
-            </div>
+        {compact ? (
+          <div className="mt-auto flex justify-end pt-1">
+            <AttendanceRing
+              percentage={attendanceSummary.percentage}
+              size="sm"
+              inverted
+            />
           </div>
-        ) : null}
+        ) : (
+          <div className="mt-auto flex min-w-0 items-end justify-between gap-1 pt-1">
+            <span className="flex min-w-0 items-center gap-1" title={fullName(tutor)}>
+              <AttendanceRing percentage={attendanceSummary.percentage} size="sm" inverted />
+              <Avatar
+                initials={initialsOf(fullName(tutor))}
+                tone={avatarTone(fullName(tutor))}
+                size="sm"
+              />
+            </span>
+            <span className="shrink-0 whitespace-nowrap rounded-full bg-black/20 px-1.5 py-0.5 text-[9px] font-extrabold leading-none">
+              {enrolled}/{lesson.capacity} students
+            </span>
+          </div>
+        )}
       </button>
     );
   };
@@ -1199,7 +1204,6 @@ function SchedulePage() {
                     type="button"
                     onClick={() => {
                       setDetailDate(lesson.start_date ?? selectedDate);
-                      setAttendanceSearch("");
                       setDetail(lesson);
                     }}
                     className="grid w-full grid-cols-[4.5rem_minmax(0,1fr)_auto] items-center gap-3 px-4 py-4 text-left hover:bg-muted/50"
@@ -1234,9 +1238,15 @@ function SchedulePage() {
                         </span>
                       </p>
                     </div>
-                    <Pill tone={capacityTone(countFor(lesson), lesson.capacity)}>
-                      {countFor(lesson)}/{lesson.capacity}
-                    </Pill>
+                    <div className="flex items-center gap-2">
+                      <AttendanceRing
+                        percentage={attendanceSummaryFor(lesson).percentage}
+                        size="sm"
+                      />
+                      <Pill tone={capacityTone(countFor(lesson), lesson.capacity)}>
+                        {countFor(lesson)}/{lesson.capacity}
+                      </Pill>
+                    </div>
                   </button>
                 </li>
               ))}
@@ -1329,16 +1339,17 @@ function SchedulePage() {
           }
         }}
       >
-        <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] overflow-y-auto overscroll-contain pb-[calc(env(safe-area-inset-bottom)+1rem)] sm:max-h-[90vh] sm:max-w-3xl sm:pb-6 xl:max-w-4xl">
+        <DialogContent className="w-[calc(100vw-1rem)] gap-0 overflow-hidden p-0 sm:max-w-lg">
           {detail ? (
             <>
-              <DialogHeader>
-                <DialogTitle>{detail.name}</DialogTitle>
+              <DialogHeader className="border-b border-border p-5 pr-12">
+                <DialogTitle className="text-left">{detail.name}</DialogTitle>
                 <DialogDescription>
-                  {detail.weekday} · {hhmm(detail.start_time)}–{hhmm(detail.end_time)}
+                  {format(parseISO(detailDate), "EEEE, d MMMM yyyy")} · {hhmm(detail.start_time)}–
+                  {hhmm(detail.end_time)}
                 </DialogDescription>
               </DialogHeader>
-              <div className="space-y-3 text-sm">
+              <div className="space-y-4 p-5 text-sm">
                 {tutorFor(detail) ? (
                   <Link
                     to="/admin/tutors/$id"
@@ -1380,206 +1391,57 @@ function SchedulePage() {
                         : "Face-to-face"}
                   </Pill>
                 </div>
-                <Pill tone={capacityTone(countFor(detail), detail.capacity)}>
-                  {countFor(detail)}/{detail.capacity} students
-                </Pill>
-                <div className="space-y-1.5" aria-label="Seat capacity">
-                  <div className="h-2.5 overflow-hidden rounded-full bg-muted">
-                    <div
-                      className="h-full rounded-full bg-primary transition-[width]"
-                      style={{
-                        width: `${
-                          detail.capacity > 0
-                            ? Math.min(100, (countFor(detail) / detail.capacity) * 100)
-                            : 0
-                        }%`,
-                      }}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex items-center gap-3 rounded-2xl border border-border bg-muted/30 p-3">
+                    <AttendanceRing
+                      percentage={attendanceSummaryFor(detail, detailDate).percentage}
+                      size="lg"
                     />
-                  </div>
-                  <p className="text-xs font-semibold text-muted-foreground">
-                    {Math.max(0, detail.capacity - countFor(detail))} seats remaining
-                  </p>
-                </div>
-                <div className="border-t border-border pt-3">
-                  <p className="mb-2 text-xs font-semibold text-muted-foreground">
-                    {studentsFor(detail).length
-                      ? `${studentsFor(detail).length} enrolled`
-                      : "No students enrolled"}
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {studentsFor(detail).map((student) => (
-                      <span
-                        key={student.id}
-                        className="inline-flex max-w-full items-center gap-1 rounded-full border border-border bg-muted/50 py-1 pl-1 pr-1"
-                      >
-                        <Avatar
-                          initials={initialsOf(fullName(student))}
-                          tone={avatarTone(fullName(student))}
-                          size="sm"
-                        />
-                        <span className="truncate text-xs font-bold">{fullName(student)}</span>
-                        <button
-                          type="button"
-                          className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                          aria-label={`Remove ${fullName(student)} from this lesson`}
-                          disabled={updateEnrolment.isPending}
-                          onClick={async () => {
-                            const enrolment = (enrolments.data ?? []).find(
-                              (item) =>
-                                item.class_id === detail.id &&
-                                item.student_id === student.id &&
-                                item.status === "active",
-                            );
-                            if (!enrolment) return;
-                            try {
-                              await updateEnrolment.mutateAsync({
-                                id: enrolment.id,
-                                values: {
-                                  status: "inactive",
-                                  end_date: format(new Date(), "yyyy-MM-dd"),
-                                },
-                              });
-                              toast.success(`${fullName(student)} removed from the lesson`);
-                            } catch (error) {
-                              toast.error(
-                                error instanceof Error
-                                  ? error.message
-                                  : "Could not remove the student",
-                              );
-                            }
-                          }}
-                        >
-                          <X className="h-3.5 w-3.5" />
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="mt-3"
-                    onClick={() => editLesson(detail)}
-                  >
-                    <Plus className="h-4 w-4" /> Manage students
-                  </Button>
-                </div>
-                <div className="border-t border-border pt-3">
-                  <div className="space-y-3">
-                    <div className="flex flex-wrap items-end justify-between gap-2">
-                      <div>
-                        <p className="font-bold">Attendance register</p>
-                        <p className="text-xs text-muted-foreground">
-                          Mark students without leaving this lesson.
-                        </p>
-                      </div>
-                      <label className="grid gap-1 text-xs font-semibold text-muted-foreground">
-                        Lesson date
-                        <Input
-                          type="date"
-                          value={detailDate}
-                          onChange={(event) => setDetailDate(event.target.value)}
-                          className="h-9 w-40 rounded-xl"
-                        />
-                      </label>
+                    <div>
+                      <p className="font-extrabold">Attendance</p>
+                      <p className="text-xs text-muted-foreground">
+                        {attendanceSummaryFor(detail, detailDate).marked
+                          ? `${attendanceSummaryFor(detail, detailDate).present} of ${attendanceSummaryFor(detail, detailDate).marked} present`
+                          : "Not marked"}
+                      </p>
                     </div>
-                    <Input
-                      value={attendanceSearch}
-                      onChange={(event) => setAttendanceSearch(event.target.value)}
-                      placeholder="Search students"
-                      className="h-9 rounded-xl"
-                    />
-                    {attendanceStudents.length ? (
-                      <div className="overflow-hidden rounded-xl border border-border">
-                        <table className="w-full table-fixed text-left text-xs">
-                          <thead className="bg-muted/50 text-muted-foreground">
-                            <tr>
-                              <th className="w-[48%] px-2 py-2">Student</th>
-                              <th className="w-[26%] px-1 py-2 text-center">Present</th>
-                              <th className="w-[26%] px-1 py-2 text-center">Absent</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-border">
-                            {attendanceStudents.map((student) => {
-                              const mark = detailAttendance.find(
-                                (item) => item.student_id === student.id,
-                              );
-                              const saving =
-                                addSession.isPending ||
-                                addAttendance.isPending ||
-                                updateAttendance.isPending;
-                              return (
-                                <tr key={student.id}>
-                                  <td className="px-2 py-2 font-bold">{fullName(student)}</td>
-                                  <td className="px-1 py-2 text-center">
-                                    <Button
-                                      type="button"
-                                      size="sm"
-                                      variant={mark?.status === "present" ? "default" : "outline"}
-                                      className="h-8 w-full px-1 text-[10px]"
-                                      disabled={saving}
-                                      onClick={() => markQuickAttendance(student.id, "present")}
-                                    >
-                                      <Check className="h-3.5 w-3.5" /> Present
-                                    </Button>
-                                  </td>
-                                  <td className="px-1 py-2 text-center">
-                                    <Button
-                                      type="button"
-                                      size="sm"
-                                      variant={
-                                        mark?.status === "absent" ? "destructive" : "outline"
-                                      }
-                                      className="h-8 w-full px-1 text-[10px]"
-                                      disabled={saving}
-                                      onClick={() => markQuickAttendance(student.id, "absent")}
-                                    >
-                                      <X className="h-3.5 w-3.5" /> Absent
-                                    </Button>
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
-                    ) : (
-                      <Empty>No enrolled students match this search.</Empty>
-                    )}
+                  </div>
+                  <div className="flex flex-col justify-center rounded-2xl border border-border bg-muted/30 p-3">
+                    <p className="text-2xl font-extrabold">
+                      {countFor(detail)}
+                      <span className="text-sm text-muted-foreground">/{detail.capacity}</span>
+                    </p>
+                    <p className="text-xs font-semibold text-muted-foreground">Students enrolled</p>
                   </div>
                 </div>
               </div>
-              <div className="sticky bottom-0 z-10 -mx-2 grid grid-cols-4 gap-2 border-t border-border bg-background px-2 py-3">
-                <>
-                  <Button
-                    className="px-2 text-xs"
-                    variant="secondary"
-                    onClick={() => editLesson(detail)}
+              <div className="grid grid-cols-[auto_1fr_auto] gap-2 border-t border-border bg-muted/20 p-4">
+                <Button
+                  className="px-3"
+                  variant="secondary"
+                  aria-label="Clone lesson"
+                  onClick={() => cloneLesson(detail)}
+                >
+                  <Copy className="h-4 w-4" />
+                  <span className="hidden sm:inline">Clone</span>
+                </Button>
+                <Button asChild>
+                  <Link
+                    to="/admin/classes/$id"
+                    params={{ id: detail.id }}
+                    search={{ date: detailDate }}
                   >
-                    <Pencil className="h-4 w-4" /> Edit
-                  </Button>
-                  <Button
-                    className="px-2 text-xs"
-                    variant="secondary"
-                    onClick={() => cloneLesson(detail)}
-                  >
-                    <Copy className="h-4 w-4" /> Clone
-                  </Button>
-                  <Button asChild className="px-2 text-xs">
-                    <Link to="/admin/classes/$id" params={{ id: detail.id }}>
-                      Open
-                    </Link>
-                  </Button>
-                  <Button
-                    className="px-2 text-xs"
-                    variant="destructive"
-                    aria-label="Delete lesson"
-                    onClick={() => setLessonPendingDelete(detail)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    <span className="hidden sm:inline">Delete</span>
-                  </Button>
-                </>
+                    Open lesson
+                  </Link>
+                </Button>
+                <Button
+                  className="px-3"
+                  variant="destructive"
+                  aria-label="Delete lesson"
+                  onClick={() => setLessonPendingDelete(detail)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
               </div>
             </>
           ) : null}

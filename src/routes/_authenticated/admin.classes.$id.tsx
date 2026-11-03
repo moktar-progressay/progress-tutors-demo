@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { format } from "date-fns";
-import { useMemo, useState } from "react";
-import { ArrowLeft, Check, Filter, Pencil, Plus, Search, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { ArrowLeft, Check, Filter, Plus, Save, Search, X } from "lucide-react";
 import { toast } from "sonner";
 import { Page } from "@/components/AppShell";
 import { Avatar, avatarTone, Empty, GoProgressLink, PageHeader, Pill } from "@/components/kit";
@@ -38,6 +38,12 @@ import {
 } from "@/lib/db";
 
 export const Route = createFileRoute("/_authenticated/admin/classes/$id")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    date:
+      typeof search["date"] === "string" && /^\d{4}-\d{2}-\d{2}$/.test(search["date"])
+        ? search["date"]
+        : undefined,
+  }),
   head: () => ({
     meta: [{ title: "Lesson | ProgressTutors" }, { name: "robots", content: "noindex" }],
   }),
@@ -49,6 +55,7 @@ type Tab = (typeof TABS)[number];
 
 function ClassProfile() {
   const { id } = Route.useParams();
+  const { date: requestedDate } = Route.useSearch();
   const navigate = useNavigate();
   const classes = useTable("classes", "name");
   const sites = useTable("sites", "name");
@@ -86,8 +93,14 @@ function ClassProfile() {
     studentName: string;
   } | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const [attendanceDate, setAttendanceDate] = useState(() => format(new Date(), "yyyy-MM-dd"));
+  const [attendanceDate, setAttendanceDate] = useState(
+    () => requestedDate ?? format(new Date(), "yyyy-MM-dd"),
+  );
   const [attendanceSearch, setAttendanceSearch] = useState("");
+  const [attendanceFilter, setAttendanceFilter] = useState<
+    "all" | "present" | "absent" | "unmarked"
+  >("all");
+  const [initialisedClassId, setInitialisedClassId] = useState<string | null>(null);
   const [edit, setEdit] = useState({
     name: "",
     start_date: DEMO_DATE,
@@ -115,6 +128,38 @@ function ClassProfile() {
   const rows = useMemo(() => classes.data ?? [], [classes.data]);
   const c = rows.find((item) => item.id === id);
   const visibleClasses = rows.filter((item) => item.active || item.id === id);
+
+  useEffect(() => {
+    if (!c || initialisedClassId === c.id) return;
+    setEdit({
+      name: c.name,
+      start_date: c.start_date ?? DEMO_DATE,
+      start_time: hhmm(c.start_time),
+      end_time: hhmm(c.end_time),
+      recurrence: c.recurrence ?? "weekly",
+      end_date: c.end_date ?? "",
+      delivery_mode: c.delivery_mode,
+      site_id: c.site_id ?? "",
+      venue_name: c.venue_name ?? "",
+      online_url: c.online_url ?? "",
+      tutor_id: c.tutor_id ?? "",
+      subject: c.subject ?? "",
+      level: c.level ?? "",
+      room: c.room ?? "",
+      capacity: String(c.capacity),
+      session_rate: c.session_rate === null ? "" : String(c.session_rate),
+      price_per_session: c.price_per_session === null ? "" : String(c.price_per_session),
+      card_colour: c.card_colour ?? "pink",
+      active: c.active ? "active" : "archived",
+      notes: c.notes ?? "",
+      goprogress_course_url: c.goprogress_course_url ?? "",
+    });
+    setInitialisedClassId(c.id);
+  }, [c, initialisedClassId]);
+
+  useEffect(() => {
+    if (requestedDate) setAttendanceDate(requestedDate);
+  }, [requestedDate]);
 
   if (classes.isLoading)
     return (
@@ -207,25 +252,41 @@ function ClassProfile() {
     const link = links.find((item) => item.is_primary) ?? links[0];
     return (parents.data ?? []).find((item) => item.id === link?.parent_id);
   };
-  const attendanceRoster = activeRoster.filter((item) => {
-    const student = (students.data ?? []).find((value) => value.id === item.student_id);
-    const parent = parentFor(item.student_id);
-    const query = attendanceSearch.trim().toLowerCase();
-    return (
-      !query ||
-      [fullName(student), student?.year_group, student?.school, fullName(parent)]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase()
-        .includes(query)
-    );
-  });
   const currentAttendanceFor = (studentIdValue: string) =>
     attendanceSession
       ? classAttendance.find(
           (item) => item.session_id === attendanceSession.id && item.student_id === studentIdValue,
         )
       : undefined;
+  const attendanceRoster = activeRoster.filter((item) => {
+    const student = (students.data ?? []).find((value) => value.id === item.student_id);
+    const parent = parentFor(item.student_id);
+    const query = attendanceSearch.trim().toLowerCase();
+    const mark = currentAttendanceFor(item.student_id);
+    const matchesAttendance =
+      attendanceFilter === "all" ||
+      (attendanceFilter === "present" && ["present", "late"].includes(mark?.status ?? "")) ||
+      (attendanceFilter === "absent" && ["absent", "excused"].includes(mark?.status ?? "")) ||
+      (attendanceFilter === "unmarked" && !mark);
+    return (
+      matchesAttendance &&
+      (!query ||
+        [fullName(student), student?.year_group, student?.school, fullName(parent)]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase()
+          .includes(query))
+    );
+  });
+  const marksForDate = attendanceSession
+    ? classAttendance.filter((item) => item.session_id === attendanceSession.id)
+    : [];
+  const presentForDate = marksForDate.filter((item) =>
+    ["present", "late"].includes(item.status),
+  ).length;
+  const attendancePercentage = marksForDate.length
+    ? Math.round((presentForDate / marksForDate.length) * 100)
+    : null;
 
   const markAttendance = async (studentIdValue: string, status: "present" | "absent") => {
     try {
@@ -262,6 +323,44 @@ function ClassProfile() {
       toast.error(error instanceof Error ? error.message : "Could not save attendance");
     }
   };
+  const saveLesson = async () => {
+    if (!edit.name.trim()) {
+      toast.error("Add a lesson name before saving");
+      return;
+    }
+    try {
+      await updateClass.mutateAsync({
+        id: c.id,
+        values: {
+          name: edit.name.trim(),
+          start_date: edit.start_date,
+          weekday: weekdayOf(edit.start_date),
+          start_time: edit.start_time,
+          end_time: edit.end_time,
+          recurrence: edit.recurrence,
+          end_date: edit.recurrence === "once" ? edit.start_date : edit.end_date || null,
+          delivery_mode: edit.delivery_mode,
+          site_id: edit.delivery_mode === "online" ? null : edit.site_id || null,
+          venue_name: edit.delivery_mode === "online" ? null : edit.venue_name.trim() || null,
+          online_url: edit.delivery_mode === "online" ? edit.online_url.trim() || null : null,
+          tutor_id: edit.tutor_id || null,
+          subject: edit.subject.trim() || null,
+          level: edit.level.trim() || null,
+          room: edit.room.trim() || null,
+          capacity: Number(edit.capacity) || 0,
+          session_rate: edit.session_rate ? Number(edit.session_rate) : null,
+          price_per_session: edit.price_per_session ? Number(edit.price_per_session) : null,
+          card_colour: edit.card_colour,
+          active: edit.active === "active",
+          notes: edit.notes.trim() || null,
+          goprogress_course_url: edit.goprogress_course_url.trim() || null,
+        },
+      });
+      toast.success("Lesson saved");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not update the lesson");
+    }
+  };
   const openEdit = () => {
     setEdit({
       name: c.name,
@@ -293,19 +392,19 @@ function ClassProfile() {
 
   return (
     <Page className="space-y-5">
-      <section className="rounded-2xl border border-border bg-card p-3 shadow-sm sm:p-4">
+      <section className="sticky top-0 z-20 rounded-2xl border border-border bg-card/95 p-3 shadow-sm backdrop-blur sm:p-4">
         <div className="flex min-w-0 items-center gap-2">
           <Button asChild size="icon" variant="ghost" aria-label="Back to schedule">
             <Link to="/admin/classes">
               <ArrowLeft className="h-5 w-5" />
             </Link>
           </Button>
-          <div className="min-w-0 flex-1">
-            <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
-              Lesson
-            </p>
-            <h1 className="truncate text-base font-extrabold sm:text-xl">{c.name}</h1>
-          </div>
+          <Input
+            value={edit.name}
+            onChange={(event) => setEdit({ ...edit, name: event.target.value })}
+            aria-label="Lesson name"
+            className="min-w-0 flex-1 border-0 bg-transparent px-2 text-base font-extrabold shadow-none focus-visible:ring-0 sm:text-xl"
+          />
           <Button
             size="sm"
             variant="secondary"
@@ -317,55 +416,148 @@ function ClassProfile() {
             <Filter className="h-4 w-4" />
             <span className="hidden sm:inline">Change lesson</span>
           </Button>
-          <Button size="icon" onClick={openEdit} aria-label="Edit lesson">
-            <Pencil className="h-4 w-4" />
+          <Button onClick={saveLesson} disabled={updateClass.isPending}>
+            <Save className="h-4 w-4" />
+            <span className="hidden sm:inline">{updateClass.isPending ? "Saving…" : "Save"}</span>
           </Button>
         </div>
       </section>
 
       <section className="overflow-hidden rounded-3xl border border-border bg-card">
-        <div className="p-5 sm:p-7">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <Pill tone={c.active ? "green" : "neutral"}>
-                  {c.active ? "Active" : "Archived"}
-                </Pill>
-                {c.level ? <Pill>{c.level}</Pill> : null}
-              </div>
-              <p className="mt-3 text-sm text-muted-foreground">
-                {site?.name ?? "Venue to confirm"} · {c.weekday ?? "Day to confirm"}{" "}
-                {hhmm(c.start_time)}–{hhmm(c.end_time)}
-                {c.room ? ` · ${c.room}` : ""}
-              </p>
-            </div>
+        <div className="grid gap-5 p-4 sm:p-6 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <TextField
+              label="Start date"
+              type="date"
+              value={edit.start_date}
+              onChange={(start_date) => setEdit({ ...edit, start_date })}
+            />
+            <SelectField
+              label="Repeats"
+              value={edit.recurrence}
+              onChange={(recurrence) => setEdit({ ...edit, recurrence })}
+              options={[
+                { value: "once", label: "Does not repeat" },
+                { value: "weekly", label: "Every week" },
+              ]}
+            />
+            <LessonTimeRangePicker
+              start={edit.start_time}
+              end={edit.end_time}
+              onChange={(start_time, end_time) => setEdit({ ...edit, start_time, end_time })}
+            />
+            {edit.recurrence === "weekly" ? (
+              <TextField
+                label="Repeat until"
+                type="date"
+                value={edit.end_date}
+                onChange={(end_date) => setEdit({ ...edit, end_date })}
+              />
+            ) : null}
+            <SelectField
+              label="Delivery"
+              value={edit.delivery_mode}
+              onChange={(delivery_mode) => setEdit({ ...edit, delivery_mode })}
+              options={[
+                { value: "in_person", label: "Face-to-face" },
+                { value: "online", label: "Online" },
+                { value: "hybrid", label: "Hybrid" },
+              ]}
+            />
+            {edit.delivery_mode === "online" ? (
+              <TextField
+                label="Online meeting link"
+                value={edit.online_url}
+                onChange={(online_url) => setEdit({ ...edit, online_url })}
+              />
+            ) : (
+              <SelectField
+                label="Location"
+                value={edit.site_id}
+                onChange={(site_id) => setEdit({ ...edit, site_id })}
+                options={[
+                  { value: "", label: "Venue to confirm" },
+                  ...(sites.data ?? []).map((item) => ({ value: item.id, label: item.name })),
+                ]}
+              />
+            )}
+            <SelectField
+              label="Tutor"
+              value={edit.tutor_id}
+              onChange={(tutor_id) => setEdit({ ...edit, tutor_id })}
+              options={[
+                { value: "", label: "Not assigned" },
+                ...(tutors.data ?? []).map((item) => ({ value: item.id, label: fullName(item) })),
+              ]}
+            />
+            <TextField
+              label="Room"
+              value={edit.room}
+              onChange={(room) => setEdit({ ...edit, room })}
+            />
+            <TextField
+              label="Subject"
+              value={edit.subject}
+              onChange={(subject) => setEdit({ ...edit, subject })}
+            />
+            <TextField
+              label="Level"
+              value={edit.level}
+              onChange={(level) => setEdit({ ...edit, level })}
+            />
+          </div>
+          <aside className="space-y-4 rounded-2xl bg-muted/35 p-4">
             <div className="flex items-center gap-3">
               <Avatar
                 initials={initialsOf(fullName(tutor))}
                 tone={avatarTone(fullName(tutor))}
                 size="lg"
               />
-              <div>
-                <p className="text-sm font-bold">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-bold">
                   {tutor ? fullName(tutor) : "Tutor not assigned"}
                 </p>
                 <p className="text-xs text-muted-foreground">Tutor</p>
               </div>
             </div>
-          </div>
-          <div className="mt-6 grid grid-cols-2 divide-x divide-y divide-border border-t border-border sm:grid-cols-4 sm:divide-y-0">
-            {[
-              ["Students", `${activeRoster.length}/${c.capacity}`],
-              ["Spaces", String(Math.max(c.capacity - activeRoster.length, 0))],
-              ["Lessons held", String(classSessions.length)],
-              ["Per lesson", money(c.price_per_session)],
-            ].map(([label, value]) => (
-              <div key={label} className="px-3 py-4 text-center">
-                <p className="text-xl font-extrabold">{value}</p>
-                <p className="text-xs text-muted-foreground">{label}</p>
-              </div>
-            ))}
-          </div>
+            <TextField
+              label="Capacity"
+              type="number"
+              value={edit.capacity}
+              onChange={(capacity) => setEdit({ ...edit, capacity })}
+            />
+            <TextField
+              label="Client price per lesson (£)"
+              type="number"
+              value={edit.price_per_session}
+              onChange={(price_per_session) => setEdit({ ...edit, price_per_session })}
+            />
+            <TextField
+              label="Tutor pay per lesson (£)"
+              type="number"
+              value={edit.session_rate}
+              onChange={(session_rate) => setEdit({ ...edit, session_rate })}
+            />
+            <TextField
+              label="GoProgress course URL"
+              value={edit.goprogress_course_url}
+              onChange={(goprogress_course_url) => setEdit({ ...edit, goprogress_course_url })}
+            />
+            <SelectField
+              label="Status"
+              value={edit.active}
+              onChange={(active) => setEdit({ ...edit, active })}
+              options={[
+                { value: "active", label: "Active" },
+                { value: "archived", label: "Archived" },
+              ]}
+            />
+            <TextAreaField
+              label="Notes"
+              value={edit.notes}
+              onChange={(notes) => setEdit({ ...edit, notes })}
+            />
+          </aside>
         </div>
         <div className="overflow-x-auto border-t border-border px-3">
           <div className="flex min-w-max gap-1">
@@ -419,9 +611,16 @@ function ClassProfile() {
       {tab === "Students" ? (
         <section className="rounded-2xl border border-border bg-card p-4 sm:p-5">
           <div className="flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-bold">Students ({activeRoster.length})</h2>
-              <p className="text-xs text-muted-foreground">Take attendance for this lesson</p>
+            <div className="flex items-center gap-3">
+              <AttendanceProgress percentage={attendancePercentage} />
+              <div>
+                <h2 className="text-lg font-bold">Attendance ({activeRoster.length} students)</h2>
+                <p className="text-xs text-muted-foreground">
+                  {marksForDate.length
+                    ? `${presentForDate} present from ${marksForDate.length} marked`
+                    : "No attendance marked for this date"}
+                </p>
+              </div>
             </div>
             <div className="flex flex-wrap items-end gap-2">
               <label className="flex min-w-[210px] flex-col gap-1 text-xs font-semibold text-muted-foreground">
@@ -454,6 +653,27 @@ function ClassProfile() {
               placeholder="Search students by name, year, school or parent"
               className="h-11 rounded-xl pl-9"
             />
+          </div>
+          <div className="mt-3 flex gap-2 overflow-x-auto pb-1" aria-label="Attendance filters">
+            {(
+              [
+                ["all", "All"],
+                ["present", "Present"],
+                ["absent", "Absent"],
+                ["unmarked", "Unmarked"],
+              ] as const
+            ).map(([value, label]) => (
+              <Button
+                key={value}
+                type="button"
+                size="sm"
+                variant={attendanceFilter === value ? "default" : "outline"}
+                className="shrink-0 rounded-full"
+                onClick={() => setAttendanceFilter(value)}
+              >
+                {label}
+              </Button>
+            ))}
           </div>
           {activeRoster.length === 0 ? (
             <div className="mt-4">
@@ -499,21 +719,6 @@ function ClassProfile() {
                                 {fullName(student)}
                               </span>
                             </Link>
-                            <Button
-                              type="button"
-                              size="icon"
-                              variant="ghost"
-                              className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
-                              aria-label={`Remove ${fullName(student)} from this lesson`}
-                              onClick={() =>
-                                setStudentPendingRemoval({
-                                  enrolmentId: item.id,
-                                  studentName: fullName(student),
-                                })
-                              }
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
                           </div>
                         </td>
                         <td className="px-1 py-3 text-center">
@@ -638,9 +843,7 @@ function ClassProfile() {
               {c.goprogress_course_url ? "Connected" : "Not connected"}
             </Pill>
             <GoProgressLink label={c.goprogress_course_url ? "Open course" : "GoProgress"} />
-            <Button variant="secondary" onClick={openEdit}>
-              Edit connection
-            </Button>
+            <p className="text-xs text-muted-foreground">Edit the course URL above, then save.</p>
           </div>
         </section>
       ) : null}
@@ -1165,6 +1368,24 @@ function ClassProfile() {
         }}
       />
     </Page>
+  );
+}
+
+function AttendanceProgress({ percentage }: { percentage: number | null }) {
+  const safePercentage = Math.max(0, Math.min(100, percentage ?? 0));
+  return (
+    <span
+      className="relative inline-grid h-16 w-16 shrink-0 place-items-center rounded-full"
+      style={{
+        background: `conic-gradient(var(--primary) ${safePercentage * 3.6}deg, var(--muted) 0deg)`,
+      }}
+      role="img"
+      aria-label={percentage === null ? "Attendance not marked" : `${percentage}% attendance`}
+    >
+      <span className="absolute inset-[5px] grid place-items-center rounded-full bg-card text-xs font-extrabold">
+        {percentage === null ? "—" : `${percentage}%`}
+      </span>
+    </span>
   );
 }
 
