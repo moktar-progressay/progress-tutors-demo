@@ -839,8 +839,10 @@ function SchedulePage() {
           compact ? "text-[10px]" : "text-xs",
         )}
       >
-        <p className="line-clamp-2 font-extrabold leading-tight">{lesson.name}</p>
-        <p className="mt-0.5 whitespace-nowrap text-[9px] font-semibold leading-none opacity-85">
+        <p className="line-clamp-2 min-h-[1rem] shrink-0 font-extrabold leading-tight">
+          {lesson.name || "Untitled lesson"}
+        </p>
+        <p className="mt-0.5 shrink-0 whitespace-nowrap text-[9px] font-semibold leading-none opacity-85">
           {hhmm(lesson.start_time)}–{hhmm(lesson.end_time)}
         </p>
         {dense ? null : (
@@ -862,51 +864,24 @@ function SchedulePage() {
             </span>
           </div>
         )}
-        {!compact ? (
-          <div
-            className={cn("mt-auto", dense ? "pt-1" : "pt-2")}
-            title={
-              attendanceSummary.percentage === null
-                ? "Attendance not marked"
-                : `${attendanceSummary.percentage}% attendance`
-            }
-          >
-            <div className="h-1.5 overflow-hidden rounded-full bg-black/20">
-              <div
-                className="h-full rounded-full bg-white/95 transition-[width]"
-                style={{ width: `${attendanceSummary.percentage ?? 0}%` }}
-              />
-            </div>
-            <div className="mt-1 flex items-center justify-between gap-2 text-[9px] font-extrabold leading-none">
-              <span>
-                {attendanceSummary.percentage === null
-                  ? "Attendance not marked"
-                  : `${attendanceSummary.percentage}% attendance`}
-              </span>
-              <span>
-                {enrolled}/{lesson.capacity} seats
-              </span>
-            </div>
-          </div>
-        ) : null}
         {compact ? (
           <div className="mt-auto flex justify-end pt-1">
             <AttendanceRing percentage={attendanceSummary.percentage} size="sm" inverted />
           </div>
-        ) : dense ? null : (
-          <div className="flex min-w-0 items-end justify-between gap-1 pt-1">
+        ) : (
+          <div className="mt-auto flex min-w-0 items-center justify-between gap-1 pt-1">
             <span className="flex min-w-0 items-center gap-1" title={fullName(tutor)}>
               <AttendanceRing percentage={attendanceSummary.percentage} size="sm" inverted />
-              <Avatar
-                initials={initialsOf(fullName(tutor))}
-                tone={avatarTone(fullName(tutor))}
-                size="sm"
-              />
+              {dense ? null : (
+                <Avatar
+                  initials={initialsOf(fullName(tutor))}
+                  tone={avatarTone(fullName(tutor))}
+                  size="sm"
+                />
+              )}
             </span>
             <span className="shrink-0 whitespace-nowrap rounded-full bg-black/20 px-1.5 py-0.5 text-[9px] font-extrabold leading-none">
-              {attendanceSummary.marked
-                ? `${attendanceSummary.present}/${attendanceSummary.marked} present`
-                : "No marks"}
+              {enrolled}/{lesson.capacity} seats
             </span>
           </div>
         )}
