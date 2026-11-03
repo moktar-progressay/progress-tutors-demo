@@ -826,7 +826,7 @@ function SchedulePage() {
         ? format(anchor, "MMMM yyyy")
         : `${format(weekStart, "d MMM")} – ${format(addDays(weekStart, 6), "d MMM yyyy")}`;
 
-  const renderCard = (lesson: ClassRow, compact = false, occurrenceDate?: Date) => {
+  const renderCard = (lesson: ClassRow, compact = false, occurrenceDate?: Date, narrow = false) => {
     const tutor = tutorFor(lesson);
     const enrolled = countFor(lesson);
     const dense = !compact && calendarZoom <= 1;
@@ -879,9 +879,29 @@ function SchedulePage() {
             </span>
           </div>
         )}
-        {compact ? (
-          <div className="mt-auto flex justify-end pt-1">
-            <AttendanceRing percentage={attendanceSummary.percentage} size="sm" inverted />
+        {compact || narrow ? (
+          <div
+            className="mt-auto min-w-0 pt-1"
+            title={
+              attendanceSummary.percentage === null
+                ? "Attendance not marked"
+                : `${attendanceSummary.percentage}% attendance`
+            }
+          >
+            <div className="h-1 overflow-hidden rounded-full bg-black/20">
+              <div
+                className="h-full rounded-full bg-white/95"
+                style={{ width: `${attendanceSummary.percentage ?? 0}%` }}
+              />
+            </div>
+            <div className="mt-0.5 flex min-w-0 items-center justify-between gap-1 text-[8px] font-extrabold leading-none">
+              <span>
+                {attendanceSummary.percentage === null ? "—" : `${attendanceSummary.percentage}%`}
+              </span>
+              <span className="truncate">
+                {enrolled}/{lesson.capacity} seats
+              </span>
+            </div>
           </div>
         ) : (
           <div className="mt-auto flex min-w-0 items-center justify-between gap-1 pt-1">
@@ -1015,7 +1035,7 @@ function SchedulePage() {
                         document.body.style.overflow = pageOverflowRef.current;
                       }}
                     >
-                      {renderCard(lesson, days.length > 3, day)}
+                      {renderCard(lesson, days.length > 3, day, overlappingLessons.length >= 3)}
                     </div>
                   );
                 })}

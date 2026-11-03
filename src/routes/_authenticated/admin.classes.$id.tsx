@@ -484,28 +484,46 @@ export function ClassWorkspace({
               value={edit.start_date}
               onChange={(start_date) => setEdit({ ...edit, start_date })}
             />
-            <SelectField
-              label="Repeats"
-              value={edit.recurrence}
-              onChange={(recurrence) => setEdit({ ...edit, recurrence })}
-              options={[
-                { value: "once", label: "Does not repeat" },
-                { value: "weekly", label: "Every week" },
-              ]}
-            />
             <LessonTimeRangePicker
               start={edit.start_time}
               end={edit.end_time}
               onChange={(start_time, end_time) => setEdit({ ...edit, start_time, end_time })}
             />
-            {edit.recurrence === "weekly" ? (
-              <TextField
-                label="Repeat until"
-                type="date"
-                value={edit.end_date}
-                onChange={(end_date) => setEdit({ ...edit, end_date })}
-              />
-            ) : null}
+            <fieldset className="space-y-2 rounded-xl border border-border bg-muted/30 p-3 sm:col-span-2">
+              <legend className="px-1 text-xs font-extrabold text-foreground">Recurrence</legend>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <SelectField
+                  label="Repeats"
+                  value={edit.recurrence}
+                  onChange={(recurrence) =>
+                    setEdit({
+                      ...edit,
+                      recurrence,
+                      end_date: recurrence === "once" ? "" : edit.end_date,
+                    })
+                  }
+                  options={[
+                    { value: "once", label: "Does not repeat" },
+                    { value: "weekly", label: "Every week" },
+                  ]}
+                />
+                {edit.recurrence === "weekly" ? (
+                  <TextField
+                    label="Repeat until"
+                    type="date"
+                    value={edit.end_date}
+                    onChange={(end_date) => setEdit({ ...edit, end_date })}
+                  />
+                ) : (
+                  <div className="hidden sm:block" />
+                )}
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                {edit.recurrence === "weekly"
+                  ? `Repeats every week from ${prettyDate(edit.start_date)}${edit.end_date ? ` until ${prettyDate(edit.end_date)}` : " until you add an end date"}.`
+                  : "This lesson happens once on the start date."}
+              </p>
+            </fieldset>
           </div>
         </section>
 
