@@ -567,37 +567,6 @@ export function ClassWorkspace({
               value={edit.capacity}
               onChange={(capacity) => setEdit({ ...edit, capacity })}
             />
-            <TextField
-              label="Client price per lesson (£)"
-              type="number"
-              value={edit.price_per_session}
-              onChange={(price_per_session) => setEdit({ ...edit, price_per_session })}
-            />
-            <TextField
-              label="Tutor pay per lesson (£)"
-              type="number"
-              value={edit.session_rate}
-              onChange={(session_rate) => setEdit({ ...edit, session_rate })}
-            />
-            <TextField
-              label="GoProgress course URL"
-              value={edit.goprogress_course_url}
-              onChange={(goprogress_course_url) => setEdit({ ...edit, goprogress_course_url })}
-            />
-            <SelectField
-              label="Status"
-              value={edit.active}
-              onChange={(active) => setEdit({ ...edit, active })}
-              options={[
-                { value: "active", label: "Active" },
-                { value: "archived", label: "Archived" },
-              ]}
-            />
-            <TextAreaField
-              label="Notes"
-              value={edit.notes}
-              onChange={(notes) => setEdit({ ...edit, notes })}
-            />
           </aside>
         </div>
         <div className="overflow-x-auto border-t border-border px-3">
