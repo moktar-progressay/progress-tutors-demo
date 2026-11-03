@@ -593,7 +593,6 @@ export function ClassWorkspace({
               <Info label="Subject" value={c.subject ?? "Not set"} />
               <Info label="Age group" value={c.age_group ?? "Not set"} />
               <Info label="Delivery" value={c.delivery_mode.replace("_", " ")} />
-              <Info label="Tutor pay" value={money(c.session_rate)} />
             </dl>
           </section>
           <aside className="rounded-2xl border border-border bg-card p-5">
