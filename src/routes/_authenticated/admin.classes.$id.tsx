@@ -94,6 +94,7 @@ export function ClassWorkspace({
 }: ClassWorkspaceProps) {
   const navigate = useNavigate();
   const tutorSelectRef = useRef<HTMLSelectElement>(null);
+  const titleInputRef = useRef<HTMLInputElement>(null);
   const classes = useTable("classes", "name");
   const sites = useTable("sites", "name");
   const tutors = useTable("tutors", "first_name");
@@ -112,6 +113,7 @@ export function ClassWorkspace({
   const updateAttendance = useUpdateRow("student_attendance");
 
   const [lessonPickerOpen, setLessonPickerOpen] = useState(false);
+  const [editingTitle, setEditingTitle] = useState(false);
   const [lessonSearch, setLessonSearch] = useState("");
   const [enrolOpen, setEnrolOpen] = useState(false);
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
@@ -387,12 +389,37 @@ export function ClassWorkspace({
               </Link>
             </Button>
           )}
-          <Input
-            value={edit.name}
-            onChange={(event) => setEdit({ ...edit, name: event.target.value })}
-            aria-label="Lesson name"
-            className="min-w-0 flex-1 border-0 bg-transparent px-1 text-base font-extrabold shadow-none focus-visible:ring-0 sm:text-xl"
-          />
+          {editingTitle ? (
+            <Input
+              ref={titleInputRef}
+              autoFocus
+              value={edit.name}
+              onChange={(event) => setEdit({ ...edit, name: event.target.value })}
+              onBlur={() => setEditingTitle(false)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") event.currentTarget.blur();
+                if (event.key === "Escape") {
+                  setEdit({ ...edit, name: c.name });
+                  event.currentTarget.blur();
+                }
+              }}
+              aria-label="Lesson name"
+              className="min-w-0 flex-1 px-2 text-base font-extrabold sm:text-xl"
+            />
+          ) : (
+            <button
+              type="button"
+              className="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-1 py-2 text-left hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              onClick={() => {
+                setEditingTitle(true);
+                requestAnimationFrame(() => titleInputRef.current?.select());
+              }}
+              aria-label="Edit lesson name"
+            >
+              <span className="truncate text-base font-extrabold sm:text-xl">{edit.name}</span>
+              <Pencil className="h-4 w-4 shrink-0 text-primary" />
+            </button>
+          )}
           {embedded ? null : (
             <Button
               size="icon"
