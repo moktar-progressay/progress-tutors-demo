@@ -401,9 +401,24 @@ function SchedulePage() {
         );
   const summaryCapacity = summaryLessons.reduce((total, lesson) => total + lesson.capacity, 0);
   const summarySeatsTaken = summaryEnrolments.length;
-  const summaryOccupancy = summaryCapacity
-    ? Math.round((summarySeatsTaken / summaryCapacity) * 100)
-    : 0;
+  const summaryDateIsos = new Set(summaryDates.map((date) => format(date, "yyyy-MM-dd")));
+  const summarySessions = (sessions.data ?? []).filter(
+    (session) =>
+      Boolean(session.class_id && summaryLessonIds.has(session.class_id)) &&
+      (view === "list" || summaryDateIsos.has(session.session_date)),
+  );
+  const summarySessionIds = new Set(summarySessions.map((session) => session.id));
+  const summaryAttendanceMarks = (attendance.data ?? []).filter(
+    (mark) =>
+      summarySessionIds.has(mark.session_id) &&
+      ["present", "late", "absent", "excused"].includes(mark.status),
+  );
+  const summaryPresentMarks = summaryAttendanceMarks.filter((mark) =>
+    ["present", "late"].includes(mark.status),
+  ).length;
+  const summaryAttendancePercentage = summaryAttendanceMarks.length
+    ? Math.round((summaryPresentMarks / summaryAttendanceMarks.length) * 100)
+    : null;
   const colourFor = (lesson: ClassRow) => {
     if (lesson.card_colour && lesson.card_colour in CARD_COLOURS)
       return CARD_COLOURS[lesson.card_colour as CardColour];
@@ -1127,6 +1142,7 @@ function SchedulePage() {
         <StatCard
           label="Students"
           value={String(summaryStudents)}
+          hint={`${summarySeatsTaken} / ${summaryCapacity} seats filled`}
           tone="green"
           icon={<GraduationCap className="h-4 w-4" />}
           compact
@@ -1139,12 +1155,16 @@ function SchedulePage() {
           compact
         />
         <StatCard
-          label="Seats filled"
-          value={`${summaryOccupancy}%`}
-          hint={`${summarySeatsTaken} / ${summaryCapacity} seats`}
+          label="Attendance"
+          value={summaryAttendancePercentage === null ? "—" : `${summaryAttendancePercentage}%`}
+          hint={
+            summaryAttendanceMarks.length
+              ? `${summaryPresentMarks} / ${summaryAttendanceMarks.length} present`
+              : "Not marked"
+          }
           tone="blue"
+          icon={<AttendanceRing percentage={summaryAttendancePercentage} size="md" />}
           compact
-          progress={summaryOccupancy}
         />
       </div>
 
