@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { format } from "date-fns";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Check, Filter, Plus, Save, Search, X } from "lucide-react";
+import { ArrowLeft, Check, Copy, Filter, Plus, Save, Search, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Page } from "@/components/AppShell";
 import { Avatar, avatarTone, Empty, GoProgressLink, PageHeader, Pill } from "@/components/kit";
@@ -56,6 +56,24 @@ type Tab = (typeof TABS)[number];
 function ClassProfile() {
   const { id } = Route.useParams();
   const { date: requestedDate } = Route.useSearch();
+  return <ClassWorkspace id={id} requestedDate={requestedDate} />;
+}
+
+type ClassWorkspaceProps = {
+  id: string;
+  requestedDate?: string;
+  embedded?: boolean;
+  onClose?: () => void;
+  onClone?: () => void;
+};
+
+export function ClassWorkspace({
+  id,
+  requestedDate,
+  embedded = false,
+  onClose,
+  onClone,
+}: ClassWorkspaceProps) {
   const navigate = useNavigate();
   const classes = useTable("classes", "name");
   const sites = useTable("sites", "name");
@@ -391,30 +409,53 @@ function ClassProfile() {
   };
 
   return (
-    <Page className="space-y-5">
+    <Page className={embedded ? "space-y-5 px-3 py-3 sm:px-5 sm:py-4" : "space-y-5"}>
       <section className="sticky top-0 z-20 rounded-2xl border border-border bg-card/95 p-3 shadow-sm backdrop-blur sm:p-4">
         <div className="flex min-w-0 items-center gap-2">
-          <Button asChild size="icon" variant="ghost" aria-label="Back to schedule">
-            <Link to="/admin/classes">
+          {embedded ? (
+            <Button size="icon" variant="ghost" aria-label="Close lesson" onClick={onClose}>
               <ArrowLeft className="h-5 w-5" />
-            </Link>
-          </Button>
+            </Button>
+          ) : (
+            <Button asChild size="icon" variant="ghost" aria-label="Back to schedule">
+              <Link to="/admin/classes">
+                <ArrowLeft className="h-5 w-5" />
+              </Link>
+            </Button>
+          )}
           <Input
             value={edit.name}
             onChange={(event) => setEdit({ ...edit, name: event.target.value })}
             aria-label="Lesson name"
             className="min-w-0 flex-1 border-0 bg-transparent px-2 text-base font-extrabold shadow-none focus-visible:ring-0 sm:text-xl"
           />
+          {embedded ? null : (
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => {
+                setLessonSearch("");
+                setLessonPickerOpen(true);
+              }}
+            >
+              <Filter className="h-4 w-4" />
+              <span className="hidden sm:inline">Change lesson</span>
+            </Button>
+          )}
+          {onClone ? (
+            <Button size="icon" variant="secondary" onClick={onClone} aria-label="Clone lesson">
+              <Copy className="h-4 w-4" />
+              <span className="hidden sm:inline">Clone</span>
+            </Button>
+          ) : null}
           <Button
-            size="sm"
-            variant="secondary"
-            onClick={() => {
-              setLessonSearch("");
-              setLessonPickerOpen(true);
-            }}
+            size="icon"
+            variant="ghost"
+            className="text-destructive hover:text-destructive"
+            onClick={() => setDeleteOpen(true)}
+            aria-label="Delete lesson"
           >
-            <Filter className="h-4 w-4" />
-            <span className="hidden sm:inline">Change lesson</span>
+            <Trash2 className="h-4 w-4" />
           </Button>
           <Button onClick={saveLesson} disabled={updateClass.isPending}>
             <Save className="h-4 w-4" />
@@ -1361,7 +1402,8 @@ function ClassProfile() {
             toast.success("Lesson deleted");
             setDeleteOpen(false);
             setEditOpen(false);
-            navigate({ to: "/admin/classes" });
+            if (embedded) onClose?.();
+            else navigate({ to: "/admin/classes" });
           } catch (error) {
             toast.error(error instanceof Error ? error.message : "Could not delete the lesson");
           }

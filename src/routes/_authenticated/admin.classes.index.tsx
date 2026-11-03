@@ -68,6 +68,7 @@ import {
   WEEKDAYS,
 } from "@/lib/db";
 import { cn } from "@/lib/utils";
+import { ClassWorkspace } from "./admin.classes.$id";
 
 export const Route = createFileRoute("/_authenticated/admin/classes/")({
   validateSearch: (search: Record<string, unknown>) => {
@@ -858,16 +859,39 @@ function SchedulePage() {
                 : "Face-to-face"}
           </span>
         </div>
+        {!compact ? (
+          <div
+            className="mt-auto pt-2"
+            title={
+              attendanceSummary.percentage === null
+                ? "Attendance not marked"
+                : `${attendanceSummary.percentage}% attendance`
+            }
+          >
+            <div className="h-1.5 overflow-hidden rounded-full bg-black/20">
+              <div
+                className="h-full rounded-full bg-white/95 transition-[width]"
+                style={{ width: `${attendanceSummary.percentage ?? 0}%` }}
+              />
+            </div>
+            <div className="mt-1 flex items-center justify-between gap-2 text-[9px] font-extrabold leading-none">
+              <span>
+                {attendanceSummary.percentage === null
+                  ? "Attendance not marked"
+                  : `${attendanceSummary.percentage}% attendance`}
+              </span>
+              <span>
+                {enrolled}/{lesson.capacity} seats
+              </span>
+            </div>
+          </div>
+        ) : null}
         {compact ? (
           <div className="mt-auto flex justify-end pt-1">
-            <AttendanceRing
-              percentage={attendanceSummary.percentage}
-              size="sm"
-              inverted
-            />
+            <AttendanceRing percentage={attendanceSummary.percentage} size="sm" inverted />
           </div>
         ) : (
-          <div className="mt-auto flex min-w-0 items-end justify-between gap-1 pt-1">
+          <div className="flex min-w-0 items-end justify-between gap-1 pt-1">
             <span className="flex min-w-0 items-center gap-1" title={fullName(tutor)}>
               <AttendanceRing percentage={attendanceSummary.percentage} size="sm" inverted />
               <Avatar
@@ -877,7 +901,9 @@ function SchedulePage() {
               />
             </span>
             <span className="shrink-0 whitespace-nowrap rounded-full bg-black/20 px-1.5 py-0.5 text-[9px] font-extrabold leading-none">
-              {enrolled}/{lesson.capacity} students
+              {attendanceSummary.marked
+                ? `${attendanceSummary.present}/${attendanceSummary.marked} present`
+                : "No marks"}
             </span>
           </div>
         )}
@@ -1339,111 +1365,15 @@ function SchedulePage() {
           }
         }}
       >
-        <DialogContent className="w-[calc(100vw-1rem)] gap-0 overflow-hidden p-0 sm:max-w-lg">
+        <DialogContent className="h-[100dvh] w-screen max-w-none gap-0 overflow-y-auto rounded-none border-0 p-0 sm:max-w-none [&>button]:hidden">
           {detail ? (
-            <>
-              <DialogHeader className="border-b border-border p-5 pr-12">
-                <DialogTitle className="text-left">{detail.name}</DialogTitle>
-                <DialogDescription>
-                  {format(parseISO(detailDate), "EEEE, d MMMM yyyy")} · {hhmm(detail.start_time)}–
-                  {hhmm(detail.end_time)}
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4 p-5 text-sm">
-                {tutorFor(detail) ? (
-                  <Link
-                    to="/admin/tutors/$id"
-                    params={{ id: tutorFor(detail)!.id }}
-                    className="flex w-fit items-center gap-2 font-bold hover:text-primary"
-                  >
-                    <Avatar
-                      initials={initialsOf(fullName(tutorFor(detail)))}
-                      tone={avatarTone(fullName(tutorFor(detail)))}
-                      size="sm"
-                    />
-                    {fullName(tutorFor(detail))}
-                  </Link>
-                ) : (
-                  <p className="text-muted-foreground">Tutor not assigned</p>
-                )}
-                <p className="flex items-center gap-2">
-                  {detail.delivery_mode === "online" ? (
-                    <Video className="h-4 w-4 text-primary" />
-                  ) : (
-                    <MapPin className="h-4 w-4 text-primary" />
-                  )}
-                  {detail.delivery_mode === "online"
-                    ? "Online lesson"
-                    : (siteFor(detail)?.name ?? detail.venue_name ?? "Venue to confirm")}
-                </p>
-                <p className="flex items-center gap-2">
-                  <Clock3 className="h-4 w-4 text-primary" />
-                  {detail.recurrence === "once" ? "One-off lesson" : "Repeats weekly"}
-                </p>
-                <div className="flex flex-wrap gap-1.5">
-                  <Pill tone="blue">{subjectLabel(detail.subject) || "Subject TBC"}</Pill>
-                  <Pill tone="purple">{detail.level || "Level TBC"}</Pill>
-                  <Pill tone="green">
-                    {detail.delivery_mode === "online"
-                      ? "Online"
-                      : detail.delivery_mode === "hybrid"
-                        ? "Hybrid"
-                        : "Face-to-face"}
-                  </Pill>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="flex items-center gap-3 rounded-2xl border border-border bg-muted/30 p-3">
-                    <AttendanceRing
-                      percentage={attendanceSummaryFor(detail, detailDate).percentage}
-                      size="lg"
-                    />
-                    <div>
-                      <p className="font-extrabold">Attendance</p>
-                      <p className="text-xs text-muted-foreground">
-                        {attendanceSummaryFor(detail, detailDate).marked
-                          ? `${attendanceSummaryFor(detail, detailDate).present} of ${attendanceSummaryFor(detail, detailDate).marked} present`
-                          : "Not marked"}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex flex-col justify-center rounded-2xl border border-border bg-muted/30 p-3">
-                    <p className="text-2xl font-extrabold">
-                      {countFor(detail)}
-                      <span className="text-sm text-muted-foreground">/{detail.capacity}</span>
-                    </p>
-                    <p className="text-xs font-semibold text-muted-foreground">Students enrolled</p>
-                  </div>
-                </div>
-              </div>
-              <div className="grid grid-cols-[auto_1fr_auto] gap-2 border-t border-border bg-muted/20 p-4">
-                <Button
-                  className="px-3"
-                  variant="secondary"
-                  aria-label="Clone lesson"
-                  onClick={() => cloneLesson(detail)}
-                >
-                  <Copy className="h-4 w-4" />
-                  <span className="hidden sm:inline">Clone</span>
-                </Button>
-                <Button asChild>
-                  <Link
-                    to="/admin/classes/$id"
-                    params={{ id: detail.id }}
-                    search={{ date: detailDate }}
-                  >
-                    Open lesson
-                  </Link>
-                </Button>
-                <Button
-                  className="px-3"
-                  variant="destructive"
-                  aria-label="Delete lesson"
-                  onClick={() => setLessonPendingDelete(detail)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            </>
+            <ClassWorkspace
+              id={detail.id}
+              requestedDate={detailDate}
+              embedded
+              onClose={() => setDetail(null)}
+              onClone={() => cloneLesson(detail)}
+            />
           ) : null}
         </DialogContent>
       </Dialog>
