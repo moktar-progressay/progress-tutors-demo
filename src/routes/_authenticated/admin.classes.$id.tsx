@@ -1,12 +1,13 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { format } from "date-fns";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   ArrowLeft,
   CalendarDays,
   Check,
   Copy,
   Filter,
+  Pencil,
   Plus,
   Save,
   Search,
@@ -92,6 +93,7 @@ export function ClassWorkspace({
   onClone,
 }: ClassWorkspaceProps) {
   const navigate = useNavigate();
+  const tutorSelectRef = useRef<HTMLSelectElement>(null);
   const classes = useTable("classes", "name");
   const sites = useTable("sites", "name");
   const tutors = useTable("tutors", "first_name");
@@ -201,7 +203,7 @@ export function ClassWorkspace({
       </Page>
     );
 
-  const tutor = (tutors.data ?? []).find((item) => item.id === c.tutor_id);
+  const tutor = (tutors.data ?? []).find((item) => item.id === edit.tutor_id);
   const roster = (enrolments.data ?? []).filter((item) => item.class_id === c.id);
   const activeRoster = roster.filter((item) => item.status === "active");
   const classSessions = (sessions.data ?? []).filter((item) => item.class_id === c.id);
@@ -535,22 +537,40 @@ export function ClassWorkspace({
         <section className="rounded-2xl border border-border bg-card p-4 lg:col-span-2">
           <h2 className="mb-3 text-sm font-extrabold">Tutor</h2>
           <div className="flex items-end gap-3">
-            <Avatar
-              initials={initialsOf(fullName(tutor))}
-              tone={avatarTone(fullName(tutor))}
-              size="lg"
-            />
-            <div className="min-w-0 flex-1">
-              <SelectField
-                label="Assigned tutor"
-                value={edit.tutor_id}
-                onChange={(tutor_id) => setEdit({ ...edit, tutor_id })}
-                options={[
-                  { value: "", label: "Not assigned" },
-                  ...(tutors.data ?? []).map((item) => ({ value: item.id, label: fullName(item) })),
-                ]}
+            <button
+              type="button"
+              className="group relative shrink-0 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              aria-label="Change assigned tutor"
+              onClick={() => {
+                tutorSelectRef.current?.focus();
+                tutorSelectRef.current?.showPicker?.();
+              }}
+            >
+              <Avatar
+                initials={initialsOf(fullName(tutor))}
+                tone={avatarTone(fullName(tutor))}
+                size="lg"
               />
-            </div>
+              <span className="absolute -right-1 -bottom-1 grid h-6 w-6 place-items-center rounded-full bg-primary text-primary-foreground shadow-sm ring-2 ring-card">
+                <Pencil className="h-3 w-3" />
+              </span>
+            </button>
+            <label className="flex min-w-0 flex-1 flex-col gap-1 text-xs font-semibold text-muted-foreground">
+              Assigned tutor
+              <select
+                ref={tutorSelectRef}
+                value={edit.tutor_id}
+                onChange={(event) => setEdit({ ...edit, tutor_id: event.target.value })}
+                className="h-10 w-full min-w-0 rounded-xl border border-border bg-card px-3 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                <option value="">Not assigned</option>
+                {(tutors.data ?? []).map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {fullName(item)}
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
         </section>
       </div>
