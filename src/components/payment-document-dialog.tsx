@@ -49,12 +49,14 @@ const emptyDocument = (): PaymentDocumentData => ({
 export function PaymentDocumentDialog({
   open,
   onOpenChange,
+  onCreateTutorRequest,
   parents,
   students,
   links,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onCreateTutorRequest?: () => void;
   parents: ParentOption[];
   students: StudentOption[];
   links: ParentStudentOption[];
@@ -106,11 +108,20 @@ export function PaymentDocumentDialog({
             <Field label="Document type">
               <select
                 value={data.type}
-                onChange={(event) => update("type", event.target.value as PaymentDocumentType)}
+                onChange={(event) => {
+                  const type = event.target.value as PaymentDocumentType;
+                  if (type === "payment_request") {
+                    onOpenChange(false);
+                    onCreateTutorRequest?.();
+                    return;
+                  }
+                  update("type", type);
+                }}
                 className="h-10 w-full rounded-xl border border-border bg-card px-3 text-sm"
               >
                 <option value="childcare">Childcare confirmation</option>
                 <option value="invoice">Invoice</option>
+                <option value="payment_request">Tutor payment request</option>
               </select>
             </Field>
             <div className="grid grid-cols-2 gap-2">
