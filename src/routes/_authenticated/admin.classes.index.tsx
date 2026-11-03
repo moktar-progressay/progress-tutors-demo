@@ -135,10 +135,10 @@ type CardColour = keyof typeof CARD_COLOURS;
 const CARD_COLOUR_NAMES = Object.keys(CARD_COLOURS) as CardColour[];
 
 const HOURS = Array.from({ length: 13 }, (_, index) => index + 8);
-const CALENDAR_HOUR_HEIGHT = 100;
-const CALENDAR_ZOOM_MIN = 0.6;
-const CALENDAR_ZOOM_MAX = 1.6;
-const CALENDAR_ZOOM_STEP = 0.2;
+const CALENDAR_HOUR_HEIGHT = 60;
+const CALENDAR_ZOOM_MIN = 1;
+const CALENDAR_ZOOM_MAX = 2;
+const CALENDAR_ZOOM_STEP = 0.25;
 
 const LEVEL_OPTIONS = ["KS1", "KS2", "KS3", "GCSE", "A Level", "Degree", "Masters", "Other"];
 
@@ -242,7 +242,7 @@ function SchedulePage() {
   const updateEnrolment = useUpdateRow("class_enrolments", ["classes"]);
 
   const [view, setView] = useState<CalendarView>(requestedView ?? "day");
-  const [calendarZoom, setCalendarZoom] = useState(1.25);
+  const [calendarZoom, setCalendarZoom] = useState(1);
   const [selectedDate, setSelectedDate] = useState(requestedDate ?? currentDateIso);
   const [search, setSearch] = useState("");
   const [tutorId, setTutorId] = useState("all");
@@ -814,6 +814,7 @@ function SchedulePage() {
   const renderCard = (lesson: ClassRow, compact = false, occurrenceDate?: Date) => {
     const tutor = tutorFor(lesson);
     const enrolled = countFor(lesson);
+    const dense = !compact && calendarZoom <= 1;
     const occurrenceIso = format(
       occurrenceDate ?? parseISO(lesson.start_date ?? selectedDate),
       "yyyy-MM-dd",
@@ -842,26 +843,28 @@ function SchedulePage() {
         <p className="mt-0.5 whitespace-nowrap text-[9px] font-semibold leading-none opacity-85">
           {hhmm(lesson.start_time)}–{hhmm(lesson.end_time)}
         </p>
-        <div className="mt-1 flex min-w-0 flex-wrap gap-1 text-[8px] font-bold leading-none">
-          {lesson.subject ? (
+        {dense ? null : (
+          <div className="mt-1 flex min-w-0 flex-wrap gap-1 text-[8px] font-bold leading-none">
+            {lesson.subject ? (
+              <span className="truncate rounded-full bg-black/20 px-1.5 py-1">
+                {subjectLabel(lesson.subject)}
+              </span>
+            ) : null}
+            {lesson.level ? (
+              <span className="truncate rounded-full bg-black/20 px-1.5 py-1">{lesson.level}</span>
+            ) : null}
             <span className="truncate rounded-full bg-black/20 px-1.5 py-1">
-              {subjectLabel(lesson.subject)}
+              {lesson.delivery_mode === "online"
+                ? "Online"
+                : lesson.delivery_mode === "hybrid"
+                  ? "Hybrid"
+                  : "Face-to-face"}
             </span>
-          ) : null}
-          {lesson.level ? (
-            <span className="truncate rounded-full bg-black/20 px-1.5 py-1">{lesson.level}</span>
-          ) : null}
-          <span className="truncate rounded-full bg-black/20 px-1.5 py-1">
-            {lesson.delivery_mode === "online"
-              ? "Online"
-              : lesson.delivery_mode === "hybrid"
-                ? "Hybrid"
-                : "Face-to-face"}
-          </span>
-        </div>
+          </div>
+        )}
         {!compact ? (
           <div
-            className="mt-auto pt-2"
+            className={cn("mt-auto", dense ? "pt-1" : "pt-2")}
             title={
               attendanceSummary.percentage === null
                 ? "Attendance not marked"
@@ -890,7 +893,7 @@ function SchedulePage() {
           <div className="mt-auto flex justify-end pt-1">
             <AttendanceRing percentage={attendanceSummary.percentage} size="sm" inverted />
           </div>
-        ) : (
+        ) : dense ? null : (
           <div className="flex min-w-0 items-end justify-between gap-1 pt-1">
             <span className="flex min-w-0 items-center gap-1" title={fullName(tutor)}>
               <AttendanceRing percentage={attendanceSummary.percentage} size="sm" inverted />
