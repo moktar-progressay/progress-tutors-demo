@@ -106,6 +106,7 @@ export function ClassWorkspace({
   const attendance = useTable("student_attendance");
   const updateClass = useUpdateRow("classes");
   const deleteClass = useDeleteRow("classes");
+  const addStudent = useUpsert("students");
   const addEnrolment = useUpsert("class_enrolments");
   const updateEnrolment = useUpdateRow("class_enrolments");
   const addSession = useUpsert("sessions", ["student_attendance"]);
@@ -120,6 +121,14 @@ export function ClassWorkspace({
   const [studentSearch, setStudentSearch] = useState("");
   const [studentSchool, setStudentSchool] = useState("all");
   const [studentYear, setStudentYear] = useState("all");
+  const [newStudentOpen, setNewStudentOpen] = useState(false);
+  const [newStudent, setNewStudent] = useState({
+    first_name: "",
+    last_name: "",
+    email: "",
+    school: "",
+    year_group: "",
+  });
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [attendanceDate, setAttendanceDate] = useState(
     () => requestedDate ?? format(new Date(), "yyyy-MM-dd"),
@@ -652,6 +661,14 @@ export function ClassWorkspace({
                 setStudentSearch("");
                 setStudentSchool("all");
                 setStudentYear("all");
+                setNewStudentOpen(false);
+                setNewStudent({
+                  first_name: "",
+                  last_name: "",
+                  email: "",
+                  school: "",
+                  year_group: "",
+                });
                 setEnrolOpen(true);
               }}
             >
@@ -816,11 +833,101 @@ export function ClassWorkspace({
       <Dialog open={enrolOpen} onOpenChange={setEnrolOpen}>
         <DialogContent className="flex max-h-[88vh] flex-col p-0 sm:max-w-2xl">
           <DialogHeader className="px-5 pt-5 text-left">
-            <DialogTitle>Manage students</DialogTitle>
+            <div className="flex items-center justify-between gap-3 pr-8">
+              <DialogTitle>Manage students</DialogTitle>
+              <Button
+                type="button"
+                size="sm"
+                variant={newStudentOpen ? "secondary" : "default"}
+                onClick={() => setNewStudentOpen((open) => !open)}
+              >
+                {newStudentOpen ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+                {newStudentOpen ? "Close" : "New student"}
+              </Button>
+            </div>
             <DialogDescription>
               Tick students to add them. Untick enrolled students to remove them from this lesson.
             </DialogDescription>
           </DialogHeader>
+          {newStudentOpen ? (
+            <form
+              className="mx-5 grid gap-3 rounded-xl border border-primary/25 bg-primary/5 p-4 sm:grid-cols-2"
+              onSubmit={async (event) => {
+                event.preventDefault();
+                const firstName = newStudent.first_name.trim();
+                if (!firstName) {
+                  toast.error("Enter the student's first name");
+                  return;
+                }
+                try {
+                  const created = await addStudent.mutateAsync({
+                    first_name: firstName,
+                    last_name: newStudent.last_name.trim() || null,
+                    email: newStudent.email.trim() || null,
+                    school: newStudent.school.trim() || null,
+                    year_group: newStudent.year_group.trim() || null,
+                    status: "active",
+                  });
+                  const studentId = created[0]?.id;
+                  if (!studentId) throw new Error("The student was created without an ID");
+                  setSelectedStudentIds((studentIds) =>
+                    studentIds.includes(studentId) ? studentIds : [...studentIds, studentId],
+                  );
+                  setStudentSearch("");
+                  setStudentSchool("all");
+                  setStudentYear("all");
+                  setNewStudent({
+                    first_name: "",
+                    last_name: "",
+                    email: "",
+                    school: "",
+                    year_group: "",
+                  });
+                  setNewStudentOpen(false);
+                  toast.success("Student created and selected");
+                } catch (error) {
+                  toast.error(error instanceof Error ? error.message : "Could not create student");
+                }
+              }}
+            >
+              <p className="sm:col-span-2 text-sm font-bold">Add a new student</p>
+              <TextField
+                label="First name"
+                value={newStudent.first_name}
+                onChange={(first_name) => setNewStudent({ ...newStudent, first_name })}
+                required
+              />
+              <TextField
+                label="Last name"
+                value={newStudent.last_name}
+                onChange={(last_name) => setNewStudent({ ...newStudent, last_name })}
+              />
+              <TextField
+                label="Email"
+                type="email"
+                value={newStudent.email}
+                onChange={(email) => setNewStudent({ ...newStudent, email })}
+              />
+              <TextField
+                label="School"
+                value={newStudent.school}
+                onChange={(school) => setNewStudent({ ...newStudent, school })}
+              />
+              <TextField
+                label="Year group"
+                value={newStudent.year_group}
+                onChange={(year_group) => setNewStudent({ ...newStudent, year_group })}
+              />
+              <Button
+                type="submit"
+                className="self-end"
+                disabled={addStudent.isPending || !newStudent.first_name.trim()}
+              >
+                <Plus className="h-4 w-4" />
+                {addStudent.isPending ? "Creating…" : "Create & select"}
+              </Button>
+            </form>
+          ) : null}
           <div className="grid gap-2 px-5 sm:grid-cols-2">
             <div className="relative sm:col-span-2">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
