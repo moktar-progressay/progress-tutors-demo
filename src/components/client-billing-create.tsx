@@ -219,7 +219,9 @@ function SubscriptionCreate({
   return (
     <div className="min-h-[calc(100dvh-var(--app-header-height))] bg-background">
       <EditorHeader title="New subscription" mode="subscription" onCancel={onCancel} />
-      <main className="mx-auto max-w-[1600px] px-4 py-5 pb-28 sm:px-6">
+      <CustomerSummary client={client} />
+
+      <main className="mx-auto max-w-6xl px-4 py-6 pb-28 sm:px-8">
         <section className="grid gap-5 lg:grid-cols-[180px_minmax(0,1fr)]">
           <div>
             <h2 className="font-black">Subscription details</h2>
