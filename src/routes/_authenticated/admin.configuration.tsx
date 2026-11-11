@@ -30,6 +30,7 @@ function TeachingConfiguration() {
   const [remove, setRemove] = useState<CatalogueItem | null>(null);
   const [showArchived, setShowArchived] = useState(false);
   const sites = useTable("sites", "name");
+  const lessons = useTable("classes");
   const levels = useCatalogue("teaching_levels");
   const subjects = useCatalogue("teaching_subjects");
   const rooms = useCatalogue("site_rooms");
@@ -179,7 +180,7 @@ function TeachingConfiguration() {
         ))}
       </section>
       <ConfirmDeleteDialog open={!!remove} onOpenChange={(open) => { if (!open) setRemove(null); }} title="Delete this option?" description="This cannot be undone. If lessons depend on it, archive instead." confirmLabel="Delete" busy={mutation.isPending} onConfirm={deleteItem} />
-      <ConfirmDeleteDialog open={!!siteRemoveId} onOpenChange={(open) => { if (!open) setSiteRemoveId(null); }} title="Delete this site?" description="Sites used by lessons or rooms cannot be deleted. Archive instead." confirmLabel="Delete site" busy={deleteSite.isPending} onConfirm={async () => { if (!siteRemoveId) return; try { await deleteSite.mutateAsync(siteRemoveId); setSiteRemoveId(null); toast.success("Site deleted"); } catch (error) { toast.error(error instanceof Error ? error.message : "Could not delete site"); } }} />
+      <ConfirmDeleteDialog open={!!siteRemoveId} onOpenChange={(open) => { if (!open) setSiteRemoveId(null); }} title="Delete this site?" description="Sites used by lessons or rooms cannot be deleted. Archive instead." confirmLabel="Delete site" busy={deleteSite.isPending} onConfirm={async () => { if (!siteRemoveId) return; if ((lessons.data ?? []).some((lesson) => lesson.site_id === siteRemoveId) || (rooms.data ?? []).some((room) => room.site_id === siteRemoveId)) { toast.error("This site has lessons or rooms. Archive it instead."); return; } try { await deleteSite.mutateAsync(siteRemoveId); setSiteRemoveId(null); toast.success("Site deleted"); } catch (error) { toast.error(error instanceof Error ? error.message : "Could not delete site"); } }} />
     </Page>
   );
 }
