@@ -54,15 +54,15 @@ function TeachingConfiguration() {
   }
   async function save() {
     const trimmed = name.trim();
-    if (!trimmed) return toast.error("Enter a name");
-    if (category === "site_rooms" && !siteId) return toast.error("Choose a site");
-    if (capacity && (!Number.isInteger(Number(capacity)) || Number(capacity) < 1)) return toast.error("Capacity must be a positive whole number");
+    if (!trimmed) { toast.error("Enter a name"); return; }
+    if (category === "site_rooms" && !siteId) { toast.error("Choose a site"); return; }
+    if (capacity && (!Number.isInteger(Number(capacity)) || Number(capacity) < 1)) { toast.error("Capacity must be a positive whole number"); return; }
     try {
       const values: Record<string, unknown> = { name: trimmed };
       if (category === "site_rooms") {
-        values.site_id = siteId;
-        values.floor = floor.trim() || null;
-        values.capacity = capacity ? Number(capacity) : null;
+        values["site_id"] = siteId;
+        values["floor"] = floor.trim() || null;
+        values["capacity"] = capacity ? Number(capacity) : null;
       }
       await mutation.mutateAsync(editing ? { type: "update", id: editing.id, values } : { type: "create", values });
       toast.success(editing ? "Updated" : "Added");
@@ -95,7 +95,7 @@ function TeachingConfiguration() {
 
   return (
     <Page className="space-y-5">
-      <PageHeader title="Teaching configuration" description="Manage subjects, levels, rooms and sites. Archived options remain in existing lessons." />
+      <PageHeader title="Teaching configuration" subtitle="Manage subjects, levels, rooms and sites. Archived options remain in existing lessons." />
       <div className="flex flex-wrap gap-2">
         {categories.map((item) => (
           <Button key={item.table} variant={category === item.table ? "default" : "outline"} onClick={() => { setCategory(item.table); setEditing(null); setName(""); }}>
