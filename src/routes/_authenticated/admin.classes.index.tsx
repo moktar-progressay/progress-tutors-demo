@@ -1761,7 +1761,7 @@ function LocationPicker({
         <span className="truncate">
           {selectedSite?.name || customValue.trim() || "No location selected"}
         </span>
- 
+      </span>
         <button
           type="button"
           className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-primary hover:bg-secondary focus-visible:outline-2 focus-visible:outline-primary"
@@ -1772,7 +1772,7 @@ function LocationPicker({
         >
           <Pencil className="h-3.5 w-3.5" />
         </button>
-      </div>     </span>
+      </div>
       {expanded ? (
         <div className="space-y-2 rounded-2xl bg-muted/40 p-2">
           <div className="overflow-x-auto pb-1">
