@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Activity, BookOpenCheck, ClipboardCheck } from "lucide-react";
+import { Activity, BookOpenCheck, ClipboardCheck, Pencil } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Page } from "@/components/AppShell";
@@ -52,6 +52,14 @@ function StudentDetail() {
   const addEnrolment = useUpsert("class_enrolments");
   const removeEnrolment = useDeleteRow("class_enrolments");
   const updateEnrolment = useUpdateRow("class_enrolments");
+  const updateStudent = useUpdateRow("students");
+  const [editOpen, setEditOpen] = useState(false);
+  const [nameForm, setNameForm] = useState({ first_name: "", last_name: "", year_group: "", school: "" });
+  const openNameEdit = () => {
+    if (!student) return;
+    setNameForm({ first_name: student.first_name, last_name: student.last_name ?? "", year_group: student.year_group ?? "", school: student.school ?? "" });
+    setEditOpen(true);
+  };
   const addProgress = useUpsert("progress_records");
   const addHomework = useUpsert("homework_items");
 
@@ -144,7 +152,7 @@ function StudentDetail() {
             Students
           </Link>
         }
-        title={fullName(student)}
+        title={<span className="inline-flex max-w-full items-center gap-2"><span className="truncate">{fullName(student)}</span><button type="button" onClick={openNameEdit} aria-label="Edit student details" title="Edit student" className="shrink-0 rounded-full p-1.5 text-muted-foreground hover:bg-muted hover:text-primary focus-visible:outline focus-visible:outline-2"><Pencil className="h-4 w-4" /></button></span>}
         subtitle={
           [student.year_group, student.school].filter(Boolean).join(" · ") ||
           "No year group recorded"
@@ -152,6 +160,12 @@ function StudentDetail() {
         actions={<Button onClick={() => setClassDialog(true)}>Add to class</Button>}
       />
 
+      <FormDialog open={editOpen} onOpenChange={setEditOpen} title="Edit student details" busy={updateStudent.isPending} onSubmit={async () => { if (!nameForm.first_name.trim()) { toast.error("First name is required"); return; } try { await updateStudent.mutateAsync({ id, values: { first_name: nameForm.first_name.trim(), last_name: nameForm.last_name.trim(), year_group: nameForm.year_group.trim(), school: nameForm.school.trim() } }); setEditOpen(false); toast.success("Student updated"); } catch { toast.error("Unable to update student"); } }}>
+        <TextField label="First name" value={nameForm.first_name} onChange={(v) => setNameForm((f) => ({ ...f, first_name: v }))} required />
+        <TextField label="Last name" value={nameForm.last_name} onChange={(v) => setNameForm((f) => ({ ...f, last_name: v }))} />
+        <TextField label="Year group" value={nameForm.year_group} onChange={(v) => setNameForm((f) => ({ ...f, year_group: v }))} />
+        <TextField label="School" value={nameForm.school} onChange={(v) => setNameForm((f) => ({ ...f, school: v }))} />
+      </FormDialog>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard
           label="Classes"
