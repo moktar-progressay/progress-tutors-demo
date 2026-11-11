@@ -906,9 +906,17 @@ function SchedulePage() {
             </span>
           </div>
         )}
-        <div className="mt-auto w-full min-w-0 shrink-0 rounded-md bg-black/45 px-1 py-1">
-          <AttendanceBar percentage={attendanceSummary.percentage} inverted />
-          <span className="block truncate text-[9px] font-bold leading-none text-white">{attendanceSummary.marked ? `${attendanceSummary.present}/${attendanceSummary.total} present` : "Not marked"}</span>
+        <div
+          className="mt-auto flex w-full min-w-0 shrink-0 items-center gap-1.5 rounded-md bg-black/55 px-1.5 py-1"
+          title={attendanceSummary.marked ? `${attendanceSummary.percentage}% attendance (${attendanceSummary.present}/${attendanceSummary.total} present)` : "Attendance not marked"}
+          aria-label={attendanceSummary.marked ? `Attendance ${attendanceSummary.percentage}%, ${attendanceSummary.present} of ${attendanceSummary.total} present` : "Attendance not marked"}
+        >
+          <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-white/35" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={attendanceSummary.percentage ?? undefined}>
+            <div className="h-full rounded-full bg-white" style={{ width: `${Math.max(0, Math.min(100, attendanceSummary.percentage ?? 0))}%` }} />
+          </div>
+          <span className="shrink-0 rounded bg-white px-1.5 py-0.5 text-[10px] font-extrabold leading-none tabular-nums text-slate-950">
+            {attendanceSummary.percentage === null ? "—" : `${attendanceSummary.percentage}%`}
+          </span>
         </div>
         {!compact && !narrow && !dense ? (
           <div className="mt-auto flex min-w-0 items-center justify-between gap-1 pt-1 text-[9px] font-bold">
