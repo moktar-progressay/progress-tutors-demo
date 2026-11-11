@@ -399,17 +399,17 @@ function InvoiceCreate({
   return (
     <div className="min-h-[calc(100dvh-var(--app-header-height))] bg-background">
       <EditorHeader title="New invoice" mode="invoice" onCancel={onCancel} />
-      <CustomerSummary client={client} />
-
-      <main className="mx-auto max-w-6xl px-4 py-6 pb-28 sm:px-8">
-        <section className="grid gap-5 lg:grid-cols-[180px_minmax(0,1fr)]">
+      <main className="mx-auto max-w-[1600px] px-4 py-5 pb-28 sm:px-6">
+        <div className="grid items-start gap-5 lg:grid-cols-[minmax(360px,0.85fr)_minmax(0,1.15fr)]">
+          <section className="min-w-0 rounded-xl border border-border bg-card p-4 sm:p-5">
+            <h2 className="mb-4 text-base font-black">Edit invoice</h2>
           <div>
             <h2 className="font-black">Invoice details</h2>
             <p className="mt-1 text-xs text-muted-foreground">
               Add the dates, student and billable product.
             </p>
           </div>
-          <div className="max-w-4xl space-y-6">
+          <div className="min-w-0 space-y-6">
             <div className="grid gap-4 sm:grid-cols-3">
               <Field label="Invoice number">
                 <Input value="Generated on save" readOnly className="h-11 rounded-lg bg-muted" />
@@ -542,7 +542,19 @@ function InvoiceCreate({
               </dl>
             </div>
           </div>
-        </section>
+          </section>
+          <aside className="min-w-0 lg:sticky lg:top-20" aria-label="Live invoice preview">
+            <div className="mb-3 flex items-center justify-between"><h2 className="text-sm font-bold">Live invoice preview</h2><span className="text-xs text-muted-foreground">Updates as you type</span></div>
+            <div className="aspect-[1/1.414] overflow-auto rounded-xl border border-border bg-white p-5 text-slate-900 shadow-sm sm:p-8">
+              <div className="flex justify-between gap-4"><div><h3 className="text-xl font-black text-pink-600">ProgressTutors</h3><p className="mt-1 text-xs text-slate-500">Progressay Impact CIC</p></div><div className="text-right"><h3 className="text-2xl font-light uppercase tracking-wider">Invoice</h3><p className="text-xs text-slate-500">Number generated on save</p></div></div>
+              <div className="mt-10 grid grid-cols-2 gap-4 text-xs"><div><p className="font-bold uppercase text-slate-500">Bill to</p><p className="mt-2 font-bold">{fullName(client)}</p><p className="break-all text-slate-500">{client.email ?? ""}</p></div><div className="text-right"><p>Invoice date: {issueDate}</p><p className="mt-1">Due date: {dueDate || "Not set"}</p><p className="mt-1">Currency: GBP</p></div></div>
+              {reference.trim() && <p className="mt-5 text-xs">Reference: {reference}</p>}
+              <div className="mt-10 overflow-x-auto"><table className="w-full text-left text-xs"><thead className="border-b-2 border-slate-200 bg-slate-50"><tr><th className="p-2">Item</th><th className="p-2 text-right">Qty</th><th className="p-2 text-right">Rate</th><th className="p-2 text-right">Amount</th></tr></thead><tbody><tr className="border-b border-slate-100"><td className="p-2"><span className="font-semibold">{description || "Description of service"}</span>{studentId && <span className="block text-slate-500">{fullName(students.find((student) => student.id === studentId) ?? students[0])}</span>}</td><td className="p-2 text-right">{quantity || "0"}</td><td className="p-2 text-right">{money(Number(unitPrice) || 0)}</td><td className="p-2 text-right">{money(subtotal)}</td></tr></tbody></table></div>
+              <div className="ml-auto mt-6 max-w-52 space-y-2 text-xs"><div className="flex justify-between"><span>Subtotal</span><strong>{money(subtotal)}</strong></div><div className="flex justify-between"><span>Tax ({taxRate}%)</span><strong>{money(tax)}</strong></div><div className="flex justify-between border-t-2 border-slate-200 pt-3 text-base font-black"><span>Total</span><span>{money(total)}</span></div></div>
+              {notes.trim() && <div className="mt-10 border-t border-slate-200 pt-4 text-xs"><p className="font-bold">Notes</p><p className="mt-2 whitespace-pre-wrap text-slate-600">{notes}</p></div>}
+            </div>
+          </aside>
+        </div>
       </main>
 
       <footer className="fixed inset-x-0 bottom-0 z-30 flex flex-wrap items-center justify-end gap-2 border-t border-border bg-background/95 px-4 py-3 backdrop-blur sm:px-8">
