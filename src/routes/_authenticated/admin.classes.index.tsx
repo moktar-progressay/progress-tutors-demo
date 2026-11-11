@@ -205,7 +205,7 @@ function AttendanceBar({
     >
       <div className="flex items-center gap-1.5">
         <div
-          className={cn("h-2 min-w-0 flex-1 overflow-hidden rounded-full", inverted ? "bg-white/30" : "bg-muted")}
+          className={cn("h-2 min-w-0 flex-1 overflow-hidden rounded-full", inverted ? "bg-black/35" : "bg-muted")}
           role="progressbar"
           aria-label="Attendance"
           aria-valuemin={0}
@@ -218,7 +218,7 @@ function AttendanceBar({
             style={{ width: `${value}%` }}
           />
         </div>
-        <span className={cn("shrink-0 font-bold tabular-nums", compact ? "text-[10px]" : "text-[11px]")}>
+        <span className={cn("shrink-0 rounded-md px-1.5 py-0.5 font-extrabold leading-none tabular-nums", inverted ? "bg-white text-slate-950 shadow-sm" : "text-foreground", compact ? "text-[10px]" : "text-[11px]")}>
           {percentage === null ? "—" : `${value}%`}
         </span>
       </div>
@@ -906,7 +906,7 @@ function SchedulePage() {
             </span>
           </div>
         )}
-        <div className="mt-auto w-full min-w-0 shrink-0 rounded-md bg-black/35 px-1 py-0.5">
+        <div className="mt-auto w-full min-w-0 shrink-0 rounded-md bg-black/45 px-1 py-1">
           <AttendanceBar percentage={attendanceSummary.percentage} inverted />
           <span className="block truncate text-[9px] font-bold leading-none text-white">{attendanceSummary.marked ? `${attendanceSummary.present}/${attendanceSummary.total} present` : "Not marked"}</span>
         </div>
