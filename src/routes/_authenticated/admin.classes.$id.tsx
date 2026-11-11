@@ -611,24 +611,26 @@ export function ClassWorkspace({
                 onChange={(online_url) => setEdit({ ...edit, online_url })}
               />
             ) : (
-              <SelectField
-                label="Location"
-                value={edit.site_id}
-                onChange={(site_id) => setEdit({ ...edit, site_id, room: "" })}
-                options={[
-                  { value: "", label: "Venue to confirm" },
-                  ...(sites.data ?? []).map((item) => ({ value: item.id, label: item.name })),
-                ]}
-              />
+              <div className="min-w-0 space-y-2 sm:col-span-2">
+                <SelectField
+                  label="Location / site"
+                  value={edit.site_id}
+                  onChange={(site_id) => setEdit({ ...edit, site_id, room: "" })}
+                  options={[
+                    { value: "", label: "Venue to confirm" },
+                    ...(sites.data ?? []).map((item) => ({ value: item.id, label: item.name })),
+                  ]}
+                />
+                <div className="ml-3 border-l-2 border-primary/25 pl-3">
+                  <SiteRoomField
+                    siteId={edit.site_id}
+                    siteName={(sites.data ?? []).find((site) => site.id === edit.site_id)?.name ?? edit.venue_name}
+                    value={edit.room}
+                    onChange={(room) => setEdit({ ...edit, room })}
+                  />
+                </div>
+              </div>
             )}
-            {edit.delivery_mode !== "online" ? (
-              <SiteRoomField
-                siteId={edit.site_id}
-                siteName={(sites.data ?? []).find((site) => site.id === edit.site_id)?.name ?? edit.venue_name}
-                value={edit.room}
-                onChange={(room) => setEdit({ ...edit, room })}
-              />
-            ) : null}
           </div>
         </section>
 
