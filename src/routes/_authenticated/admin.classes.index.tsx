@@ -247,6 +247,7 @@ function SchedulePage() {
   const [calendarZoom, setCalendarZoom] = useState(1);
   const [selectedDate, setSelectedDate] = useState(requestedDate ?? currentDateIso);
   const [search, setSearch] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
   const [tutorId, setTutorId] = useState("all");
   const [siteId, setSiteId] = useState("all");
   const [formatFilter, setFormatFilter] = useState("all");
@@ -1050,18 +1051,18 @@ function SchedulePage() {
 
   return (
     <Page className="space-y-4">
-      <div className="sticky top-[var(--app-header-height)] z-30 -mx-4 bg-background/95 px-4 pb-2 pt-2 shadow-sm backdrop-blur-md sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
-      <PageHeader
-        title="Schedule"
-        subtitle="One calendar for every online and face-to-face lesson."
-        actions={
-          <Button className="hidden sm:inline-flex" onClick={() => openNew()}>
-            Add lesson
-          </Button>
-        }
-      />
+      <div className="sticky top-[var(--app-header-height)] z-30 -mx-4 space-y-2 bg-background/95 px-4 pb-2 pt-1 backdrop-blur-md sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div><h1 className="text-xl font-extrabold sm:text-2xl">Schedule</h1><p className="hidden text-xs text-muted-foreground sm:block">One calendar for every online and face-to-face lesson.</p></div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {searchOpen || search ? <div className="relative w-40 sm:w-56"><Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" /><Input autoFocus aria-label="Search lessons" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search lessons" className="h-8 rounded-lg pl-8 pr-7 text-xs" /><button type="button" aria-label="Close search" className="absolute right-2 top-1/2 -translate-y-1/2" onClick={() => { setSearch(""); setSearchOpen(false); }}>×</button></div> : <Button size="icon" variant="ghost" className="h-8 w-8" aria-label="Search lessons" onClick={() => setSearchOpen(true)}><Search className="h-4 w-4" /></Button>}
+          <Button size="sm" variant="secondary" className="h-8" onClick={() => setFiltersOpen(true)}><Filter className="h-4 w-4" /><span className="hidden sm:inline">Filters</span>{activeFilterCount ? ` ${activeFilterCount}` : ""}</Button>
+          <Button size="sm" variant="ghost" className="h-8" onClick={downloadTeachingReport}><Download className="h-4 w-4" /><span className="hidden sm:inline">Report</span></Button>
+          <Button size="sm" className="h-8" onClick={() => openNew()}>Add lesson</Button>
+        </div>
+      </div>
 
-      <section className="space-y-3 rounded-2xl border border-border bg-card p-3 sm:p-4">
+      <section className="rounded-xl border border-border bg-card px-2 py-1.5 sm:px-3">
         <div className="flex flex-wrap items-center gap-2">
           <Button size="sm" variant="secondary" onClick={() => setSelectedDate(currentDateIso())}>
             Today
@@ -1136,21 +1137,6 @@ function SchedulePage() {
               </Button>
             </div>
           ) : null}
-          <Button size="sm" variant="secondary" onClick={() => setFiltersOpen(true)}>
-            <Filter className="h-4 w-4" /> Filters{activeFilterCount ? ` ${activeFilterCount}` : ""}
-          </Button>
-          <Button size="sm" variant="secondary" onClick={downloadTeachingReport}>
-            <Download className="h-4 w-4" /> Report
-          </Button>
-        </div>
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search lessons, subjects or tutors"
-            className="h-10 rounded-xl pl-10"
-          />
         </div>
       </section>
       </div>
