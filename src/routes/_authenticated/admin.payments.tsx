@@ -1366,6 +1366,9 @@ function ParentPayments() {
                 <Button variant="secondary" onClick={() => openPayment("received")}>
                   <Banknote className="h-4 w-4" /> Record payment
                 </Button>
+                <Button variant="secondary" onClick={() => setTutorRequestOpen(true)}>
+                  <Plus className="h-4 w-4" /> Tutor payment request
+                </Button>
                 <Button variant="ghost" asChild>
                   <Link to="/admin/payment-requests">Review tutor requests</Link>
                 </Button>
