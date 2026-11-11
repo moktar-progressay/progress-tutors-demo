@@ -225,7 +225,7 @@ export function PageHeader({
   actions,
   breadcrumb,
 }: {
-  title: string;
+  title: ReactNode;
   subtitle?: string;
   actions?: ReactNode;
   breadcrumb?: ReactNode;
