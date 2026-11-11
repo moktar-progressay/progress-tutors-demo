@@ -23,7 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LessonTimeRangePicker } from "@/components/lesson-time-range-picker";
 import { SiteRoomField } from "@/components/site-room-field";
-import { LEVEL_OPTIONS } from "@/lib/lesson-options";
+import { useCatalogue } from "@/lib/teaching-catalogue";
 import {
   Dialog,
   DialogContent,
@@ -99,6 +99,8 @@ export function ClassWorkspace({
   const titleInputRef = useRef<HTMLInputElement>(null);
   const classes = useTable("classes", "name");
   const sites = useTable("sites", "name");
+  const levelCatalogue = useCatalogue("teaching_levels");
+  const subjectCatalogue = useCatalogue("teaching_subjects");
   const tutors = useTable("tutors", "first_name");
   const students = useTable("students", "first_name");
   const parents = useTable("parents", "first_name");
@@ -555,7 +557,7 @@ export function ClassWorkspace({
               onChange={(subject) => setEdit({ ...edit, subject })}
               options={[
                 { value: "", label: "Select subject" },
-                ...subjectOptions.map((subject) => ({ value: subject, label: subject })),
+                ...Array.from(new Set([...(subjectCatalogue.data ?? []).filter((item) => item.active).map((item) => item.name), ...subjectOptions, edit.subject].filter(Boolean))).map((subject) => ({ value: subject, label: subject })),
               ]}
             />
             <SelectField
@@ -564,10 +566,7 @@ export function ClassWorkspace({
               onChange={(level) => setEdit({ ...edit, level })}
               options={[
                 { value: "", label: "Select level" },
-                ...LEVEL_OPTIONS.map((level) => ({ value: level, label: level })),
-                ...(edit.level && !LEVEL_OPTIONS.some((level) => level === edit.level)
-                  ? [{ value: edit.level, label: `${edit.level} (existing)` }]
-                  : []),
+                ...Array.from(new Set([...(levelCatalogue.data ?? []).filter((item) => item.active).map((item) => item.name), edit.level].filter(Boolean))).map((level) => ({ value: level, label: level })),
               ]}
             />
             <fieldset className="min-w-0 sm:col-span-2">
@@ -624,6 +623,7 @@ export function ClassWorkspace({
             )}
             {edit.delivery_mode !== "online" ? (
               <SiteRoomField
+                siteId={edit.site_id}
                 siteName={(sites.data ?? []).find((site) => site.id === edit.site_id)?.name ?? edit.venue_name}
                 value={edit.room}
                 onChange={(room) => setEdit({ ...edit, room })}
