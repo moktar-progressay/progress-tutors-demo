@@ -992,7 +992,20 @@ function SchedulePage() {
                           <span className="text-muted-foreground">Attendance</span>
                           <span>{totals.percentage === null ? "Not marked" : `${totals.percentage}% (${totals.present}/${totals.expected})`}</span>
                         </div>
-                        <div className="h-2 w-full overflow-hidden rounded-full bg-muted" role="progressbar" aria-label={`Attendance for ${tutor ? fullName(tutor) : "unassigned lessons"}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={totals.percentage ?? undefined} aria-valuetext={totals.percentage === null ? "Not marked" : `${totals.percentage}%`}>\n                          <div className="h-full rounded-full bg-primary" style={{ width: `${totals.percentage ?? 0}%` }} />\n                        </div>
+                        <div
+                          className="h-3 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700"
+                          role="progressbar"
+                          aria-label={`Attendance for ${tutor ? fullName(tutor) : "unassigned lessons"}`}
+                          aria-valuemin={0}
+                          aria-valuemax={100}
+                          aria-valuenow={totals.percentage ?? undefined}
+                          aria-valuetext={totals.percentage === null ? "Not marked" : `${totals.percentage}%`}
+                        >
+                          <div
+                            className="h-full min-h-full rounded-full bg-[#e92e73] transition-[width] duration-200"
+                            style={{ width: `${totals.percentage ?? 0}%` }}
+                          />
+                        </div>
                       </div>
                     );
                   })()}
