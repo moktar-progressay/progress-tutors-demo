@@ -22,6 +22,8 @@ import { ConfirmDeleteDialog, SelectField, TextField } from "@/components/form-k
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LessonTimeRangePicker } from "@/components/lesson-time-range-picker";
+import { SiteRoomField } from "@/components/site-room-field";
+import { LEVEL_OPTIONS } from "@/lib/lesson-options";
 import {
   Dialog,
   DialogContent,
@@ -464,24 +466,28 @@ export function ClassWorkspace({
       </section>
 
       <section className="grid grid-cols-3 gap-2" aria-label="Lesson summary">
-        <SummaryCard
-          label="Attendance"
-          hint={
-            marksForDate.length ? `${presentForDate}/${activeRoster.length} present` : "Not marked"
-          }
-        >
-          <AttendanceProgress percentage={attendancePercentage} compact />
-        </SummaryCard>
-        <SummaryCard label="Students" value={String(activeRoster.length)} hint="Enrolled">
-          <Users className="h-5 w-5 text-emerald-600" />
-        </SummaryCard>
-        <SummaryCard
-          label="Seats filled"
-          value={`${Number(edit.capacity) ? Math.round((activeRoster.length / Number(edit.capacity)) * 100) : 0}%`}
-          hint={`${activeRoster.length}/${Number(edit.capacity) || 0} filled`}
-        >
-          <CalendarDays className="h-5 w-5 text-blue-600" />
-        </SummaryCard>
+        <button type="button" className="min-w-0 rounded-2xl text-left focus-visible:outline-2 focus-visible:outline-primary" aria-label="Jump to attendance register" onClick={() => document.getElementById("lesson-attendance")?.scrollIntoView({ behavior: "smooth", block: "start" })}>
+          <SummaryCard
+            label="Attendance"
+            hint={marksForDate.length ? `${presentForDate}/${activeRoster.length} present` : "Not marked"}
+          >
+            <AttendanceProgress percentage={attendancePercentage} compact />
+          </SummaryCard>
+        </button>
+        <button type="button" className="min-w-0 rounded-2xl text-left focus-visible:outline-2 focus-visible:outline-primary" aria-label="Jump to enrolled students" onClick={() => document.getElementById("lesson-attendance")?.scrollIntoView({ behavior: "smooth", block: "start" })}>
+          <SummaryCard label="Students" value={String(activeRoster.length)} hint="Enrolled">
+            <Users className="h-5 w-5 text-emerald-600" />
+          </SummaryCard>
+        </button>
+        <button type="button" className="min-w-0 rounded-2xl text-left focus-visible:outline-2 focus-visible:outline-primary" aria-label="Jump to lesson capacity and roster" onClick={() => document.getElementById("lesson-attendance")?.scrollIntoView({ behavior: "smooth", block: "start" })}>
+          <SummaryCard
+            label="Seats filled"
+            value={`${Number(edit.capacity) ? Math.round((activeRoster.length / Number(edit.capacity)) * 100) : 0}%`}
+            hint={`${activeRoster.length}/${Number(edit.capacity) || 0} filled`}
+          >
+            <CalendarDays className="h-5 w-5 text-blue-600" />
+          </SummaryCard>
+        </button>
       </section>
 
       <div className="grid gap-3 lg:grid-cols-2">
@@ -549,10 +555,17 @@ export function ClassWorkspace({
                 ...subjectOptions.map((subject) => ({ value: subject, label: subject })),
               ]}
             />
-            <TextField
+            <SelectField
               label="Level"
               value={edit.level}
               onChange={(level) => setEdit({ ...edit, level })}
+              options={[
+                { value: "", label: "Select level" },
+                ...LEVEL_OPTIONS.map((level) => ({ value: level, label: level })),
+                ...(edit.level && !LEVEL_OPTIONS.some((level) => level === edit.level)
+                  ? [{ value: edit.level, label: `${edit.level} (existing)` }]
+                  : []),
+              ]}
             />
             <SelectField
               label="Delivery"
@@ -574,18 +587,20 @@ export function ClassWorkspace({
               <SelectField
                 label="Location"
                 value={edit.site_id}
-                onChange={(site_id) => setEdit({ ...edit, site_id })}
+                onChange={(site_id) => setEdit({ ...edit, site_id, room: "" })}
                 options={[
                   { value: "", label: "Venue to confirm" },
                   ...(sites.data ?? []).map((item) => ({ value: item.id, label: item.name })),
                 ]}
               />
             )}
-            <TextField
-              label="Room"
-              value={edit.room}
-              onChange={(room) => setEdit({ ...edit, room })}
-            />
+            {edit.delivery_mode !== "online" ? (
+              <SiteRoomField
+                siteName={(sites.data ?? []).find((site) => site.id === edit.site_id)?.name ?? edit.venue_name}
+                value={edit.room}
+                onChange={(room) => setEdit({ ...edit, room })}
+              />
+            ) : null}
           </div>
         </section>
 
@@ -602,8 +617,8 @@ export function ClassWorkspace({
               }}
             >
               <Avatar
-                initials={initialsOf(fullName(tutor))}
-                tone={avatarTone(fullName(tutor))}
+                initials={tutor ? initialsOf(fullName(tutor)) : "?"}
+                tone={tutor ? avatarTone(fullName(tutor)) : "neutral"}
                 size="lg"
               />
               <span className="absolute -right-1 -bottom-1 grid h-6 w-6 place-items-center rounded-full bg-primary text-primary-foreground shadow-sm ring-2 ring-card">
@@ -630,7 +645,7 @@ export function ClassWorkspace({
         </section>
       </div>
 
-      <section className="rounded-2xl border border-border bg-card p-4 sm:p-5">
+      <section id="lesson-attendance" className="scroll-mt-6 rounded-2xl border border-border bg-card p-4 sm:p-5">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <h2 className="text-lg font-bold">Attendance &amp; students</h2>
