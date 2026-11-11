@@ -704,7 +704,7 @@ export function ClassWorkspace({
                 setStudentSearch("");
                 setStudentSchool("all");
                 setStudentYear("all");
-                setNewStudentOpen(true);
+                setNewStudentOpen(false);
                 setNewStudent({
                   first_name: "",
                   last_name: "",
@@ -888,22 +888,13 @@ export function ClassWorkspace({
       <Dialog open={enrolOpen} onOpenChange={setEnrolOpen}>
         <DialogContent className="flex max-h-[88vh] flex-col p-0 sm:max-w-2xl">
           <DialogHeader className="px-5 pt-5 text-left">
-            <div className="flex items-center justify-between gap-3 pr-8">
-              <DialogTitle>Manage students</DialogTitle>
-              <Button
-                type="button"
-                size="sm"
-                variant={newStudentOpen ? "secondary" : "default"}
-                onClick={() => setNewStudentOpen((open) => !open)}
-              >
-                {newStudentOpen ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-                {newStudentOpen ? "Close" : "New student"}
-              </Button>
-            </div>
-            <DialogDescription>
-              Tick students to add them. Untick enrolled students to remove them from this lesson.
-            </DialogDescription>
+            <DialogTitle>Add student to lesson</DialogTitle>
+            <DialogDescription>Choose an existing student or create a new student. Save to confirm enrolment.</DialogDescription>
           </DialogHeader>
+          <div className="grid grid-cols-2 gap-2 border-b border-border px-5 py-3" role="group" aria-label="How to add a student">
+            <Button type="button" variant={!newStudentOpen ? "default" : "secondary"} aria-pressed={!newStudentOpen} onClick={() => setNewStudentOpen(false)}><Search className="h-4 w-4" /> Add existing</Button>
+            <Button type="button" variant={newStudentOpen ? "default" : "secondary"} aria-pressed={newStudentOpen} onClick={() => setNewStudentOpen(true)}><Plus className="h-4 w-4" /> Add new</Button>
+          </div>
           {newStudentOpen ? (
             <form
               className="mx-5 grid gap-3 rounded-xl border border-primary/25 bg-primary/5 p-4 sm:grid-cols-2"
@@ -945,7 +936,7 @@ export function ClassWorkspace({
                 }
               }}
             >
-              <p className="sm:col-span-2 text-sm font-bold">Add a new student</p>
+              <p className="sm:col-span-2 text-sm font-bold">Create a new student</p>
               <TextField
                 label="First name"
                 value={newStudent.first_name}
@@ -983,6 +974,8 @@ export function ClassWorkspace({
               </Button>
             </form>
           ) : null}
+          {!newStudentOpen && (
+            <div className="flex min-h-0 flex-1 flex-col gap-2">
           <div className="grid gap-2 px-5 sm:grid-cols-2">
             <div className="relative sm:col-span-2">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -1076,6 +1069,8 @@ export function ClassWorkspace({
               </ul>
             )}
           </div>
+            </div>
+          )}
           <DialogFooter className="border-t border-border p-4 sm:space-x-2">
             <Button type="button" variant="ghost" onClick={() => setEnrolOpen(false)}>
               Cancel
