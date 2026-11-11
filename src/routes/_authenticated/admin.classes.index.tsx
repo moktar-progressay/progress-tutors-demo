@@ -953,7 +953,7 @@ function SchedulePage() {
     return (
       <div className="relative max-h-[calc(100dvh-var(--app-header-height)-13rem)] min-h-[320px] overflow-auto overscroll-contain rounded-2xl border border-border bg-card" aria-label="Teacher timetable" tabIndex={0}>
         <div style={{ minWidth: `${64 + columns.length * columnWidth}px` }}>
-          <div className="sticky top-0 z-30 grid border-b border-border bg-card" style={{ gridTemplateColumns }}>
+          {view !== "day" && <div className="sticky top-0 z-30 grid border-b border-border bg-card" style={{ gridTemplateColumns }}>
             <div className="sticky left-0 z-40 bg-card p-2" />
             {lanesByDay.map(({ day, lanes }) => (
               <button
@@ -973,13 +973,13 @@ function SchedulePage() {
                 )}>{format(day, "d")}</span>
               </button>
             ))}
-          </div>
-          <div className="sticky top-[57px] z-30 grid border-b border-border bg-card" style={{ gridTemplateColumns }}>
+          </div>}
+          <div className={cn("sticky z-30 grid border-b border-border bg-card", view === "day" ? "top-0" : "top-[57px]")} style={{ gridTemplateColumns }}>
             <div className="sticky left-0 z-40 bg-card p-2" />
             {columns.map(({ day, id }) => {
               const tutor = (tutors.data ?? []).find((person) => person.id === id);
               return (
-                <div key={`${format(day, "yyyy-MM-dd")}-${id}`} className="min-w-0 border-l border-border bg-card px-2 py-1.5">
+                <div key={`${format(day, "yyyy-MM-dd")}-${id}`} className="min-w-0 border-l border-border bg-card px-2 py-2">
                   <div className="flex min-w-0 items-center gap-2">
                     <Avatar size="md" initials={tutor ? initialsOf(fullName(tutor)) : "?"} tone={tutor ? avatarTone(fullName(tutor)) : "neutral"} />
                     <span className={cn("truncate text-xs font-bold", !tutor && "text-muted-foreground")}>{tutor ? fullName(tutor) : "Not assigned"}</span>
@@ -992,7 +992,7 @@ function SchedulePage() {
                           <span className="text-muted-foreground">Attendance</span>
                           <span>{totals.percentage === null ? "Not marked" : `${totals.percentage}% (${totals.present}/${totals.expected})`}</span>
                         </div>
-                        <AttendanceBar percentage={totals.percentage} compact />
+                        <div className="h-2 w-full overflow-hidden rounded-full bg-muted" role="progressbar" aria-label={`Attendance for ${tutor ? fullName(tutor) : "unassigned lessons"}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={totals.percentage ?? undefined} aria-valuetext={totals.percentage === null ? "Not marked" : `${totals.percentage}%`}>\n                          <div className="h-full rounded-full bg-primary" style={{ width: `${totals.percentage ?? 0}%` }} />\n                        </div>
                       </div>
                     );
                   })()}
