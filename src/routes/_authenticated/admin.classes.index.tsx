@@ -26,6 +26,7 @@ import {
   GraduationCap,
   MapPin,
   Minus,
+  Pencil,
   Plus,
   Search,
   Trash2,
@@ -1665,16 +1666,8 @@ function TutorPicker({
   const selectedTutor = tutors.find((tutor) => tutor.id === value);
   return (
     <div className="min-w-0 space-y-2 sm:col-span-2">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-xs font-semibold text-muted-foreground">Tutor</p>
-        <button
-          type="button"
-          className="text-xs font-bold text-primary"
-          onClick={() => setExpanded((current) => !current)}
-        >
-          {expanded ? "Close" : selectedTutor ? "Edit" : "+ Add"}
-        </button>
-      </div>
+      <p className="text-xs font-semibold text-muted-foreground">Tutor</p>
+      <div className="flex min-w-0 items-center gap-1.5">
       <div className="inline-flex max-w-full items-center gap-2 rounded-full border border-primary/30 bg-card py-1.5 pl-1.5 pr-3 text-xs font-bold">
         <Avatar
           initials={selectedTutor ? initialsOf(fullName(selectedTutor)) : "?"}
@@ -1683,7 +1676,18 @@ function TutorPicker({
         />
         <span className="truncate">{selectedTutor ? fullName(selectedTutor) : "Not assigned"}</span>
       </div>
-      {expanded ? (
+ 
+        <button
+          type="button"
+          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-primary hover:bg-secondary focus-visible:outline-2 focus-visible:outline-primary"
+          aria-label={expanded ? "Close tutor choices" : "Edit tutor"}
+          title={expanded ? "Close" : "Edit"}
+          aria-expanded={expanded}
+          onClick={() => setExpanded((current) => !current)}
+        >
+          <Pencil className="h-3.5 w-3.5" />
+        </button>
+      </div>     {expanded ? (
         <div className="overflow-x-auto rounded-2xl bg-muted/40 p-2">
           <div className="flex w-max min-w-full gap-2">
             <button
@@ -1750,22 +1754,25 @@ function LocationPicker({
   ];
   return (
     <div className="min-w-0 space-y-2 sm:col-span-2">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-xs font-semibold text-muted-foreground">Location</p>
-        <button
-          type="button"
-          className="text-xs font-bold text-primary"
-          onClick={() => setExpanded((current) => !current)}
-        >
-          {expanded ? "Close" : selectedSite || customValue ? "Edit" : "+ Add"}
-        </button>
-      </div>
+      <p className="text-xs font-semibold text-muted-foreground">Location</p>
+      <div className="flex min-w-0 items-center gap-1.5">
       <span className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-tile-blue px-3 py-2 text-xs font-bold text-tile-blue-ink">
         <MapPin className="h-3.5 w-3.5 shrink-0" />
         <span className="truncate">
           {selectedSite?.name || customValue.trim() || "No location selected"}
         </span>
       </span>
+        <button
+          type="button"
+          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-primary hover:bg-secondary focus-visible:outline-2 focus-visible:outline-primary"
+          aria-label={expanded ? "Close location choices" : "Edit location"}
+          title={expanded ? "Close" : "Edit"}
+          aria-expanded={expanded}
+          onClick={() => setExpanded((current) => !current)}
+        >
+          <Pencil className="h-3.5 w-3.5" />
+        </button>
+      </div>
       {expanded ? (
         <div className="space-y-2 rounded-2xl bg-muted/40 p-2">
           <div className="overflow-x-auto pb-1">
@@ -1897,20 +1904,23 @@ function SubjectPicker({
 
   return (
     <div className="min-w-0 space-y-2 sm:col-span-2">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-xs font-semibold text-muted-foreground">Subject</p>
-        <button
-          type="button"
-          className="text-xs font-bold text-primary"
-          onClick={() => setExpanded((current) => !current)}
-        >
-          {expanded ? "Close" : selected ? "Edit" : "+ Add"}
-        </button>
-      </div>
+      <p className="text-xs font-semibold text-muted-foreground">Subject</p>
+      <div className="flex min-w-0 items-center gap-1.5">
       <span className="inline-flex max-w-full rounded-full bg-tile-blue px-3 py-2 text-xs font-bold text-tile-blue-ink">
         {selected || "No subject selected"}
       </span>
-      {expanded ? (
+ 
+        <button
+          type="button"
+          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-primary hover:bg-secondary focus-visible:outline-2 focus-visible:outline-primary"
+          aria-label={expanded ? "Close subject choices" : "Edit subject"}
+          title={expanded ? "Close" : "Edit"}
+          aria-expanded={expanded}
+          onClick={() => setExpanded((current) => !current)}
+        >
+          <Pencil className="h-3.5 w-3.5" />
+        </button>
+      </div>     {expanded ? (
         <div className="space-y-2 rounded-2xl bg-muted/40 p-2">
           <div className="overflow-x-auto pb-1">
             <div className="flex w-max min-w-full gap-2">
