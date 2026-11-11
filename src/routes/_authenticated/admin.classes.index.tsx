@@ -872,7 +872,7 @@ function SchedulePage() {
         )}
       >
         <div className="flex min-w-0 shrink-0 items-start gap-1.5">
-          <p className="line-clamp-2 min-w-0 flex-1 font-extrabold leading-tight">
+          <p className="line-clamp-1 min-w-0 flex-1 font-extrabold leading-tight">
             {lesson.name || "Untitled lesson"}
           </p>
           <span className="shrink-0 rounded-full ring-1 ring-white/70" title={tutor ? fullName(tutor) : "Not assigned"} aria-label={tutor ? `Teacher: ${fullName(tutor)}` : "Teacher not assigned"}>
@@ -905,9 +905,9 @@ function SchedulePage() {
             </span>
           </div>
         )}
-        <div className="mt-auto w-full min-w-0 shrink-0 rounded-md bg-black/35 px-1 py-1">
+        <div className="mt-auto w-full min-w-0 shrink-0 rounded-md bg-black/35 px-1 py-0.5">
           <AttendanceBar percentage={attendanceSummary.percentage} inverted />
-          <span className="mt-0.5 block text-[9px] font-bold leading-none text-white">{attendanceSummary.marked ? `${attendanceSummary.present}/${attendanceSummary.total} present` : "Attendance not marked"}</span>
+          <span className="block truncate text-[9px] font-bold leading-none text-white">{attendanceSummary.marked ? `${attendanceSummary.present}/${attendanceSummary.total} present` : "Not marked"}</span>
         </div>
         {!compact && !narrow && !dense ? (
           <div className="mt-auto flex min-w-0 items-center justify-between gap-1 pt-1 text-[9px] font-bold">
