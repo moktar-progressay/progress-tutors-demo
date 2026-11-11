@@ -205,7 +205,7 @@ function AttendanceBar({
     >
       <div className="flex items-center gap-1.5">
         <div
-          className={cn("h-1.5 min-w-0 flex-1 overflow-hidden rounded-full", inverted ? "bg-black/30" : "bg-muted")}
+          className={cn("h-2 min-w-0 flex-1 overflow-hidden rounded-full", inverted ? "bg-white/30" : "bg-muted")}
           role="progressbar"
           aria-label="Attendance"
           aria-valuemin={0}
@@ -218,7 +218,7 @@ function AttendanceBar({
             style={{ width: `${value}%` }}
           />
         </div>
-        <span className={cn("shrink-0 font-bold tabular-nums", compact ? "text-[10px]" : "text-[9px]")}>
+        <span className={cn("shrink-0 font-bold tabular-nums", compact ? "text-[10px]" : "text-[11px]")}>
           {percentage === null ? "—" : `${value}%`}
         </span>
       </div>
@@ -905,8 +905,9 @@ function SchedulePage() {
             </span>
           </div>
         )}
-        <div className="mt-1 w-full min-w-0 shrink-0">
+        <div className="mt-auto w-full min-w-0 shrink-0 rounded-md bg-black/35 px-1 py-1">
           <AttendanceBar percentage={attendanceSummary.percentage} inverted />
+          <span className="mt-0.5 block text-[9px] font-bold leading-none text-white">{attendanceSummary.marked ? `${attendanceSummary.present}/${attendanceSummary.total} present` : "Attendance not marked"}</span>
         </div>
         {!compact && !narrow && !dense ? (
           <div className="mt-auto flex min-w-0 items-center justify-between gap-1 pt-1 text-[9px] font-bold">
@@ -935,6 +936,17 @@ function SchedulePage() {
       };
     });
     const columns = lanesByDay.flatMap(({ day, lanes }) => lanes.map((id) => ({ day, id })));
+    const tutorAttendanceFor = (day: Date, tutorId: string) => {
+      const iso = format(day, "yyyy-MM-dd");
+      const tutorLessons = filtered.filter((lesson) =>
+        lessonRunsOn(lesson, day) && (lesson.tutor_id ?? "") === tutorId,
+      );
+      const expected = tutorLessons.reduce((sum, lesson) => sum + countFor(lesson), 0);
+      const summaries = tutorLessons.map((lesson) => attendanceSummaryFor(lesson, iso));
+      const present = summaries.reduce((sum, item) => sum + item.present, 0);
+      const marked = summaries.reduce((sum, item) => sum + item.marked, 0);
+      return { present, expected, marked, percentage: marked && expected ? Math.round((present / expected) * 100) : null };
+    };
     const columnWidth = 220;
     const gridTemplateColumns = `4rem repeat(${columns.length}, minmax(${columnWidth}px, 1fr))`;
 
@@ -967,15 +979,23 @@ function SchedulePage() {
             {columns.map(({ day, id }) => {
               const tutor = (tutors.data ?? []).find((person) => person.id === id);
               return (
-                <div key={`${format(day, "yyyy-MM-dd")}-${id}`} className="flex min-w-0 items-center gap-2 border-l border-border bg-card px-3 py-2">
-                  <Avatar
-                    size="md"
-                    initials={tutor ? initialsOf(fullName(tutor)) : "?"}
-                    tone={tutor ? avatarTone(fullName(tutor)) : "neutral"}
-                  />
-                  <span className={cn("truncate text-xs font-bold", !tutor && "text-muted-foreground")}>
-                    {tutor ? fullName(tutor) : "Not assigned"}
-                  </span>
+                <div key={`${format(day, "yyyy-MM-dd")}-${id}`} className="min-w-0 border-l border-border bg-card px-2 py-1.5">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <Avatar size="md" initials={tutor ? initialsOf(fullName(tutor)) : "?"} tone={tutor ? avatarTone(fullName(tutor)) : "neutral"} />
+                    <span className={cn("truncate text-xs font-bold", !tutor && "text-muted-foreground")}>{tutor ? fullName(tutor) : "Not assigned"}</span>
+                  </div>
+                  {(() => {
+                    const totals = tutorAttendanceFor(day, id);
+                    return (
+                      <div className="mt-1.5" title={totals.marked ? `${totals.present} present out of ${totals.expected} expected; ${totals.marked} marked` : "Attendance not marked"}>
+                        <div className="mb-1 flex items-center justify-between gap-1 text-[10px] font-bold tabular-nums">
+                          <span className="text-muted-foreground">Attendance</span>
+                          <span>{totals.percentage === null ? "Not marked" : `${totals.percentage}% (${totals.present}/${totals.expected})`}</span>
+                        </div>
+                        <AttendanceBar percentage={totals.percentage} compact />
+                      </div>
+                    );
+                  })()}
                 </div>
               );
             })}
