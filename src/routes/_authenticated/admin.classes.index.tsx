@@ -1045,6 +1045,7 @@ function SchedulePage() {
 
   return (
     <Page className="space-y-4">
+      <div className="sticky top-[var(--app-header-height)] z-30 -mx-4 bg-background/95 px-4 pb-2 pt-2 shadow-sm backdrop-blur-md sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
       <PageHeader
         title="Schedule"
         subtitle="One calendar for every online and face-to-face lesson."
@@ -1147,6 +1148,7 @@ function SchedulePage() {
           />
         </div>
       </section>
+      </div>
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <StatCard
