@@ -388,7 +388,8 @@ export function ClassWorkspace({
 
   return (
     <Page className={embedded ? "space-y-3 px-3 py-3 sm:px-5 sm:py-4" : "space-y-3"}>
-      <section className="sticky top-0 z-20 rounded-2xl border border-border bg-card/95 p-2.5 shadow-sm backdrop-blur sm:p-3">
+      <div className="sticky top-0 z-30 space-y-2 bg-background/95 pb-2 backdrop-blur-md">
+      <section className="rounded-2xl border border-border bg-card/95 p-2.5 shadow-sm sm:p-3">
         <div className="flex min-w-0 items-center gap-2">
           {embedded ? (
             <Button size="icon" variant="ghost" aria-label="Close lesson" onClick={onClose}>
@@ -489,6 +490,7 @@ export function ClassWorkspace({
           </SummaryCard>
         </button>
       </section>
+      </div>
 
       <div className="grid gap-3 lg:grid-cols-2">
         <section className="rounded-2xl border border-border bg-card p-4">
@@ -567,6 +569,31 @@ export function ClassWorkspace({
                   : []),
               ]}
             />
+            <fieldset className="min-w-0 sm:col-span-2">
+              <legend className="mb-2 text-xs font-semibold text-muted-foreground">Lesson card colour</legend>
+              <div className="flex flex-wrap gap-2" role="group" aria-label="Lesson card colour">
+                {([
+                  ["pink", "Pink", "bg-pink-500"],
+                  ["blue", "Blue", "bg-blue-600"],
+                  ["green", "Green", "bg-emerald-500"],
+                  ["amber", "Amber", "bg-amber-400"],
+                  ["violet", "Violet", "bg-violet-600"],
+                  ["teal", "Teal", "bg-teal-600"],
+                ] as const).map(([value, label, background]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setEdit((current) => ({ ...current, card_colour: value }))}
+                    aria-label={`Set lesson colour to ${label}`}
+                    aria-pressed={edit.card_colour === value}
+                    title={label}
+                    className={`inline-flex h-9 w-9 items-center justify-center rounded-full border-2 border-white shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${background} ${edit.card_colour === value ? "ring-2 ring-foreground ring-offset-2" : ""}`}
+                  >
+                    {edit.card_colour === value ? <Check className="h-4 w-4 text-white" /> : null}
+                  </button>
+                ))}
+              </div>
+            </fieldset>
             <SelectField
               label="Delivery"
               value={edit.delivery_mode}
