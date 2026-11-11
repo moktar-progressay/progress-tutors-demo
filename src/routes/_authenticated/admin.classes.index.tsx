@@ -48,7 +48,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LessonTimeRangePicker } from "@/components/lesson-time-range-picker";
 import { SiteRoomField } from "@/components/site-room-field";
-import { LEVEL_OPTIONS } from "@/lib/lesson-options";
+import { useCatalogue } from "@/lib/teaching-catalogue";
 import {
   Dialog,
   DialogContent,
@@ -230,6 +230,8 @@ function SchedulePage() {
   const { add, date: requestedDate, view: requestedView } = Route.useSearch();
   const lessons = useTable("classes", "start_time");
   const sites = useTable("sites", "name");
+  const levelCatalogue = useCatalogue("teaching_levels");
+  const subjectCatalogue = useCatalogue("teaching_subjects");
   const tutors = useTable("tutors", "first_name");
   const students = useTable("students", "first_name");
   const enrolments = useTable("class_enrolments");
@@ -1485,7 +1487,7 @@ function SchedulePage() {
           value={form.subject}
           onChange={(subject) => setForm({ ...form, subject })}
           options={Array.from(
-            new Set(["English", "Maths", "Science", ...subjects, subjectLabel(form.subject)]),
+            new Set([...(subjectCatalogue.data ?? []).filter((item) => item.active).map((item) => item.name), subjectLabel(form.subject)]),
           ).filter(Boolean)}
         />
         <SelectField
@@ -1494,7 +1496,7 @@ function SchedulePage() {
           onChange={(level) => setForm({ ...form, level })}
           options={[
             { value: "", label: "Select level" },
-            ...LEVEL_OPTIONS.map((level) => ({ value: level, label: level })),
+            ...(levelCatalogue.data ?? []).filter((item) => item.active || item.name === form.level).map((item) => ({ value: item.name, label: item.name })),
           ]}
         />
         {form.delivery_mode !== "online" ? (
@@ -1514,6 +1516,7 @@ function SchedulePage() {
         )}
         {form.delivery_mode !== "online" ? (
           <SiteRoomField
+            siteId={form.site_id}
             siteName={(sites.data ?? []).find((site) => site.id === form.site_id)?.name ?? form.venue_name}
             value={form.room}
             onChange={(room) => setForm({ ...form, room })}
