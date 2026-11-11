@@ -119,6 +119,7 @@ export function ClassWorkspace({
   const [editingTitle, setEditingTitle] = useState(false);
   const [lessonSearch, setLessonSearch] = useState("");
   const [enrolOpen, setEnrolOpen] = useState(false);
+  const [studentToRemove, setStudentToRemove] = useState<{ enrolmentId: string; name: string } | null>(null);
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
   const [studentSearch, setStudentSearch] = useState("");
   const [studentSchool, setStudentSchool] = useState("all");
@@ -703,7 +704,7 @@ export function ClassWorkspace({
                 setStudentSearch("");
                 setStudentSchool("all");
                 setStudentYear("all");
-                setNewStudentOpen(false);
+                setNewStudentOpen(true);
                 setNewStudent({
                   first_name: "",
                   last_name: "",
@@ -714,7 +715,7 @@ export function ClassWorkspace({
                 setEnrolOpen(true);
               }}
             >
-              <Plus className="h-4 w-4" /> Manage students
+              <Plus className="h-4 w-4" /> New student
             </Button>
           </div>
         </div>
@@ -763,9 +764,10 @@ export function ClassWorkspace({
             <table className="w-full min-w-[320px] table-fixed text-left text-sm">
               <thead className="border-b border-border bg-muted/50 text-xs text-muted-foreground">
                 <tr>
-                  <th className="w-[52%] px-2 py-2.5 sm:px-3">Student</th>
-                  <th className="w-[24%] px-1 py-2.5 text-center">Present</th>
-                  <th className="w-[24%] px-1 py-2.5 text-center">Absent</th>
+                  <th className="w-[46%] px-2 py-2.5 sm:px-3">Student</th>
+                  <th className="w-[22%] px-1 py-2.5 text-center">Present</th>
+                  <th className="w-[22%] px-1 py-2.5 text-center">Absent</th>
+                  <th className="w-[10%] px-1 py-2.5 text-center">Remove</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -807,6 +809,17 @@ export function ClassWorkspace({
                           disabled={saving}
                           onClick={() => markAttendance(item.student_id, "absent")}
                         />
+                      </td>
+                      <td className="px-1 py-2.5 text-center">
+                        <button
+                          type="button"
+                          aria-label={`Remove ${fullName(student)} from this lesson`}
+                          title="Remove from lesson"
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive focus-visible:outline-2 focus-visible:outline-primary"
+                          onClick={() => setStudentToRemove({ enrolmentId: item.id, name: fullName(student) })}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
                       </td>
                     </tr>
                   );
@@ -1121,6 +1134,29 @@ export function ClassWorkspace({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <ConfirmDeleteDialog
+        open={studentToRemove !== null}
+        onOpenChange={(open) => {
+          if (!open && !updateEnrolment.isPending) setStudentToRemove(null);
+        }}
+        title="Are you sure you want to remove this student from this lesson?"
+        description={studentToRemove ? `${studentToRemove.name} will be removed from this lesson's active roster. Their student record and previous attendance history will be kept.` : ""}
+        confirmLabel="Remove student"
+        busy={updateEnrolment.isPending}
+        onConfirm={async () => {
+          if (!studentToRemove) return;
+          try {
+            await updateEnrolment.mutateAsync({
+              id: studentToRemove.enrolmentId,
+              values: { status: "inactive", end_date: new Date().toISOString().slice(0, 10) },
+            });
+            toast.success(`${studentToRemove.name} removed from lesson`);
+            setStudentToRemove(null);
+          } catch (error) {
+            toast.error(error instanceof Error ? error.message : "Could not remove student");
+          }
+        }}
+      />
       <ConfirmDeleteDialog
         open={deleteOpen}
         onOpenChange={(nextOpen) => {
