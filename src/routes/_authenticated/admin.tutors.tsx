@@ -14,6 +14,8 @@ import {
 } from "@/components/form-kit";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { TagInput } from "@/components/tag-input";
+import { useCatalogue } from "@/lib/teaching-catalogue";
 import { Progress } from "@/components/ui/progress";
 import {
   Table,
@@ -69,8 +71,8 @@ const BLANK = {
   last_name: "",
   email: "",
   phone: "",
-  subjects: "",
-  levels: "",
+  subjects: [] as string[],
+  levels: [] as string[],
   hourly_rate: "",
   pay_notes: "",
   status: "active",
@@ -108,6 +110,10 @@ function hoursLabel(value: number) {
 }
 
 function TutorsPage() {
+  const catalogueSubjects = useCatalogue("teaching_subjects");
+  const catalogueLevels = useCatalogue("teaching_levels");
+  const subjectOptions = (catalogueSubjects.data ?? []).filter((item) => item.active).map((item) => item.name);
+  const levelOptions = (catalogueLevels.data ?? []).filter((item) => item.active).map((item) => item.name);
   const { add } = Route.useSearch();
   const tutors = useTable("tutors", "first_name");
   const classes = useTable("classes", "name");
@@ -203,8 +209,8 @@ function TutorsPage() {
       last_name: t.last_name ?? "",
       email: t.email ?? "",
       phone: t.phone ?? "",
-      subjects: (t.subjects ?? []).join(", "),
-      levels: (t.levels ?? []).join(", "),
+      subjects: t.subjects ?? [],
+      levels: t.levels ?? [],
       hourly_rate: t.hourly_rate === null ? "" : String(t.hourly_rate),
       pay_notes: t.pay_notes ?? "",
       status: t.status,
@@ -219,18 +225,8 @@ function TutorsPage() {
       last_name: form.last_name || null,
       email: form.email || null,
       phone: form.phone || null,
-      subjects: form.subjects
-        ? form.subjects
-            .split(",")
-            .map((s) => s.trim())
-            .filter(Boolean)
-        : [],
-      levels: form.levels
-        ? form.levels
-            .split(",")
-            .map((s) => s.trim())
-            .filter(Boolean)
-        : [],
+      subjects: form.subjects,
+      levels: form.levels,
       hourly_rate: form.hourly_rate ? Number(form.hourly_rate) : null,
       pay_notes: form.pay_notes || null,
       status: form.status,
@@ -499,17 +495,21 @@ function TutorsPage() {
           value={form.phone}
           onChange={(v) => setForm({ ...form, phone: v })}
         />
-        <TextField
-          label="Subjects / activities (comma separated)"
+        <TagInput
+          label="Subjects / activities"
           value={form.subjects}
-          onChange={(v) => setForm({ ...form, subjects: v })}
-          full
+          onChange={(subjects) => setForm((current) => ({ ...current, subjects }))}
+          suggestions={subjectOptions}
+          placeholder="Choose or add a subject"
+          className="col-span-full"
         />
-        <TextField
-          label="Levels (comma separated)"
+        <TagInput
+          label="Levels"
           value={form.levels}
-          onChange={(v) => setForm({ ...form, levels: v })}
-          full
+          onChange={(levels) => setForm((current) => ({ ...current, levels }))}
+          suggestions={levelOptions}
+          placeholder="Choose or add a level"
+          className="col-span-full"
         />
         <TextField
           label="Hourly rate (£)"
