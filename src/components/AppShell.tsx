@@ -147,7 +147,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       {/* Sticky application header */}
       <header ref={headerRef} className="sticky top-0 z-40">
         <div className="relative bg-primary text-primary-foreground shadow-sm">
-          <div className="mx-auto flex h-14 max-w-[1500px] items-center justify-between gap-3 px-4 sm:px-6">
+          <div className="flex h-14 w-full items-center justify-between gap-3 px-4 sm:px-6">
             <Link
               to={ROLE_HOME[role]}
               className="flex min-w-0 items-center gap-2"
@@ -226,7 +226,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </header>
 
-      <div className="mx-auto flex w-full min-w-0 max-w-[1500px]">
+      <div className="flex w-full min-w-0">
         {/* Desktop sidebar */}
         <aside
           className={cn(
