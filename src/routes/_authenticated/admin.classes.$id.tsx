@@ -569,6 +569,31 @@ export function ClassWorkspace({
                   : []),
               ]}
             />
+            <fieldset className="min-w-0 sm:col-span-2">
+              <legend className="mb-2 text-xs font-semibold text-muted-foreground">Lesson card colour</legend>
+              <div className="flex flex-wrap gap-2" role="group" aria-label="Lesson card colour">
+                {([
+                  ["pink", "Pink", "bg-pink-500"],
+                  ["blue", "Blue", "bg-blue-600"],
+                  ["green", "Green", "bg-emerald-500"],
+                  ["amber", "Amber", "bg-amber-400"],
+                  ["purple", "Purple", "bg-violet-600"],
+                  ["teal", "Teal", "bg-teal-600"],
+                ] as const).map(([value, label, background]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setEdit((current) => ({ ...current, card_colour: value }))}
+                    aria-label={`Set lesson colour to ${label}`}
+                    aria-pressed={edit.card_colour === value}
+                    title={label}
+                    className={`inline-flex h-9 w-9 items-center justify-center rounded-full border-2 border-white shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${background} ${edit.card_colour === value ? "ring-2 ring-foreground ring-offset-2" : ""}`}
+                  >
+                    {edit.card_colour === value ? <Check className="h-4 w-4 text-white" /> : null}
+                  </button>
+                ))}
+              </div>
+            </fieldset>
             <SelectField
               label="Delivery"
               value={edit.delivery_mode}
