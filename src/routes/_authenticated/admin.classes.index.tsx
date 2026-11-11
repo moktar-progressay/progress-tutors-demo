@@ -867,9 +867,18 @@ function SchedulePage() {
           compact ? "text-[10px]" : "text-xs",
         )}
       >
-        <p className="line-clamp-2 min-h-[1rem] shrink-0 font-extrabold leading-tight">
-          {lesson.name || "Untitled lesson"}
-        </p>
+        <div className="flex min-w-0 shrink-0 items-start gap-1.5">
+          <p className="line-clamp-2 min-w-0 flex-1 font-extrabold leading-tight">
+            {lesson.name || "Untitled lesson"}
+          </p>
+          <span className="shrink-0 rounded-full ring-1 ring-white/70" title={tutor ? fullName(tutor) : "Not assigned"} aria-label={tutor ? `Teacher: ${fullName(tutor)}` : "Teacher not assigned"}>
+            <Avatar
+              initials={tutor ? initialsOf(fullName(tutor)) : "?"}
+              tone={tutor ? avatarTone(fullName(tutor)) : "neutral"}
+              size="sm"
+            />
+          </span>
+        </div>
         <p className="mt-0.5 shrink-0 whitespace-nowrap text-[9px] font-semibold leading-none opacity-85">
           {hhmm(lesson.start_time)}–{hhmm(lesson.end_time)}
         </p>
@@ -897,14 +906,7 @@ function SchedulePage() {
         </div>
         {!compact && !narrow && !dense ? (
           <div className="mt-auto flex min-w-0 items-center justify-between gap-1 pt-1 text-[9px] font-bold">
-            <span className="flex min-w-0 items-center gap-1 truncate" title={tutor ? fullName(tutor) : "Not assigned"}>
-              <Avatar
-                initials={tutor ? initialsOf(fullName(tutor)) : "?"}
-                tone={tutor ? avatarTone(fullName(tutor)) : "neutral"}
-                size="sm"
-              />
-              <span className="truncate">{tutor ? fullName(tutor) : "Not assigned"}</span>
-            </span>
+            <span className="truncate">{tutor ? fullName(tutor) : "Not assigned"}</span>
             <span className="shrink-0">{enrolled}/{lesson.capacity} seats</span>
           </div>
         ) : null}
@@ -963,7 +965,7 @@ function SchedulePage() {
               return (
                 <div key={`${format(day, "yyyy-MM-dd")}-${id}`} className="flex min-w-0 items-center gap-2 border-l border-border px-3 py-2">
                   <Avatar
-                    size="sm"
+                    size="md"
                     initials={tutor ? initialsOf(fullName(tutor)) : "?"}
                     tone={tutor ? avatarTone(fullName(tutor)) : "neutral"}
                   />
