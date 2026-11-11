@@ -187,42 +187,41 @@ function lessonRunsOn(lesson: ClassRow, date: Date) {
   return lesson.weekday === format(date, "EEEE");
 }
 
-function AttendanceRing({
+function AttendanceBar({
   percentage,
-  size = "md",
   inverted = false,
+  compact = false,
 }: {
   percentage: number | null;
-  size?: "sm" | "md" | "lg";
   inverted?: boolean;
+  compact?: boolean;
 }) {
-  const dimension = size === "sm" ? 32 : size === "lg" ? 64 : 44;
-  const safePercentage = Math.max(0, Math.min(100, percentage ?? 0));
-  const track = inverted ? "rgba(255,255,255,.28)" : "var(--muted)";
-  const progress = inverted ? "rgba(255,255,255,.96)" : "var(--primary)";
-
+  const value = Math.max(0, Math.min(100, percentage ?? 0));
   return (
-    <span
-      className="relative inline-grid shrink-0 place-items-center rounded-full"
-      style={{
-        width: dimension,
-        height: dimension,
-        background: `conic-gradient(${progress} ${safePercentage * 3.6}deg, ${track} 0deg)`,
-      }}
-      role="img"
-      aria-label={percentage === null ? "Attendance not marked" : `${percentage}% attendance`}
-      title={percentage === null ? "Attendance not marked" : `${percentage}% attendance`}
+    <div
+      className={cn("min-w-0", compact ? "w-24" : "w-full")}
+      aria-label={percentage === null ? "Attendance not marked" : `${value}% attendance`}
     >
-      <span
-        className={cn(
-          "absolute inset-[4px] grid place-items-center rounded-full font-extrabold",
-          inverted ? "bg-black/25 text-white" : "bg-card text-foreground",
-          size === "sm" ? "text-[8px]" : size === "lg" ? "text-xs" : "text-[9px]",
-        )}
-      >
-        {percentage === null ? "—" : `${percentage}%`}
-      </span>
-    </span>
+      <div className="flex items-center gap-1.5">
+        <div
+          className={cn("h-1.5 min-w-0 flex-1 overflow-hidden rounded-full", inverted ? "bg-black/30" : "bg-muted")}
+          role="progressbar"
+          aria-label="Attendance"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={percentage === null ? undefined : value}
+          aria-valuetext={percentage === null ? "Not marked" : `${value}%`}
+        >
+          <div
+            className={cn("h-full rounded-full transition-[width]", inverted ? "bg-white" : "bg-primary")}
+            style={{ width: `${value}%` }}
+          />
+        </div>
+        <span className={cn("shrink-0 font-bold tabular-nums", compact ? "text-[10px]" : "text-[9px]")}>
+          {percentage === null ? "—" : `${value}%`}
+        </span>
+      </div>
+    </div>
   );
 }
 
@@ -893,35 +892,22 @@ function SchedulePage() {
             </span>
           </div>
         )}
-        <div className="mt-auto min-w-0 space-y-1 pt-1">
-          <div className="flex min-w-0 items-center justify-between gap-1">
-            <span className="flex min-w-0 items-center gap-1 text-[9px] font-bold" title={tutor ? fullName(tutor) : "Not assigned"}>
+        <div className="mt-1 w-full min-w-0 shrink-0">
+          <AttendanceBar percentage={attendanceSummary.percentage} inverted />
+        </div>
+        {!compact && !narrow && !dense ? (
+          <div className="mt-auto flex min-w-0 items-center justify-between gap-1 pt-1 text-[9px] font-bold">
+            <span className="flex min-w-0 items-center gap-1 truncate" title={tutor ? fullName(tutor) : "Not assigned"}>
               <Avatar
                 initials={tutor ? initialsOf(fullName(tutor)) : "?"}
                 tone={tutor ? avatarTone(fullName(tutor)) : "neutral"}
                 size="sm"
               />
-              {!compact && !narrow && !dense ? (
-                <span className="truncate">{tutor ? fullName(tutor) : "Not assigned"}</span>
-              ) : null}
+              <span className="truncate">{tutor ? fullName(tutor) : "Not assigned"}</span>
             </span>
-            <span className="shrink-0 text-[9px] font-bold">{enrolled}/{lesson.capacity} seats</span>
+            <span className="shrink-0">{enrolled}/{lesson.capacity} seats</span>
           </div>
-          <div
-            className="h-1.5 overflow-hidden rounded-full bg-black/25"
-            role="progressbar"
-            aria-label="Attendance"
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={attendanceSummary.percentage ?? 0}
-            title={attendanceSummary.percentage === null ? "Attendance not marked" : `${attendanceSummary.percentage}% attendance`}
-          >
-            <div className="h-full rounded-full bg-white/95 transition-[width]" style={{ width: `${Math.max(0, Math.min(100, attendanceSummary.percentage ?? 0))}%` }} />
-          </div>
-          <span className="block text-right text-[9px] font-bold leading-none">
-            {attendanceSummary.percentage === null ? "Attendance not marked" : `${attendanceSummary.percentage}% attendance`}
-          </span>
-        </div>
+        ) : null}
       </button>
     );
   };
@@ -1194,7 +1180,7 @@ function SchedulePage() {
               : "Not marked"
           }
           tone="blue"
-          icon={<AttendanceRing percentage={summaryAttendancePercentage} size="md" />}
+          icon={<AttendanceBar percentage={summaryAttendancePercentage} compact />}
           compact
         />
       </div>
@@ -1294,10 +1280,7 @@ function SchedulePage() {
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
-                      <AttendanceRing
-                        percentage={attendanceSummaryFor(lesson).percentage}
-                        size="sm"
-                      />
+                      <AttendanceBar percentage={attendanceSummaryFor(lesson).percentage} compact />
                       <Pill tone={capacityTone(countFor(lesson), lesson.capacity)}>
                         {countFor(lesson)}/{lesson.capacity}
                       </Pill>
