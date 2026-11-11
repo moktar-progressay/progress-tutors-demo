@@ -867,7 +867,7 @@ function SchedulePage() {
           setDetail(lesson);
         }}
         className={cn(
-          "flex h-full w-full flex-col overflow-hidden rounded-xl border border-l-4 border-white/30 p-1.5 text-left shadow-sm ring-1 ring-black/5 transition hover:brightness-95",
+          "relative flex h-full w-full flex-col overflow-hidden rounded-xl border border-l-4 border-white/30 p-1.5 pb-5 text-left shadow-sm ring-1 ring-black/5 transition hover:brightness-95",
           colourFor(lesson),
           compact ? "text-[10px]" : "text-xs",
         )}
@@ -906,9 +906,11 @@ function SchedulePage() {
             </span>
           </div>
         )}
-        <div className="mt-auto w-full min-w-0 shrink-0 rounded-md bg-black/45 px-1 py-1">
-          <AttendanceBar percentage={attendanceSummary.percentage} inverted />
-          <span className="block truncate text-[9px] font-bold leading-none text-white">{attendanceSummary.marked ? `${attendanceSummary.present}/${attendanceSummary.total} present` : "Not marked"}</span>
+        <div className="absolute inset-x-1 bottom-1 flex h-3.5 min-w-0 items-center gap-1 rounded bg-black/55 px-1" aria-label={attendanceSummary.marked ? `Attendance ${attendanceSummary.percentage}%: ${attendanceSummary.present} of ${attendanceSummary.total} present` : "Attendance not marked"}>
+          <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-white/40" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={attendanceSummary.percentage ?? undefined}>
+            <div className="h-full rounded-full bg-white" style={{ width: `${attendanceSummary.percentage ?? 0}%` }} />
+          </div>
+          <span className="shrink-0 rounded bg-white px-1 text-[10px] font-extrabold leading-3 tabular-nums text-slate-950">{attendanceSummary.percentage === null ? "—" : `${attendanceSummary.percentage}%`}</span>
         </div>
         {!compact && !narrow && !dense ? (
           <div className="mt-auto flex min-w-0 items-center justify-between gap-1 pt-1 text-[9px] font-bold">
