@@ -490,6 +490,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/_authenticated/admin/contacts'
     | '/_authenticated/admin/dashboard'
+    | '/_authenticated/admin/configuration'
     | '/_authenticated/admin/operations'
     | '/_authenticated/admin/payment-requests'
     | '/_authenticated/admin/payments'
@@ -533,6 +534,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/_authenticated/admin/configuration': {
+      id: '/_authenticated/admin/configuration'
+      path: '/admin/configuration'
+      fullPath: '/admin/configuration'
+      preLoaderRoute: typeof AuthenticatedAdminConfigurationRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/': {
       id: '/'
       path: '/'
