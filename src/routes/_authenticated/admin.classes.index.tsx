@@ -1180,7 +1180,7 @@ function SchedulePage() {
               : "Not marked"
           }
           tone="blue"
-          icon={<AttendanceRing percentage={summaryAttendancePercentage} size="md" />}
+          icon={<AttendanceBar percentage={summaryAttendancePercentage} compact />}
           compact
         />
       </div>
