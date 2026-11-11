@@ -46,6 +46,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LessonTimeRangePicker } from "@/components/lesson-time-range-picker";
+import { SiteRoomField } from "@/components/site-room-field";
+import { LEVEL_OPTIONS } from "@/lib/lesson-options";
 import {
   Dialog,
   DialogContent,
@@ -139,8 +141,6 @@ const CALENDAR_HOUR_HEIGHT = 60;
 const CALENDAR_ZOOM_MIN = 1;
 const CALENDAR_ZOOM_MAX = 2;
 const CALENDAR_ZOOM_STEP = 0.25;
-
-const LEVEL_OPTIONS = ["KS1", "KS2", "KS3", "GCSE", "A Level", "Degree", "Masters", "Other"];
 
 function minutes(time: string | null) {
   if (!time) return 0;
@@ -1416,7 +1416,7 @@ function SchedulePage() {
           setFormOpen(open);
           if (!open) setCloningId(null);
         }}
-        wide
+        fullScreen
         title={editingId ? "Edit lesson" : cloningId ? "Clone lesson" : "Add lesson"}
         description={
           editingId
@@ -1444,6 +1444,9 @@ function SchedulePage() {
             : undefined
         }
       >
+        <details open className="sm:col-span-full min-w-0 rounded-2xl border border-border bg-card">
+          <summary className="cursor-pointer px-4 py-3 text-sm font-extrabold">1. Essentials · Name and time</summary>
+          <div className="grid gap-3 border-t border-border p-4 sm:grid-cols-2">
         <TextField
           label="Lesson name"
           value={form.name}
@@ -1473,6 +1476,11 @@ function SchedulePage() {
           end={form.end_time}
           onChange={(start_time, end_time) => setForm({ ...form, start_time, end_time })}
         />
+          </div>
+        </details>
+        <details open className="sm:col-span-full min-w-0 rounded-2xl border border-border bg-card">
+          <summary className="cursor-pointer px-4 py-3 text-sm font-extrabold">2. Teaching · Teacher, subject and location</summary>
+          <div className="grid gap-3 border-t border-border p-4 sm:grid-cols-2">
         <SelectField
           label="Delivery"
           value={form.delivery_mode}
@@ -1507,9 +1515,9 @@ function SchedulePage() {
         {form.delivery_mode !== "online" ? (
           <LocationPicker
             value={form.site_id}
-            onChange={(site_id) => setForm({ ...form, site_id })}
+            onChange={(site_id) => setForm({ ...form, site_id, room: "" })}
             customValue={form.venue_name}
-            onCustomChange={(venue_name) => setForm({ ...form, venue_name })}
+            onCustomChange={(venue_name) => setForm({ ...form, venue_name, room: "" })}
             sites={sites.data ?? []}
           />
         ) : (
@@ -1519,32 +1527,27 @@ function SchedulePage() {
             onChange={(online_url) => setForm({ ...form, online_url })}
           />
         )}
+        {form.delivery_mode !== "online" ? (
+          <SiteRoomField
+            siteName={(sites.data ?? []).find((site) => site.id === form.site_id)?.name ?? form.venue_name}
+            value={form.room}
+            onChange={(room) => setForm({ ...form, room })}
+          />
+        ) : null}
+          </div>
+        </details>
+        <details className="sm:col-span-full min-w-0 rounded-2xl border border-border bg-card">
+          <summary className="cursor-pointer px-4 py-3 text-sm font-extrabold">3. Additional options · Pricing, capacity and notes</summary>
+          <div className="grid gap-3 border-t border-border p-4 sm:grid-cols-2">
         <CardColourPicker
           value={form.card_colour}
           onChange={(card_colour) => setForm({ ...form, card_colour })}
         />
-        <div className="sm:col-span-2">
-          <Button type="button" variant="ghost" onClick={() => setShowMore(!showMore)}>
-            {showMore ? "Show fewer options" : "See more options"}
-          </Button>
-        </div>
-        {showMore ? (
-          <>
             <TextField
               label="Repeat until"
               type="date"
               value={form.end_date}
               onChange={(end_date) => setForm({ ...form, end_date })}
-            />
-            <TextField
-              label="Venue name"
-              value={form.venue_name}
-              onChange={(venue_name) => setForm({ ...form, venue_name })}
-            />
-            <TextField
-              label="Room"
-              value={form.room}
-              onChange={(room) => setForm({ ...form, room })}
             />
             <TextField
               label="Capacity"
@@ -1583,8 +1586,11 @@ function SchedulePage() {
                 { value: "archived", label: "Archived" },
               ]}
             />
-          </>
-        ) : null}
+          </div>
+        </details>
+        <details className="sm:col-span-full min-w-0 rounded-2xl border border-border bg-card">
+          <summary className="cursor-pointer px-4 py-3 text-sm font-extrabold">4. Students · {selectedStudentIds.length} selected</summary>
+          <div className="grid gap-3 border-t border-border p-4 sm:grid-cols-2">
         <div className="space-y-2 border-t border-border pt-4 sm:col-span-2">
           <p className="text-xs font-semibold text-muted-foreground">
             Students ({selectedStudentIds.length} selected)
@@ -1631,6 +1637,8 @@ function SchedulePage() {
             ))}
           </div>
         </div>
+          </div>
+        </details>
       </FormDialog>
 
       <ConfirmDeleteDialog
@@ -1685,11 +1693,11 @@ function TutorPicker({
       </div>
       <div className="inline-flex max-w-full items-center gap-2 rounded-full border border-primary/30 bg-card py-1.5 pl-1.5 pr-3 text-xs font-bold">
         <Avatar
-          initials={initialsOf(selectedTutor ? fullName(selectedTutor) : "Tutor needed")}
-          tone={avatarTone(selectedTutor ? fullName(selectedTutor) : "Tutor needed")}
+          initials={selectedTutor ? initialsOf(fullName(selectedTutor)) : "?"}
+          tone={selectedTutor ? avatarTone(fullName(selectedTutor)) : "neutral"}
           size="sm"
         />
-        <span className="truncate">{selectedTutor ? fullName(selectedTutor) : "Tutor needed"}</span>
+        <span className="truncate">{selectedTutor ? fullName(selectedTutor) : "Not assigned"}</span>
       </div>
       {expanded ? (
         <div className="overflow-x-auto rounded-2xl bg-muted/40 p-2">
@@ -1702,7 +1710,7 @@ function TutorPicker({
               }}
               className="shrink-0 rounded-full border border-border bg-card px-3 py-2 text-xs font-bold"
             >
-              Tutor needed
+              Not assigned
             </button>
             {tutors.map((tutor) => (
               <button
