@@ -46,6 +46,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LessonTimeRangePicker } from "@/components/lesson-time-range-picker";
+import { SiteRoomField } from "@/components/site-room-field";
+import { LEVEL_OPTIONS } from "@/lib/lesson-options";
 import {
   Dialog,
   DialogContent,
@@ -139,8 +141,6 @@ const CALENDAR_HOUR_HEIGHT = 60;
 const CALENDAR_ZOOM_MIN = 1;
 const CALENDAR_ZOOM_MAX = 2;
 const CALENDAR_ZOOM_STEP = 0.25;
-
-const LEVEL_OPTIONS = ["KS1", "KS2", "KS3", "GCSE", "A Level", "Degree", "Masters", "Other"];
 
 function minutes(time: string | null) {
   if (!time) return 0;
@@ -893,172 +893,169 @@ function SchedulePage() {
             </span>
           </div>
         )}
-        {compact || narrow ? (
-          <div
-            className="mt-auto min-w-0 pt-1"
-            title={
-              attendanceSummary.percentage === null
-                ? "Attendance not marked"
-                : `${attendanceSummary.percentage}% attendance`
-            }
-          >
-            <div className="h-1 overflow-hidden rounded-full bg-black/20">
-              <div
-                className="h-full rounded-full bg-white/95"
-                style={{ width: `${attendanceSummary.percentage ?? 0}%` }}
+        <div className="mt-auto min-w-0 space-y-1 pt-1">
+          <div className="flex min-w-0 items-center justify-between gap-1">
+            <span className="flex min-w-0 items-center gap-1 text-[9px] font-bold" title={tutor ? fullName(tutor) : "Not assigned"}>
+              <Avatar
+                initials={tutor ? initialsOf(fullName(tutor)) : "?"}
+                tone={tutor ? avatarTone(fullName(tutor)) : "neutral"}
+                size="sm"
               />
-            </div>
-            <div className="mt-0.5 flex min-w-0 items-center justify-between gap-1 text-[8px] font-extrabold leading-none">
-              <span>
-                {attendanceSummary.percentage === null ? "—" : `${attendanceSummary.percentage}%`}
-              </span>
-              <span className="truncate">
-                {enrolled}/{lesson.capacity} seats
-              </span>
-            </div>
-          </div>
-        ) : (
-          <div className="mt-auto flex min-w-0 items-center justify-between gap-1 pt-1">
-            <span className="flex min-w-0 items-center gap-1" title={fullName(tutor)}>
-              <AttendanceRing percentage={attendanceSummary.percentage} size="sm" inverted />
-              {dense ? null : (
-                <Avatar
-                  initials={initialsOf(fullName(tutor))}
-                  tone={avatarTone(fullName(tutor))}
-                  size="sm"
-                />
-              )}
+              {!compact && !narrow && !dense ? (
+                <span className="truncate">{tutor ? fullName(tutor) : "Not assigned"}</span>
+              ) : null}
             </span>
-            <span className="shrink-0 whitespace-nowrap rounded-full bg-black/20 px-1.5 py-0.5 text-[9px] font-extrabold leading-none">
-              {enrolled}/{lesson.capacity} seats
-            </span>
+            <span className="shrink-0 text-[9px] font-bold">{enrolled}/{lesson.capacity} seats</span>
           </div>
-        )}
+          <div
+            className="h-1.5 overflow-hidden rounded-full bg-black/25"
+            role="progressbar"
+            aria-label="Attendance"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={attendanceSummary.percentage ?? 0}
+            title={attendanceSummary.percentage === null ? "Attendance not marked" : `${attendanceSummary.percentage}% attendance`}
+          >
+            <div className="h-full rounded-full bg-white/95 transition-[width]" style={{ width: `${Math.max(0, Math.min(100, attendanceSummary.percentage ?? 0))}%` }} />
+          </div>
+          <span className="block text-right text-[9px] font-bold leading-none">
+            {attendanceSummary.percentage === null ? "Attendance not marked" : `${attendanceSummary.percentage}% attendance`}
+          </span>
+        </div>
       </button>
     );
   };
 
-  const timeline = (days: Date[]) => (
-    <div className="overflow-x-auto rounded-2xl border border-border bg-card">
-      <div style={{ minWidth: days.length === 1 ? 0 : `${64 + days.length * 520}px` }}>
-        <div
-          className="grid border-b border-border"
-          style={{
-            gridTemplateColumns:
-              days.length === 1
-                ? "4rem minmax(0, 1fr)"
-                : `4rem repeat(${days.length}, minmax(520px, 1fr))`,
-          }}
-        >
-          <div className="p-2" />
-          {days.map((day) => (
-            <button
-              key={day.toISOString()}
-              type="button"
-              onClick={() => setSelectedDate(format(day, "yyyy-MM-dd"))}
-              className="border-l border-border p-2 text-center hover:bg-muted"
-            >
-              <span className="block text-[10px] font-bold uppercase text-muted-foreground">
-                {format(day, "EEE")}
-              </span>
-              <span
-                className={cn(
+  const timeline = (days: Date[]) => {
+    // Each teaching resource gets its own time column. Unassigned lessons remain visible.
+    const lanesByDay = days.map((day) => {
+      const dayLessons = filtered.filter((lesson) => lessonRunsOn(lesson, day));
+      const ids = Array.from(new Set(dayLessons.map((lesson) => lesson.tutor_id ?? "")));
+      if (!ids.length) ids.push("");
+      return {
+        day,
+        lanes: ids.sort((a, b) =>
+          a === "" ? 1 : b === "" ? -1 : fullName((tutors.data ?? []).find((tutor) => tutor.id === a)).localeCompare(
+            fullName((tutors.data ?? []).find((tutor) => tutor.id === b)),
+            "en-GB",
+          ),
+        ),
+      };
+    });
+    const columns = lanesByDay.flatMap(({ day, lanes }) => lanes.map((id) => ({ day, id })));
+    const columnWidth = 220;
+    const gridTemplateColumns = `4rem repeat(${columns.length}, minmax(${columnWidth}px, 1fr))`;
+
+    return (
+      <div className="overflow-x-auto rounded-2xl border border-border bg-card" aria-label="Teacher timetable">
+        <div style={{ minWidth: `${64 + columns.length * columnWidth}px` }}>
+          <div className="grid border-b border-border" style={{ gridTemplateColumns }}>
+            <div className="p-2" />
+            {lanesByDay.map(({ day, lanes }) => (
+              <button
+                key={format(day, "yyyy-MM-dd")}
+                type="button"
+                onClick={() => {
+                  setSelectedDate(format(day, "yyyy-MM-dd"));
+                  setView("day");
+                }}
+                className="border-l border-border p-2 text-center hover:bg-muted"
+                style={{ gridColumn: `span ${lanes.length}` }}
+              >
+                <span className="block text-[10px] font-bold uppercase text-muted-foreground">{format(day, "EEE")}</span>
+                <span className={cn(
                   "mt-1 inline-flex h-8 w-8 items-center justify-center rounded-full text-sm font-extrabold",
-                  format(day, "yyyy-MM-dd") === selectedDate &&
-                    "bg-primary text-primary-foreground",
-                )}
-              >
-                {format(day, "d")}
-              </span>
-            </button>
-          ))}
-        </div>
-        <div
-          className="grid"
-          style={{
-            gridTemplateColumns:
-              days.length === 1
-                ? "4rem minmax(0, 1fr)"
-                : `4rem repeat(${days.length}, minmax(520px, 1fr))`,
-          }}
-        >
-          <div className="relative" style={{ height: calendarHeight }}>
-            {HOURS.map((hour) => (
-              <span
-                key={hour}
-                className="absolute right-2 -translate-y-2 text-[10px] text-muted-foreground"
-                style={{ top: `${(hour - 8) * calendarHourHeight}px` }}
-              >
-                {hour}:00
-              </span>
+                  format(day, "yyyy-MM-dd") === selectedDate && "bg-primary text-primary-foreground",
+                )}>{format(day, "d")}</span>
+              </button>
             ))}
           </div>
-          {days.map((day) => (
-            <div
-              key={day.toISOString()}
-              className="relative border-l border-border"
-              data-calendar-date={format(day, "yyyy-MM-dd")}
-              style={{
-                height: calendarHeight,
-                backgroundImage: `repeating-linear-gradient(to bottom, transparent 0, transparent ${calendarHourHeight - 1}px, var(--border) ${calendarHourHeight}px)`,
-              }}
-              onDoubleClick={() => openNew(format(day, "yyyy-MM-dd"))}
-            >
-              {filtered
-                .filter((lesson) => lessonRunsOn(lesson, day))
-                .map((lesson, _index, dayLessons) => {
-                  const top =
-                    Math.max(0, minutes(lesson.start_time) - 8 * 60) * calendarMinuteScale;
-                  const height = Math.max(
-                    44,
-                    (minutes(lesson.end_time) - minutes(lesson.start_time)) * calendarMinuteScale,
-                  );
-                  const overlappingLessons = dayLessons.filter(
-                    (candidate) =>
-                      minutes(candidate.start_time) < minutes(lesson.end_time) &&
-                      minutes(candidate.end_time) > minutes(lesson.start_time),
-                  );
-                  const overlapIndex = overlappingLessons.findIndex(
-                    (candidate) => candidate.id === lesson.id,
-                  );
-                  const width = overlappingLessons.length > 1 ? 94 / overlappingLessons.length : 94;
-                  return (
-                    <div
-                      key={lesson.id}
-                      className={cn(
-                        "absolute touch-auto select-none px-1 transition-opacity",
-                        draggingId === lesson.id && "z-20 cursor-grabbing opacity-60",
-                        draggingId !== lesson.id && "cursor-grab",
-                      )}
-                      style={{
-                        top,
-                        height,
-                        left: `${3 + Math.max(0, overlapIndex) * width}%`,
-                        width: `${width}%`,
-                      }}
-                      title="Drag to reschedule. On mobile, press and hold first."
-                      onContextMenu={(event) => event.preventDefault()}
-                      onPointerDown={(event) => beginDrag(event, lesson)}
-                      onPointerMove={continueDrag}
-                      onPointerUp={finishDrag}
-                      onPointerCancel={() => {
-                        if (dragHoldTimerRef.current) clearTimeout(dragHoldTimerRef.current);
-                        dragHoldTimerRef.current = null;
-                        dragRef.current = null;
-                        setDraggingId(null);
-                        document.body.style.overflow = pageOverflowRef.current;
-                      }}
-                    >
-                      {renderCard(lesson, days.length > 3, day, overlappingLessons.length >= 3)}
-                    </div>
-                  );
-                })}
+          <div className="grid border-b border-border" style={{ gridTemplateColumns }}>
+            <div className="p-2" />
+            {columns.map(({ day, id }) => {
+              const tutor = (tutors.data ?? []).find((person) => person.id === id);
+              return (
+                <div key={`${format(day, "yyyy-MM-dd")}-${id}`} className="flex min-w-0 items-center gap-2 border-l border-border px-3 py-2">
+                  <Avatar
+                    size="sm"
+                    initials={tutor ? initialsOf(fullName(tutor)) : "?"}
+                    tone={tutor ? avatarTone(fullName(tutor)) : "neutral"}
+                  />
+                  <span className={cn("truncate text-xs font-bold", !tutor && "text-muted-foreground")}>
+                    {tutor ? fullName(tutor) : "Not assigned"}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          <div className="grid" style={{ gridTemplateColumns }}>
+            <div className="relative" style={{ height: calendarHeight }}>
+              {HOURS.map((hour) => (
+                <span key={hour} className="absolute right-2 -translate-y-2 text-[10px] text-muted-foreground" style={{ top: `${(hour - 8) * calendarHourHeight}px` }}>
+                  {hour}:00
+                </span>
+              ))}
             </div>
-          ))}
+            {columns.map(({ day, id }) => {
+              const laneLessons = filtered.filter((lesson) =>
+                lessonRunsOn(lesson, day) && (lesson.tutor_id ?? "") === id,
+              );
+              return (
+                <div
+                  key={`${format(day, "yyyy-MM-dd")}-${id}`}
+                  className="relative border-l border-border"
+                  data-calendar-date={format(day, "yyyy-MM-dd")}
+                  style={{
+                    height: calendarHeight,
+                    backgroundImage: `repeating-linear-gradient(to bottom, transparent 0, transparent ${calendarHourHeight - 1}px, var(--border) ${calendarHourHeight}px)`,
+                  }}
+                  onDoubleClick={() => {
+                    openNew(format(day, "yyyy-MM-dd"));
+                    setForm((current) => ({ ...current, tutor_id: id }));
+                  }}
+                >
+                  {laneLessons.map((lesson) => {
+                    const top = Math.max(0, minutes(lesson.start_time) - 8 * 60) * calendarMinuteScale;
+                    const height = Math.max(44, (minutes(lesson.end_time) - minutes(lesson.start_time)) * calendarMinuteScale);
+                    const overlapping = laneLessons.filter((other) =>
+                      minutes(other.start_time) < minutes(lesson.end_time) &&
+                      minutes(other.end_time) > minutes(lesson.start_time),
+                    );
+                    const index = Math.max(0, overlapping.findIndex((other) => other.id === lesson.id));
+                    const width = 96 / Math.max(1, overlapping.length);
+                    return (
+                      <div
+                        key={lesson.id}
+                        className={cn(
+                          "absolute touch-auto select-none px-1 transition-opacity",
+                          draggingId === lesson.id ? "z-20 cursor-grabbing opacity-60" : "cursor-grab",
+                        )}
+                        style={{ top, height, left: `${2 + index * width}%`, width: `${width}%` }}
+                        title="Drag to reschedule time. Teacher assignment is unchanged."
+                        onContextMenu={(event) => event.preventDefault()}
+                        onPointerDown={(event) => beginDrag(event, lesson)}
+                        onPointerMove={continueDrag}
+                        onPointerUp={finishDrag}
+                        onPointerCancel={() => {
+                          if (dragHoldTimerRef.current) clearTimeout(dragHoldTimerRef.current);
+                          dragHoldTimerRef.current = null;
+                          dragRef.current = null;
+                          setDraggingId(null);
+                          document.body.style.overflow = pageOverflowRef.current;
+                        }}
+                      >
+                        {renderCard(lesson, days.length > 3, day, overlapping.length > 1)}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <Page className="space-y-4">
@@ -1416,7 +1413,7 @@ function SchedulePage() {
           setFormOpen(open);
           if (!open) setCloningId(null);
         }}
-        wide
+        fullScreen
         title={editingId ? "Edit lesson" : cloningId ? "Clone lesson" : "Add lesson"}
         description={
           editingId
@@ -1444,6 +1441,9 @@ function SchedulePage() {
             : undefined
         }
       >
+        <details open className="sm:col-span-full min-w-0 rounded-2xl border border-border bg-card">
+          <summary className="cursor-pointer px-4 py-3 text-sm font-extrabold">1. Essentials · Name and time</summary>
+          <div className="grid gap-3 border-t border-border p-4 sm:grid-cols-2">
         <TextField
           label="Lesson name"
           value={form.name}
@@ -1473,6 +1473,11 @@ function SchedulePage() {
           end={form.end_time}
           onChange={(start_time, end_time) => setForm({ ...form, start_time, end_time })}
         />
+          </div>
+        </details>
+        <details open className="sm:col-span-full min-w-0 rounded-2xl border border-border bg-card">
+          <summary className="cursor-pointer px-4 py-3 text-sm font-extrabold">2. Teaching · Teacher, subject and location</summary>
+          <div className="grid gap-3 border-t border-border p-4 sm:grid-cols-2">
         <SelectField
           label="Delivery"
           value={form.delivery_mode}
@@ -1507,9 +1512,9 @@ function SchedulePage() {
         {form.delivery_mode !== "online" ? (
           <LocationPicker
             value={form.site_id}
-            onChange={(site_id) => setForm({ ...form, site_id })}
+            onChange={(site_id) => setForm({ ...form, site_id, room: "" })}
             customValue={form.venue_name}
-            onCustomChange={(venue_name) => setForm({ ...form, venue_name })}
+            onCustomChange={(venue_name) => setForm({ ...form, venue_name, room: "" })}
             sites={sites.data ?? []}
           />
         ) : (
@@ -1519,32 +1524,27 @@ function SchedulePage() {
             onChange={(online_url) => setForm({ ...form, online_url })}
           />
         )}
+        {form.delivery_mode !== "online" ? (
+          <SiteRoomField
+            siteName={(sites.data ?? []).find((site) => site.id === form.site_id)?.name ?? form.venue_name}
+            value={form.room}
+            onChange={(room) => setForm({ ...form, room })}
+          />
+        ) : null}
+          </div>
+        </details>
+        <details className="sm:col-span-full min-w-0 rounded-2xl border border-border bg-card">
+          <summary className="cursor-pointer px-4 py-3 text-sm font-extrabold">3. Additional options · Pricing, capacity and notes</summary>
+          <div className="grid gap-3 border-t border-border p-4 sm:grid-cols-2">
         <CardColourPicker
           value={form.card_colour}
           onChange={(card_colour) => setForm({ ...form, card_colour })}
         />
-        <div className="sm:col-span-2">
-          <Button type="button" variant="ghost" onClick={() => setShowMore(!showMore)}>
-            {showMore ? "Show fewer options" : "See more options"}
-          </Button>
-        </div>
-        {showMore ? (
-          <>
             <TextField
               label="Repeat until"
               type="date"
               value={form.end_date}
               onChange={(end_date) => setForm({ ...form, end_date })}
-            />
-            <TextField
-              label="Venue name"
-              value={form.venue_name}
-              onChange={(venue_name) => setForm({ ...form, venue_name })}
-            />
-            <TextField
-              label="Room"
-              value={form.room}
-              onChange={(room) => setForm({ ...form, room })}
             />
             <TextField
               label="Capacity"
@@ -1583,8 +1583,11 @@ function SchedulePage() {
                 { value: "archived", label: "Archived" },
               ]}
             />
-          </>
-        ) : null}
+          </div>
+        </details>
+        <details className="sm:col-span-full min-w-0 rounded-2xl border border-border bg-card">
+          <summary className="cursor-pointer px-4 py-3 text-sm font-extrabold">4. Students · {selectedStudentIds.length} selected</summary>
+          <div className="grid gap-3 border-t border-border p-4 sm:grid-cols-2">
         <div className="space-y-2 border-t border-border pt-4 sm:col-span-2">
           <p className="text-xs font-semibold text-muted-foreground">
             Students ({selectedStudentIds.length} selected)
@@ -1631,6 +1634,8 @@ function SchedulePage() {
             ))}
           </div>
         </div>
+          </div>
+        </details>
       </FormDialog>
 
       <ConfirmDeleteDialog
@@ -1685,11 +1690,11 @@ function TutorPicker({
       </div>
       <div className="inline-flex max-w-full items-center gap-2 rounded-full border border-primary/30 bg-card py-1.5 pl-1.5 pr-3 text-xs font-bold">
         <Avatar
-          initials={initialsOf(selectedTutor ? fullName(selectedTutor) : "Tutor needed")}
-          tone={avatarTone(selectedTutor ? fullName(selectedTutor) : "Tutor needed")}
+          initials={selectedTutor ? initialsOf(fullName(selectedTutor)) : "?"}
+          tone={selectedTutor ? avatarTone(fullName(selectedTutor)) : "neutral"}
           size="sm"
         />
-        <span className="truncate">{selectedTutor ? fullName(selectedTutor) : "Tutor needed"}</span>
+        <span className="truncate">{selectedTutor ? fullName(selectedTutor) : "Not assigned"}</span>
       </div>
       {expanded ? (
         <div className="overflow-x-auto rounded-2xl bg-muted/40 p-2">
@@ -1702,7 +1707,7 @@ function TutorPicker({
               }}
               className="shrink-0 rounded-full border border-border bg-card px-3 py-2 text-xs font-bold"
             >
-              Tutor needed
+              Not assigned
             </button>
             {tutors.map((tutor) => (
               <button
