@@ -577,7 +577,7 @@ export function ClassWorkspace({
                   ["blue", "Blue", "bg-blue-600"],
                   ["green", "Green", "bg-emerald-500"],
                   ["amber", "Amber", "bg-amber-400"],
-                  ["purple", "Purple", "bg-violet-600"],
+                  ["violet", "Violet", "bg-violet-600"],
                   ["teal", "Teal", "bg-teal-600"],
                 ] as const).map(([value, label, background]) => (
                   <button
