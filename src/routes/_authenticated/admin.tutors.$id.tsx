@@ -1,7 +1,9 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { eachDayOfInterval, format, parseISO, subDays } from "date-fns";
-import { ArrowLeft, CalendarDays, Mail, Phone, WalletCards } from "lucide-react";
-import { useMemo } from "react";
+import { ArrowLeft, CalendarDays, Mail, Phone, WalletCards, Pencil } from "lucide-react";
+import { useMemo, useState } from "react";
+import { toast } from "sonner";
+import { FormDialog, TextField } from "@/components/form-kit";
 import {
   Bar,
   BarChart,
@@ -23,7 +25,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { fullName, hhmm, money, num, prettyDate, useTable } from "@/lib/db";
+import { fullName, hhmm, money, num, prettyDate, useTable, useUpdateRow } from "@/lib/db";
 
 export const Route = createFileRoute("/_authenticated/admin/tutors/$id")({
   head: () => ({
@@ -93,6 +95,9 @@ function DateTick({
 
 function TutorProfile() {
   const { id } = Route.useParams();
+  const updateTutor = useUpdateRow("tutors");
+  const [editOpen, setEditOpen] = useState(false);
+  const [editForm, setEditForm] = useState({ first_name: "", last_name: "", email: "", phone: "" });
   const navigate = useNavigate();
   const tutors = useTable("tutors", "first_name");
   const classes = useTable("classes", "start_time");
@@ -165,13 +170,19 @@ function TutorProfile() {
 
   return (
     <Page className="space-y-5">
+      <FormDialog open={editOpen} onOpenChange={setEditOpen} title="Edit tutor details" busy={updateTutor.isPending} onSubmit={async () => { if (!editForm.first_name.trim()) { toast.error("First name is required"); return; } try { await updateTutor.mutateAsync({ id, values: { first_name: editForm.first_name.trim(), last_name: editForm.last_name.trim(), email: editForm.email.trim(), phone: editForm.phone.trim() } }); setEditOpen(false); toast.success("Tutor updated"); } catch { toast.error("Unable to update tutor"); } }}>
+        <TextField label="First name" value={editForm.first_name} onChange={(v) => setEditForm((f) => ({ ...f, first_name: v }))} required />
+        <TextField label="Last name" value={editForm.last_name} onChange={(v) => setEditForm((f) => ({ ...f, last_name: v }))} />
+        <TextField label="Email" value={editForm.email} onChange={(v) => setEditForm((f) => ({ ...f, email: v }))} />
+        <TextField label="Phone" value={editForm.phone} onChange={(v) => setEditForm((f) => ({ ...f, phone: v }))} />
+      </FormDialog>
       <PageHeader
         breadcrumb={
           <Link to="/admin/tutors" className="inline-flex items-center gap-1 hover:text-primary">
             <ArrowLeft className="h-4 w-4" /> Teachers
           </Link>
         }
-        title={fullName(tutor)}
+        title={<span className="inline-flex max-w-full items-center gap-2"><span className="truncate">{fullName(tutor)}</span><button type="button" aria-label="Edit tutor details" title="Edit tutor" className="shrink-0 rounded-full p-1.5 text-muted-foreground hover:bg-muted hover:text-primary" onClick={() => { setEditForm({ first_name: tutor.first_name, last_name: tutor.last_name ?? "", email: tutor.email ?? "", phone: tutor.phone ?? "" }); setEditOpen(true); }}><Pencil className="h-4 w-4" /></button></span>}
         subtitle="Teaching activity, lesson records and payment requests"
         actions={
           <label className="flex min-w-56 flex-col gap-1 text-xs font-semibold text-muted-foreground">
