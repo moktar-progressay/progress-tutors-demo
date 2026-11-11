@@ -935,10 +935,10 @@ function SchedulePage() {
     const gridTemplateColumns = `4rem repeat(${columns.length}, minmax(${columnWidth}px, 1fr))`;
 
     return (
-      <div className="overflow-x-auto rounded-2xl border border-border bg-card" aria-label="Teacher timetable">
+      <div className="relative max-h-[calc(100dvh-var(--app-header-height)-13rem)] min-h-[320px] overflow-auto overscroll-contain rounded-2xl border border-border bg-card" aria-label="Teacher timetable" tabIndex={0}>
         <div style={{ minWidth: `${64 + columns.length * columnWidth}px` }}>
-          <div className="grid border-b border-border" style={{ gridTemplateColumns }}>
-            <div className="p-2" />
+          <div className="sticky top-0 z-30 grid border-b border-border bg-card" style={{ gridTemplateColumns }}>
+            <div className="sticky left-0 z-40 bg-card p-2" />
             {lanesByDay.map(({ day, lanes }) => (
               <button
                 key={format(day, "yyyy-MM-dd")}
@@ -947,7 +947,7 @@ function SchedulePage() {
                   setSelectedDate(format(day, "yyyy-MM-dd"));
                   setView("day");
                 }}
-                className="border-l border-border p-2 text-center hover:bg-muted"
+                className="border-l border-border bg-card p-2 text-center hover:bg-muted"
                 style={{ gridColumn: `span ${lanes.length}` }}
               >
                 <span className="block text-[10px] font-bold uppercase text-muted-foreground">{format(day, "EEE")}</span>
@@ -958,12 +958,12 @@ function SchedulePage() {
               </button>
             ))}
           </div>
-          <div className="grid border-b border-border" style={{ gridTemplateColumns }}>
-            <div className="p-2" />
+          <div className="sticky top-[57px] z-30 grid border-b border-border bg-card" style={{ gridTemplateColumns }}>
+            <div className="sticky left-0 z-40 bg-card p-2" />
             {columns.map(({ day, id }) => {
               const tutor = (tutors.data ?? []).find((person) => person.id === id);
               return (
-                <div key={`${format(day, "yyyy-MM-dd")}-${id}`} className="flex min-w-0 items-center gap-2 border-l border-border px-3 py-2">
+                <div key={`${format(day, "yyyy-MM-dd")}-${id}`} className="flex min-w-0 items-center gap-2 border-l border-border bg-card px-3 py-2">
                   <Avatar
                     size="md"
                     initials={tutor ? initialsOf(fullName(tutor)) : "?"}
@@ -977,7 +977,7 @@ function SchedulePage() {
             })}
           </div>
           <div className="grid" style={{ gridTemplateColumns }}>
-            <div className="relative" style={{ height: calendarHeight }}>
+            <div className="sticky left-0 z-20 border-r border-border bg-card" style={{ height: calendarHeight }}>
               {HOURS.map((hour) => (
                 <span key={hour} className="absolute right-2 -translate-y-2 text-[10px] text-muted-foreground" style={{ top: `${(hour - 8) * calendarHourHeight}px` }}>
                   {hour}:00
