@@ -252,6 +252,7 @@ function SchedulePage() {
   const [siteId, setSiteId] = useState("all");
   const [formatFilter, setFormatFilter] = useState("all");
   const [subjectFilter, setSubjectFilter] = useState("all");
+  const [attendanceFilter, setAttendanceFilter] = useState("all");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -324,12 +325,12 @@ function SchedulePage() {
         );
       })
       .sort(compareLessons);
-  }, [formatFilter, lessons.data, search, siteId, subjectFilter, tutorId, tutors.data]);
+  }, [attendance.data, attendanceFilter, formatFilter, lessons.data, search, selectedDate, sessions.data, siteId, subjectFilter, tutorId, tutors.data, view]);
 
   const subjects = Array.from(
     new Set((lessons.data ?? []).map((item) => subjectLabel(item.subject)).filter(Boolean)),
   ).sort();
-  const activeFilterCount = [tutorId, siteId, formatFilter, subjectFilter].filter(
+  const activeFilterCount = [tutorId, siteId, formatFilter, subjectFilter, attendanceFilter].filter(
     (value) => value !== "all",
   ).length;
   const visibleStudents = (students.data ?? []).filter((student) => {
@@ -1095,6 +1096,16 @@ function SchedulePage() {
         </div>
       </div>
 
+      <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4" aria-label="Schedule overview">
+        <div className="flex items-center justify-between rounded-lg bg-pink-50 px-3 py-1.5 text-pink-800 dark:bg-pink-950/40 dark:text-pink-200"><span className="text-xs font-semibold">Lessons</span><strong className="text-sm tabular-nums">{summaryOccurrences}</strong></div>
+        <div className="flex items-center justify-between rounded-lg bg-emerald-50 px-3 py-1.5 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200"><span className="text-xs font-semibold">Students</span><strong className="text-sm tabular-nums">{summaryStudents}</strong></div>
+        <div className="flex items-center justify-between rounded-lg bg-violet-50 px-3 py-1.5 text-violet-800 dark:bg-violet-950/40 dark:text-violet-200"><span className="text-xs font-semibold">Teachers</span><strong className="text-sm tabular-nums">{summaryTutors}</strong></div>
+        <button type="button" onClick={() => setFiltersOpen(true)} className="flex min-w-0 items-center justify-between gap-2 rounded-lg bg-sky-50 px-3 py-1.5 text-left text-sky-800 hover:ring-2 hover:ring-sky-400 focus-visible:outline focus-visible:outline-2 dark:bg-sky-950/40 dark:text-sky-200" aria-label="Filter lessons by attendance">
+          <span className="min-w-0"><span className="block text-xs font-semibold">Total attendance <Filter className="inline h-3 w-3" /></span><span className="block truncate text-[10px]">{summaryAttendanceMarks.length ? `${summaryPresentMarks}/${summaryExpectedStudents} present` : "Not marked"}</span></span>
+          <strong className="shrink-0 text-base tabular-nums">{summaryAttendancePercentage === null ? "—" : `${summaryAttendancePercentage}%`}</strong>
+        </button>
+      </div>
+
       <section className="rounded-xl border border-border bg-card px-2 py-1.5 sm:px-3">
         <div className="flex flex-wrap items-center gap-2">
           <Button size="sm" variant="secondary" onClick={() => setSelectedDate(currentDateIso())}>
@@ -1172,43 +1183,6 @@ function SchedulePage() {
           ) : null}
         </div>
       </section>
-      </div>
-
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <StatCard
-          label="Lessons"
-          value={String(summaryOccurrences)}
-          tone="pink"
-          icon={<CalendarDays className="h-4 w-4" />}
-          compact
-        />
-        <StatCard
-          label="Students"
-          value={String(summaryStudents)}
-          hint={`${summarySeatsTaken} / ${summaryCapacity} seats filled`}
-          tone="green"
-          icon={<GraduationCap className="h-4 w-4" />}
-          compact
-        />
-        <StatCard
-          label="Teachers"
-          value={String(summaryTutors)}
-          tone="purple"
-          icon={<Users className="h-4 w-4" />}
-          compact
-        />
-        <StatCard
-          label="Attendance"
-          value={summaryAttendancePercentage === null ? "—" : `${summaryAttendancePercentage}%`}
-          hint={
-            summaryAttendanceMarks.length
-              ? `${summaryPresentMarks} / ${summaryExpectedStudents} present`
-              : "Not marked"
-          }
-          tone="blue"
-          icon={<AttendanceBar percentage={summaryAttendancePercentage} compact />}
-          compact
-        />
       </div>
 
       {view === "day" ? timeline([anchor]) : null}
@@ -1338,6 +1312,12 @@ function SchedulePage() {
           </DialogHeader>
           <div className="grid gap-3">
             <SelectField
+              label="Attendance"
+              value={attendanceFilter}
+              onChange={setAttendanceFilter}
+              options={[{ value: "all", label: "All attendance" }, { value: "marked", label: "Attendance marked" }, { value: "unmarked", label: "Attendance not marked" }]}
+            />
+            <SelectField
               label="Tutor"
               value={tutorId}
               onChange={setTutorId}
@@ -1384,6 +1364,7 @@ function SchedulePage() {
                   setSiteId("all");
                   setFormatFilter("all");
                   setSubjectFilter("all");
+                  setAttendanceFilter("all");
                 }}
               >
                 Clear filters
