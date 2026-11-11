@@ -388,7 +388,8 @@ export function ClassWorkspace({
 
   return (
     <Page className={embedded ? "space-y-3 px-3 py-3 sm:px-5 sm:py-4" : "space-y-3"}>
-      <section className="sticky top-0 z-20 rounded-2xl border border-border bg-card/95 p-2.5 shadow-sm backdrop-blur sm:p-3">
+      <div className="sticky top-0 z-30 space-y-2 bg-background/95 pb-2 backdrop-blur-md">
+      <section className="rounded-2xl border border-border bg-card/95 p-2.5 shadow-sm sm:p-3">
         <div className="flex min-w-0 items-center gap-2">
           {embedded ? (
             <Button size="icon" variant="ghost" aria-label="Close lesson" onClick={onClose}>
@@ -489,6 +490,7 @@ export function ClassWorkspace({
           </SummaryCard>
         </button>
       </section>
+      </div>
 
       <div className="grid gap-3 lg:grid-cols-2">
         <section className="rounded-2xl border border-border bg-card p-4">
