@@ -56,7 +56,10 @@ function ClientDetail() {
   const addSubscription = useUpsert("client_subscriptions");
   const addInvoice = useUpsert("billing_invoices");
   const addInvoiceItem = useUpsert("billing_invoice_items");
-  const addStudentLink = useUpsert("parent_students", ["students"]);\n  const createStudent = useUpsert("students");\n  const [creatingStudent, setCreatingStudent] = useState(false);\n  const [newStudent, setNewStudent] = useState({ first_name: "", last_name: "", date_of_birth: "" });
+  const addStudentLink = useUpsert("parent_students", ["students"]);
+  const createStudent = useUpsert("students");
+  const [creatingStudent, setCreatingStudent] = useState(false);
+  const [newStudent, setNewStudent] = useState({ first_name: "", last_name: "", date_of_birth: "" });
   const removeStudentLink = useDeleteRow("parent_students", ["students"]);
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState<ClientTab>("overview");
@@ -650,7 +653,19 @@ function ClientDetail() {
         submitLabel="Link student"
         busy={addStudentLink.isPending}
         onSubmit={async () => {
-          if (creatingStudent) {\n            if (!newStudent.first_name.trim()) { toast.error("Enter the student’s first name"); return; }\n            try {\n              const created = await createStudent.mutateAsync({ first_name: newStudent.first_name.trim(), last_name: newStudent.last_name.trim() || null, date_of_birth: newStudent.date_of_birth || null, status: "active" });\n              const studentId = created[0]?.id;\n              if (!studentId) throw new Error("Student was not returned after creation");\n              await addStudentLink.mutateAsync({ parent_id: client.id, student_id: studentId, is_primary: true });\n              toast.success("Student created and linked");\n              setStudentDialogOpen(false); setCreatingStudent(false); setNewStudent({ first_name: "", last_name: "", date_of_birth: "" });\n            } catch (error) { toast.error(error instanceof Error ? error.message : "Could not create and link student"); }\n            return;\n          }\n          if (!chosenStudentId) {
+          if (creatingStudent) {
+            if (!newStudent.first_name.trim()) { toast.error("Enter the student’s first name"); return; }
+            try {
+              const created = await createStudent.mutateAsync({ first_name: newStudent.first_name.trim(), last_name: newStudent.last_name.trim() || null, date_of_birth: newStudent.date_of_birth || null, status: "active" });
+              const studentId = created[0]?.id;
+              if (!studentId) throw new Error("Student was not returned after creation");
+              await addStudentLink.mutateAsync({ parent_id: client.id, student_id: studentId, is_primary: true });
+              toast.success("Student created and linked");
+              setStudentDialogOpen(false); setCreatingStudent(false); setNewStudent({ first_name: "", last_name: "", date_of_birth: "" });
+            } catch (error) { toast.error(error instanceof Error ? error.message : "Could not create and link student"); }
+            return;
+          }
+          if (!chosenStudentId) {
             toast.error("Choose a student");
             return;
           }
