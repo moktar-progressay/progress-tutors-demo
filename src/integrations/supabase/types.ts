@@ -213,6 +213,9 @@ export type Database = {
       }
       billing_plans: {
         Row: {
+          subjects: string[]
+          levels: string[]
+          class_ids: string[]
           class_id: string | null
           active: boolean
           billing_frequency: string
@@ -231,6 +234,9 @@ export type Database = {
           zoho_plan_code: string | null
         }
         Insert: {
+          subjects?: string[]
+          levels?: string[]
+          class_ids?: string[]
           class_id?: string | null
           active?: boolean
           billing_frequency?: string
@@ -249,6 +255,9 @@ export type Database = {
           zoho_plan_code?: string | null
         }
         Update: {
+          subjects?: string[]
+          levels?: string[]
+          class_ids?: string[]
           class_id?: string | null
           active?: boolean
           billing_frequency?: string
