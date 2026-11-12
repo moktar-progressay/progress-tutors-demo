@@ -57,6 +57,9 @@ function ClientDetail() {
   const addInvoice = useUpsert("billing_invoices");
   const addInvoiceItem = useUpsert("billing_invoice_items");
   const addStudentLink = useUpsert("parent_students", ["students"]);
+  const createStudent = useUpsert("students");
+  const [creatingStudent, setCreatingStudent] = useState(false);
+  const [newStudent, setNewStudent] = useState({ first_name: "", last_name: "", date_of_birth: "" });
   const removeStudentLink = useDeleteRow("parent_students", ["students"]);
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState<ClientTab>("overview");
@@ -388,9 +391,9 @@ function ClientDetail() {
                     <div><strong>2. Universal Credit childcare funding</strong><p className="text-xs text-muted-foreground">Declared: {client.uc_childcare_declared === null ? "Not confirmed" : client.uc_childcare_declared ? "Yes" : "No"}</p></div>
                     <Button size="sm" variant="secondary" onClick={() => setEditing(true)}>Update status</Button>
                   </div>
-                  {client.uc_childcare_declared === true && <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-muted p-3">
+                  {<div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-muted p-3">
                     <div><strong>Childcare confirmation letter</strong><p className="text-xs text-muted-foreground">{client.childcare_letter_url ? "Document link saved" : "Not yet linked"}</p></div>
-                    {client.childcare_letter_url ? <a href={client.childcare_letter_url} target="_blank" rel="noopener noreferrer" className="text-xs font-semibold text-primary underline">Open document</a> : <Button size="sm" variant="outline" onClick={() => setChildcareDialogOpen(true)}>Create childcare letter</Button>}
+                    <div className="flex flex-wrap gap-2">{client.childcare_letter_url && <a href={client.childcare_letter_url} target="_blank" rel="noopener noreferrer" className="self-center text-xs font-semibold text-primary underline">Open saved letter</a>}<Button size="sm" variant="outline" onClick={() => setChildcareDialogOpen(true)}>{client.childcare_letter_url ? "Create another letter" : "Create childcare letter"}</Button></div>
                   </div>}
                   <div className="flex flex-wrap items-center justify-between gap-2"><div><strong>3. Invoice or subscription</strong><p className="text-xs text-muted-foreground">{clientInvoices.length} invoices · {clientSubscriptions.length} subscriptions</p></div><Button size="sm" variant="outline" onClick={() => setCreateMode("invoice")}>Create invoice</Button></div>
                   <div className="flex flex-wrap items-center justify-between gap-2"><div><strong>4. Course enrolment</strong><p className="text-xs text-muted-foreground">{children.length} linked students</p></div><Link to="/admin/classes" className="text-xs font-semibold text-primary underline">Manage enrolments</Link></div>
@@ -647,9 +650,21 @@ function ClientDetail() {
         onOpenChange={setStudentDialogOpen}
         title="Link student"
         description={`Add an existing student to ${fullName(client)}'s account.`}
-        submitLabel="Link student"
-        busy={addStudentLink.isPending}
+        submitLabel={creatingStudent ? "Create and link student" : "Link student"}
+        busy={addStudentLink.isPending || createStudent.isPending}
         onSubmit={async () => {
+          if (creatingStudent) {
+            if (!newStudent.first_name.trim()) { toast.error("Enter the student’s first name"); return; }
+            try {
+              const created = await createStudent.mutateAsync({ first_name: newStudent.first_name.trim(), last_name: newStudent.last_name.trim() || null, date_of_birth: newStudent.date_of_birth || null, status: "active" });
+              const studentId = created[0]?.id;
+              if (!studentId) throw new Error("Student was not returned after creation");
+              await addStudentLink.mutateAsync({ parent_id: client.id, student_id: studentId, is_primary: true });
+              toast.success("Student created and linked");
+              setStudentDialogOpen(false); setCreatingStudent(false); setNewStudent({ first_name: "", last_name: "", date_of_birth: "" });
+            } catch (error) { toast.error(error instanceof Error ? error.message : "Could not create and link student"); }
+            return;
+          }
           if (!chosenStudentId) {
             toast.error("Choose a student");
             return;
@@ -668,14 +683,16 @@ function ClientDetail() {
           }
         }}
       >
-        <div className="space-y-2">
+        <div className="space-y-3">
+          <div className="flex gap-2 rounded-lg bg-muted p-1"><Button type="button" size="sm" variant={!creatingStudent ? "default" : "ghost"} onClick={() => setCreatingStudent(false)}>Find existing</Button><Button type="button" size="sm" variant={creatingStudent ? "default" : "ghost"} onClick={() => setCreatingStudent(true)}><Plus className="h-4 w-4"/> New student</Button></div>
+          {creatingStudent ? <div className="space-y-3"><label className="block text-sm font-semibold">First name<Input value={newStudent.first_name} onChange={(event) => setNewStudent((current) => ({...current,first_name:event.target.value}))} className="mt-1"/></label><label className="block text-sm font-semibold">Last name<Input value={newStudent.last_name} onChange={(event) => setNewStudent((current) => ({...current,last_name:event.target.value}))} className="mt-1"/></label><label className="block text-sm font-semibold">Date of birth (optional)<Input type="date" value={newStudent.date_of_birth} onChange={(event) => setNewStudent((current) => ({...current,date_of_birth:event.target.value}))} className="mt-1"/></label></div> : <>
           <label htmlFor="link-student-search" className="text-sm font-semibold">Search students</label>
           <div className="relative"><Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground"/><Input id="link-student-search" value={studentSearch} onChange={(event) => setStudentSearch(event.target.value)} placeholder="Search name or email" className="pl-9"/></div>
           <div className="max-h-52 overflow-y-auto rounded-xl border border-border">
             {availableStudents.filter((student) => [fullName(student), student.email ?? ""].join(" ").toLowerCase().includes(studentSearch.trim().toLowerCase())).slice(0,60).map((student) => <label key={student.id} className="flex cursor-pointer items-center gap-2 border-b border-border p-3 text-sm last:border-0 hover:bg-muted/50"><input type="radio" name="student-to-link" checked={chosenStudentId === student.id} onChange={() => setChosenStudentId(student.id)}/><span>{fullName(student)}<span className="block text-xs text-muted-foreground">{student.email ?? "No email"}</span></span></label>)}
             {availableStudents.filter((student) => [fullName(student), student.email ?? ""].join(" ").toLowerCase().includes(studentSearch.trim().toLowerCase())).length === 0 && <p className="p-3 text-sm text-muted-foreground">No matching student. Create their record first.</p>}
           </div>
-          <Link to="/admin/students" className="inline-flex items-center gap-1 text-sm font-semibold text-primary underline"><Plus className="h-4 w-4"/> Add a new student</Link>
+          </>}
         </div>
       </FormDialog>
 
