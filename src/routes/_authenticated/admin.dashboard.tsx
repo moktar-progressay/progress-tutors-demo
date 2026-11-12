@@ -18,6 +18,8 @@ import {
 import {
   BarChart3,
   CalendarDays,
+  CreditCard,
+  FilePlus2,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -791,8 +793,12 @@ function AdminDashboard() {
     </section>
   );
   const quickLink = (label: string, to: "/admin/students" | "/admin/classes" | "/admin/payments" | "/admin/payment-requests", search?: { add: boolean }) => (
-    <Link to={to} search={search} className="flex min-h-11 items-center justify-between rounded-xl bg-primary/5 px-3 py-2 text-sm font-semibold hover:bg-primary/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">
-      {label}<ChevronRight className="h-4 w-4 text-primary" />
+    <Link to={to} search={search} className="flex min-h-11 items-center justify-between gap-2 rounded-xl bg-primary/5 px-3 py-2 text-sm font-semibold hover:bg-primary/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">
+      <span className="flex min-w-0 items-center gap-2">
+        {to === "/admin/students" ? <UserPlus className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" /> : to === "/admin/classes" ? <GraduationCap className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" /> : to === "/admin/payments" ? <FilePlus2 className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" /> : <CreditCard className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />}
+        <span>{label}</span>
+      </span>
+      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground"><Plus className="h-3.5 w-3.5" aria-hidden="true" /></span>
     </Link>
   );
   return (
