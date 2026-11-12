@@ -1,12 +1,15 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { GraduationCap, Search, UserRound, Users } from "lucide-react";
+import { GraduationCap, Search, UserRound, Users, Plus } from "lucide-react";
 import { Page } from "@/components/AppShell";
 import { Avatar, Empty, PageHeader, Pill, StatCard } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { fullName, initialsOf, useTable } from "@/lib/db";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
+import { FormDialog, TextField } from "@/components/form-kit";
+import { useUpsert } from "@/lib/db";
 
 export const Route = createFileRoute("/_authenticated/admin/contacts")({
   head: () => ({
@@ -37,7 +40,10 @@ function ContactsPage() {
   const links = useTable("parent_students");
   const enrolments = useTable("class_enrolments");
   const classes = useTable("classes", "name");
-  const [tab, setTab] = useState<ContactTab>("students");
+  const [tab, setTab] = useState<ContactTab>(() => window.location.hash.includes("tab=parents") ? "parents" : "students");
+  const createParent = useUpsert("parents");
+  const [addParentOpen, setAddParentOpen] = useState(false);
+  const [newParent, setNewParent] = useState({first_name:"",last_name:"",email:"",phone:""});
   const [search, setSearch] = useState("");
 
   const query = search.trim().toLowerCase();
@@ -65,13 +71,7 @@ function ContactsPage() {
       <PageHeader
         title="Contacts"
         subtitle="Students, parents and tutors, connected in one searchable workspace."
-        actions={
-          <Button asChild>
-            <Link to={destination} aria-label={`Manage ${tab}`}>
-              <Users className="h-4 w-4" /> Manage {tab}
-            </Link>
-          </Button>
-        }
+        actions={tab === "parents" ? <Button onClick={() => setAddParentOpen(true)}><Plus className="h-4 w-4"/> Add parent</Button> : <Button asChild><Link to={destination}><Users className="h-4 w-4"/> Manage {tab}</Link></Button>}
       />
 
       <div className="grid grid-cols-3 gap-2 sm:gap-3">
@@ -179,6 +179,12 @@ function ContactsPage() {
           </ul>
         )}
       </section>
+      <FormDialog open={addParentOpen} onOpenChange={setAddParentOpen} title="Add parent" submitLabel="Save parent" busy={createParent.isPending} onSubmit={async () => {
+        if (!newParent.first_name.trim() || !newParent.last_name.trim()) { toast.error("Enter the parent's first and last name"); return; }
+        try { await createParent.mutateAsync({ ...newParent, status:"active", billing_status:"active" }); toast.success("Parent added"); setAddParentOpen(false); setNewParent({first_name:"",last_name:"",email:"",phone:""}); } catch (error) { toast.error(error instanceof Error ? error.message : "Could not add parent"); }
+      }}>
+        {(["first_name","last_name","email","phone"] as const).map((key) => <TextField key={key} label={{first_name:"First name",last_name:"Last name",email:"Email",phone:"Telephone"}[key]} value={newParent[key]} onChange={(value) => setNewParent((current) => ({...current,[key]:value}))} required={key === "first_name" || key === "last_name"}/>)}
+      </FormDialog>
     </Page>
   );
 }
