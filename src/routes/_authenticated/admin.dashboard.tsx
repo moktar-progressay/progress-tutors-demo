@@ -708,15 +708,15 @@ function AdminDashboard() {
     const expected = enrolmentCount(lesson);
     const pct = marks?.marked ? Math.round(marks.present / marks.marked * 100) : null;
     return <Link key={lesson.id + ":" + dateKey} to="/admin/classes/$id" params={{ id: lesson.id }}
-      className="block min-w-0 overflow-hidden rounded-xl border border-border bg-card transition hover:border-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">
-      <div className={cn("flex items-center gap-2 px-3 py-2", scheduleColour(lesson))}>
+      className="block min-w-0 overflow-hidden rounded-lg border border-border bg-card transition hover:border-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">
+      <div className={cn("flex items-center gap-2 px-2.5 py-1.5", scheduleColour(lesson))}>
         <CalendarDays className="h-4 w-4 shrink-0"/>
         <span className="min-w-0 flex-1 truncate text-xs font-extrabold">{lesson.name}</span>
       </div>
-      <div className="space-y-2 p-3">
+      <div className="space-y-1.5 px-2.5 py-2">
         <div className="flex items-center justify-between gap-2 text-xs"><span>{format(date, "EEE d MMM")} · {hhmm(lesson.start_time)}–{hhmm(lesson.end_time)}</span></div>
         <div className="flex items-center gap-2"><Avatar initials={initialsOf(tutorName)} tone={avatarTone(tutorName)} size="sm"/><span className="truncate text-xs font-medium">{tutorName}</span></div>
-        <div className="rounded-lg bg-muted/60 px-2.5 py-2">
+        <div className="rounded-md bg-muted/60 px-2 py-1.5">
           <div className="flex items-center justify-between gap-2 text-xs"><span className="text-muted-foreground">Attendance</span><strong>{marks?.marked ? marks.present : "—"}/{expected}</strong></div>
           <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-border"><div className="h-full rounded-full bg-primary" style={{width: pct === null ? "0%" : pct + "%"}}/></div>
           <span className="mt-1 block text-[10px] text-muted-foreground">{pct === null ? "Register not taken" : pct + "% of recorded marks present"}</span>
@@ -805,8 +805,8 @@ function AdminDashboard() {
         </div></section>
       </div>
       <div className="grid min-w-0 gap-3 lg:grid-cols-2">
-        {panel("upcoming","Upcoming lessons",upcoming.length,<div className="grid gap-2 sm:grid-cols-2">{upcoming.length ? upcoming.map(lessonTile) : <Empty>No upcoming lessons.</Empty>}</div>,<CalendarDays className="h-4 w-4 text-primary"/>)}
-        {panel("recap","Last week's recap",lastWeek.length,<div className="max-h-[540px] space-y-2 overflow-y-auto pr-1"><p className="text-xs text-muted-foreground">Previous 7 completed days. Attendance shown only when recorded.</p><div className="grid gap-2 sm:grid-cols-2">{lastWeek.length ? lastWeek.map(lessonTile) : <Empty>No lessons in the previous 7 days.</Empty>}</div></div>,<CheckCircle2 className="h-4 w-4 text-emerald-600"/>)}
+        {panel("recap","Last week's recap",lastWeek.length,<div className="max-h-[310px] overflow-y-auto overscroll-contain pr-1" tabIndex={0} aria-label="Scroll last week's lessons"><p className="mb-2 text-xs text-muted-foreground">Previous 7 completed days. Attendance shown only when recorded.</p><div className="grid gap-2">{lastWeek.length ? lastWeek.map(lessonTile) : <Empty>No lessons in the previous 7 days.</Empty>}</div></div>,<CheckCircle2 className="h-4 w-4 text-emerald-600"/>)}
+        {panel("upcoming","Upcoming lessons",upcoming.length,<div className="max-h-[310px] overflow-y-auto overscroll-contain pr-1" tabIndex={0} aria-label="Scroll upcoming lessons"><div className="grid gap-2">{upcoming.length ? upcoming.map(lessonTile) : <Empty>No upcoming lessons.</Empty>}</div></div>,<CalendarDays className="h-4 w-4 text-primary"/>)}
       </div>
       <div className="grid min-w-0 gap-3 lg:grid-cols-2">
         {panel("tasks","Tasks requiring action",unmarked.length+unassigned.length+unpaidInvoices.length+pendingRequests.length,<div className="space-y-3 text-sm">
