@@ -2419,8 +2419,8 @@ function ParentPayments() {
           onChange={(value) => setProduct({ ...product, name: value })}
           required
         />
-        <ProductTags label="Subjects" values={product.subjects} onChange={(subjects) => setProduct({ ...product, subjects })} suggestions={[...new Set(["Maths", "English", "Football", "Science", ...(classes.data ?? []).map((item) => item.subject).filter((value): value is string => Boolean(value)))].sort()} />
-        <ProductTags label="Levels" values={product.levels} onChange={(levels) => setProduct({ ...product, levels })} suggestions={[...new Set(["Primary", "KS1", "KS2", "KS3", "GCSE", "A Level", ...(classes.data ?? []).map((item) => item.level).filter((value): value is string => Boolean(value)))].sort()} />
+        <ProductTags label="Subjects" values={product.subjects} onChange={(subjects) => setProduct({ ...product, subjects })} suggestions={[...new Set(["Maths", "English", "Football", "Science", ...(classes.data ?? []).map((item) => item.subject).filter((value): value is string => Boolean(value))])].sort()} />
+        <ProductTags label="Levels" values={product.levels} onChange={(levels) => setProduct({ ...product, levels })} suggestions={[...new Set(["Primary", "KS1", "KS2", "KS3", "GCSE", "A Level", ...(classes.data ?? []).map((item) => item.level).filter((value): value is string => Boolean(value))])].sort()} />
         <div className="space-y-2 sm:col-span-2">
           <span className="text-sm font-bold">Linked classes (optional)</span>
           <p className="text-xs text-muted-foreground">Select as many classes as this product covers. Subjects and levels above are independent.</p>
