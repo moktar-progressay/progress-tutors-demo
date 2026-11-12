@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Check, CircleHelp, Filter, WalletCards, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Page } from "@/components/AppShell";
 import { FilterDialog } from "@/components/filter-dialog";
@@ -259,5 +259,6 @@ export function TutorPaymentReview() {
 }
 
 function AdminPaymentRequests() {
-  return <Page><TutorPaymentReview /></Page>;
+  useEffect(() => { window.location.replace(`${window.location.pathname}#/admin/payments?tab=tutor-requests`); }, []);
+  return <Page><Empty>Opening tutor requests in Payments…</Empty></Page>;
 }
