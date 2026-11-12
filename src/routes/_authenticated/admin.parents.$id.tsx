@@ -9,6 +9,7 @@ import {
   type NewInvoiceValues,
   type NewSubscriptionValues,
 } from "@/components/client-billing-create";
+import { PaymentDocumentDialog } from "@/components/payment-document-dialog";
 import { Avatar, Empty, Pill, avatarTone } from "@/components/kit";
 import { ConfirmDeleteDialog, FormDialog, SelectField } from "@/components/form-kit";
 import { Button } from "@/components/ui/button";
@@ -64,6 +65,7 @@ function ClientDetail() {
   const [studentDialogOpen, setStudentDialogOpen] = useState(false);
   const [chosenStudentId, setChosenStudentId] = useState("");
   const [studentSearch, setStudentSearch] = useState("");
+  const [childcareDialogOpen, setChildcareDialogOpen] = useState(false);
   const [linkPendingDelete, setLinkPendingDelete] = useState<{
     id: string;
     name: string;
@@ -388,7 +390,7 @@ function ClientDetail() {
                   </div>
                   {client.uc_childcare_declared === true && <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-muted p-3">
                     <div><strong>Childcare confirmation letter</strong><p className="text-xs text-muted-foreground">{client.childcare_letter_url ? "Document link saved" : "Not yet linked"}</p></div>
-                    {client.childcare_letter_url ? <a href={client.childcare_letter_url} target="_blank" rel="noopener noreferrer" className="text-xs font-semibold text-primary underline">Open document</a> : <Button size="sm" variant="outline" onClick={() => setEditing(true)}>Add document link</Button>}
+                    {client.childcare_letter_url ? <a href={client.childcare_letter_url} target="_blank" rel="noopener noreferrer" className="text-xs font-semibold text-primary underline">Open document</a> : <Button size="sm" variant="outline" onClick={() => setChildcareDialogOpen(true)}>Create childcare letter</Button>}
                   </div>}
                   <div className="flex flex-wrap items-center justify-between gap-2"><div><strong>3. Invoice or subscription</strong><p className="text-xs text-muted-foreground">{clientInvoices.length} invoices · {clientSubscriptions.length} subscriptions</p></div><Button size="sm" variant="outline" onClick={() => setCreateMode("invoice")}>Create invoice</Button></div>
                   <div className="flex flex-wrap items-center justify-between gap-2"><div><strong>4. Course enrolment</strong><p className="text-xs text-muted-foreground">{children.length} linked students</p></div><Link to="/admin/classes" className="text-xs font-semibold text-primary underline">Manage enrolments</Link></div>
@@ -639,6 +641,7 @@ function ClientDetail() {
         </main>
       </div>
 
+      <PaymentDocumentDialog open={childcareDialogOpen} onOpenChange={setChildcareDialogOpen} initialParentId={client.id} parents={parents.data ?? []} students={students.data ?? []} links={links.data ?? []} />
       <FormDialog
         open={studentDialogOpen}
         onOpenChange={setStudentDialogOpen}
