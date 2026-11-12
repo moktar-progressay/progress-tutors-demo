@@ -351,7 +351,7 @@ export function PaymentDocumentDialog({
                     <div className="text-right">
                       <p className="font-bold"><InlineField field="parentName" value={data.parentName} placeholder="Parent name" onCommit={applyChange} /></p>
                       <p><InlineField field="parentEmail" value={data.parentEmail} placeholder="Parent email" onCommit={applyChange} /></p>
-                      <p className="mt-2">{data.documentDate}</p>
+                      <p className="mt-2"><InlineField field="documentDate" value={data.documentDate} placeholder="YYYY-MM-DD" onCommit={applyChange} /></p>
                     </div>
                   </div>
                   {data.type === "childcare" ? (
