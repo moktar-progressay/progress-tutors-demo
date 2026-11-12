@@ -906,11 +906,11 @@ function SchedulePage() {
             </span>
           </div>
         )}
-        <div className="absolute inset-x-1 bottom-1 flex h-3.5 min-w-0 items-center gap-1 rounded bg-black/55 px-1" aria-label={attendanceSummary.marked ? `Attendance ${attendanceSummary.percentage}%: ${attendanceSummary.present} of ${attendanceSummary.total} present` : "Attendance not marked"}>
-          <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-white/40" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={attendanceSummary.percentage ?? undefined}>
+        <div className="absolute inset-x-1 bottom-1 flex h-5 min-w-0 items-center gap-1 rounded-md bg-slate-950/90 px-1.5 shadow-sm" aria-label={attendanceSummary.marked ? `Attendance ${attendanceSummary.percentage}%: ${attendanceSummary.present} of ${attendanceSummary.total} present` : "Attendance not marked"}>
+          <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-white/40" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={attendanceSummary.percentage ?? undefined}>
             <div className="h-full rounded-full bg-white" style={{ width: `${attendanceSummary.percentage ?? 0}%` }} />
           </div>
-          <span className="shrink-0 rounded bg-white px-1 text-[10px] font-extrabold leading-3 tabular-nums text-slate-950">{attendanceSummary.percentage === null ? "—" : `${attendanceSummary.percentage}%`}</span>
+          <span className="shrink-0 rounded bg-white px-1.5 py-0.5 text-[11px] font-black leading-none tabular-nums text-slate-950">{attendanceSummary.percentage === null ? "Not marked" : `${attendanceSummary.percentage}%`}</span>
         </div>
         {!compact && !narrow && !dense ? (
           <div className="mt-auto flex min-w-0 items-center justify-between gap-1 pt-1 text-[9px] font-bold">
@@ -954,7 +954,7 @@ function SchedulePage() {
     const gridTemplateColumns = `4rem repeat(${columns.length}, minmax(${columnWidth}px, 1fr))`;
 
     return (
-      <div className="relative max-h-[calc(100dvh-var(--app-header-height)-13rem)] min-h-[320px] overflow-auto overscroll-contain rounded-2xl border border-border bg-card" aria-label="Teacher timetable" tabIndex={0}>
+      <div className="relative max-h-[min(65dvh,680px)] min-h-[320px] max-w-full overflow-auto overscroll-contain rounded-2xl border border-border bg-card" aria-label="Teacher timetable" tabIndex={0}>
         <div style={{ minWidth: `${64 + columns.length * columnWidth}px` }}>
           {view !== "day" && <div className="sticky top-0 z-30 grid border-b border-border bg-card" style={{ gridTemplateColumns }}>
             <div className="sticky left-0 z-40 bg-card p-2" />
@@ -991,12 +991,12 @@ function SchedulePage() {
                     const totals = tutorAttendanceFor(day, id);
                     return (
                       <div className="mt-1.5" title={totals.marked ? `${totals.present} present out of ${totals.expected} expected; ${totals.marked} marked` : "Attendance not marked"}>
-                        <div className="mb-1 flex items-center justify-between gap-1 text-[10px] font-bold tabular-nums">
+                        <div className="mb-1 flex flex-wrap items-center justify-between gap-1 text-[11px] font-bold tabular-nums">
                           <span className="text-muted-foreground">Attendance</span>
                           <span>{totals.percentage === null ? "Not marked" : `${totals.percentage}% (${totals.present}/${totals.expected})`}</span>
                         </div>
                         <div
-                          className="h-3 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700"
+                          className="h-2.5 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700"
                           role="progressbar"
                           aria-label={`Attendance for ${tutor ? fullName(tutor) : "unassigned lessons"}`}
                           aria-valuemin={0}
@@ -1087,10 +1087,10 @@ function SchedulePage() {
 
   return (
     <Page className="space-y-4">
-      <div className="sticky top-[var(--app-header-height)] z-30 -mx-4 space-y-2 bg-background/95 px-4 pb-2 pt-1 backdrop-blur-md sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className="relative z-10 -mx-4 space-y-2 bg-background px-4 pb-2 pt-1 sm:sticky sm:top-[var(--app-header-height)] sm:z-30 sm:-mx-6 sm:bg-background/95 sm:px-6 sm:backdrop-blur-md lg:-mx-8 lg:px-8">
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
         <div><h1 className="text-xl font-extrabold sm:text-2xl">Schedule</h1><p className="hidden text-xs text-muted-foreground sm:block">One calendar for every online and face-to-face lesson.</p></div>
-        <div className="flex flex-wrap items-center gap-1.5">
+        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
           {searchOpen || search ? <div className="relative w-40 sm:w-56"><Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" /><Input autoFocus aria-label="Search lessons" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search lessons" className="h-8 rounded-lg pl-8 pr-7 text-xs" /><button type="button" aria-label="Close search" className="absolute right-2 top-1/2 -translate-y-1/2" onClick={() => { setSearch(""); setSearchOpen(false); }}>×</button></div> : <Button size="icon" variant="ghost" className="h-8 w-8" aria-label="Search lessons" onClick={() => setSearchOpen(true)}><Search className="h-4 w-4" /></Button>}
           <Button size="sm" variant="secondary" className="h-8" onClick={() => setFiltersOpen(true)}><Filter className="h-4 w-4" /><span className="hidden sm:inline">Filters</span>{activeFilterCount ? ` ${activeFilterCount}` : ""}</Button>
           <Button size="sm" variant="ghost" className="h-8" onClick={downloadTeachingReport}><Download className="h-4 w-4" /><span className="hidden sm:inline">Report</span></Button>
@@ -1120,7 +1120,7 @@ function SchedulePage() {
             <ChevronRight className="h-4 w-4" />
           </Button>
           <p className="min-w-40 flex-1 text-sm font-extrabold sm:text-base">{dateTitle}</p>
-          <div className="flex rounded-xl bg-muted p-1">
+          <div className="order-3 flex w-full min-w-0 justify-between rounded-xl bg-muted p-1 sm:order-none sm:w-auto">
             {(["day", "week", "month", "list"] as CalendarView[]).map((item) => (
               <button
                 key={item}
