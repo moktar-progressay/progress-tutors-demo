@@ -24,6 +24,9 @@ import {
   Filter,
   GraduationCap,
   Info,
+  AlertTriangle,
+  ClipboardList,
+  CheckCircle2,
   Plus,
   RotateCcw,
   UserPlus,
@@ -674,7 +677,7 @@ function AdminDashboard() {
   const invoices = useTable("billing_invoices");
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     attendance: true, upcoming: true, tasks: true, alerts: true,
-    actions: false, finance: false, leaderboards: false, reports: false,
+    recap: true, finance: false, leaderboards: false, reports: false,
   });
   const toggleSection = (key: string) => setOpenSections((previous) => ({ ...previous, [key]: !previous[key] }));
   const today = new Date();
@@ -683,17 +686,55 @@ function AdminDashboard() {
       .filter((date) => lessonRunsOn(lesson, date))
       .map((date) => ({ lesson, date }))
   ).sort((a, b) => a.date.getTime() - b.date.getTime() || (a.lesson.start_time ?? "").localeCompare(b.lesson.start_time ?? "")).slice(0, 6);
+  const lastWeek = filteredLessons.flatMap((lesson) =>
+    Array.from({ length: 7 }, (_, offset) => subDays(today, offset + 1))
+      .filter((date) => lessonRunsOn(lesson, date))
+      .map((date) => ({ lesson, date }))
+  ).sort((a, b) => b.date.getTime() - a.date.getTime() || (a.lesson.start_time ?? "").localeCompare(b.lesson.start_time ?? "")).slice(0, 20);
+  const sessionByLessonDate = new Map((sessions.data ?? []).map((session) => [session.class_id + ":" + session.session_date, session.id]));
+  const marksBySession = new Map<string, { present: number; marked: number }>();
+  (attendance.data ?? []).forEach((mark) => {
+    const count = marksBySession.get(mark.session_id) ?? { present: 0, marked: 0 };
+    count.marked += 1;
+    if (["present", "late"].includes(mark.status)) count.present += 1;
+    marksBySession.set(mark.session_id, count);
+  });
+  const lessonTile = ({ lesson, date }: { lesson: ClassRow; date: Date }) => {
+    const tutor = (tutors.data ?? []).find((item) => item.id === lesson.tutor_id);
+    const tutorName = tutor ? fullName(tutor) : "Not assigned";
+    const dateKey = format(date, "yyyy-MM-dd");
+    const sessionId = sessionByLessonDate.get(lesson.id + ":" + dateKey);
+    const marks = sessionId ? marksBySession.get(sessionId) : undefined;
+    const expected = enrolmentCount(lesson);
+    const pct = marks?.marked ? Math.round(marks.present / marks.marked * 100) : null;
+    return <Link key={lesson.id + ":" + dateKey} to="/admin/classes/$id" params={{ id: lesson.id }}
+      className="block min-w-0 overflow-hidden rounded-xl border border-border bg-card transition hover:border-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">
+      <div className={cn("flex items-center gap-2 px-3 py-2", scheduleColour(lesson))}>
+        <CalendarDays className="h-4 w-4 shrink-0"/>
+        <span className="min-w-0 flex-1 truncate text-xs font-extrabold">{lesson.name}</span>
+      </div>
+      <div className="space-y-2 p-3">
+        <div className="flex items-center justify-between gap-2 text-xs"><span>{format(date, "EEE d MMM")} · {hhmm(lesson.start_time)}–{hhmm(lesson.end_time)}</span></div>
+        <div className="flex items-center gap-2"><Avatar initials={initialsOf(tutorName)} tone={avatarTone(tutorName)} size="sm"/><span className="truncate text-xs font-medium">{tutorName}</span></div>
+        <div className="rounded-lg bg-muted/60 px-2.5 py-2">
+          <div className="flex items-center justify-between gap-2 text-xs"><span className="text-muted-foreground">Attendance</span><strong>{marks?.marked ? marks.present : "—"}/{expected}</strong></div>
+          <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-border"><div className="h-full rounded-full bg-primary" style={{width: pct === null ? "0%" : pct + "%"}}/></div>
+          <span className="mt-1 block text-[10px] text-muted-foreground">{pct === null ? "Register not taken" : pct + "% of recorded marks present"}</span>
+        </div>
+      </div>
+    </Link>;
+  };
   const unassigned = filteredLessons.filter((lesson) => !lesson.tutor_id);
   const nearlyFull = filteredLessons.filter((lesson) => lesson.capacity > 0 && enrolmentCount(lesson) / lesson.capacity >= 0.9);
   const unmarked = filteredSessions.filter((session) => !filteredAttendance.some((mark) => mark.session_id === session.id));
   const pendingRequests = (paymentRequests.data ?? []).filter((request) => request.status === "submitted");
   const unpaidInvoices = (invoices.data ?? []).filter((invoice) => ["draft", "unpaid", "overdue", "sent"].includes(invoice.status ?? ""));
   const attendancePercent = attendanceAuditRate;
-  const panel = (key: string, title: string, count: number | null, children: ReactNode) => (
+  const panel = (key: string, title: string, count: number | null, children: ReactNode, icon?: ReactNode) => (
     <section className="surface min-w-0 overflow-hidden">
       <button type="button" aria-expanded={Boolean(openSections[key])} onClick={() => toggleSection(key)}
         className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-muted/40">
-        <span className="flex min-w-0 items-center gap-2 font-bold">{title}{count !== null && <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">{count}</span>}</span>
+        <span className="flex min-w-0 items-center gap-2 font-bold">{icon}{title}{count !== null && <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">{count}</span>}</span>
         <ChevronDown className={cn("h-4 w-4 shrink-0 transition-transform", openSections[key] && "rotate-180")} />
       </button>
       {openSections[key] && <div className="border-t border-border p-4">{children}</div>}
@@ -745,30 +786,28 @@ function AdminDashboard() {
           {quickLink("Tutor payment requests","/admin/payment-requests")}
         </div></section>
       </div>
-      {panel("actions","Actions required",unmarked.length+unassigned.length+pendingRequests.length,
-        <div className="space-y-2 text-sm">
-          <Link className="block hover:text-primary" to="/admin/classes">{unmarked.length} sessions without attendance records · Open schedule</Link>
-          <Link className="block hover:text-primary" to="/admin/classes">{unassigned.length} classes without tutors · Assign tutor</Link>
-          <Link className="block hover:text-primary" to="/admin/payment-requests">{pendingRequests.length} tutor requests awaiting review</Link>
-        </div>)}
-      <div className="grid min-w-0 gap-3 lg:grid-cols-3">
-        {panel("upcoming","Upcoming lessons",upcoming.length,<div className="space-y-2">{upcoming.length ? upcoming.map(({lesson,date},i)=><Link key={lesson.id+"-"+i} to="/admin/classes/$id" params={{id:lesson.id}} className="block rounded-lg border border-border p-2 hover:border-primary"><span className="block truncate font-semibold">{lesson.name}</span><span className="text-xs text-muted-foreground">{format(date,"EEE d MMM")} · {hhmm(lesson.start_time)} · {hhmm(lesson.end_time)}</span></Link>) : <Empty>No upcoming lessons.</Empty>}</div>)}
-        {panel("tasks","Tasks pending",unmarked.length+unpaidInvoices.length+pendingRequests.length,<div className="space-y-3 text-sm">
-          <Link className="block hover:text-primary" to="/admin/classes">Mark attendance · {unmarked.length} sessions</Link>
-          <Link className="block hover:text-primary" to="/admin/payments">Review invoices · {unpaidInvoices.length}</Link>
-          <Link className="block hover:text-primary" to="/admin/payment-requests">Review tutor payment requests · {pendingRequests.length}</Link>
+      <div className="grid min-w-0 gap-3 lg:grid-cols-2">
+        {panel("upcoming","Upcoming lessons",upcoming.length,<div className="grid gap-2 sm:grid-cols-2">{upcoming.length ? upcoming.map(lessonTile) : <Empty>No upcoming lessons.</Empty>}</div>,<CalendarDays className="h-4 w-4 text-primary"/>)}
+        {panel("recap","Last week's recap",lastWeek.length,<div className="max-h-[540px] space-y-2 overflow-y-auto pr-1"><p className="text-xs text-muted-foreground">Previous 7 completed days. Attendance shown only when recorded.</p><div className="grid gap-2 sm:grid-cols-2">{lastWeek.length ? lastWeek.map(lessonTile) : <Empty>No lessons in the previous 7 days.</Empty>}</div></div>,<CheckCircle2 className="h-4 w-4 text-emerald-600"/>)}
+      </div>
+      <div className="grid min-w-0 gap-3 lg:grid-cols-2">
+        {panel("tasks","Tasks requiring action",unmarked.length+unassigned.length+unpaidInvoices.length+pendingRequests.length,<div className="space-y-3 text-sm">
+          <Link className="flex items-center gap-2 rounded-lg p-2 hover:bg-muted" to="/admin/classes"><ClipboardList className="h-4 w-4 text-primary"/><span>Complete attendance registers · {unmarked.length}</span></Link>
+          <Link className="flex items-center gap-2 rounded-lg p-2 hover:bg-muted" to="/admin/classes"><Users className="h-4 w-4 text-primary"/><span>Assign tutors · {unassigned.length} classes</span></Link>
+          <Link className="flex items-center gap-2 rounded-lg p-2 hover:bg-muted" to="/admin/payments"><ClipboardList className="h-4 w-4 text-primary"/><span>Review invoices · {unpaidInvoices.length}</span></Link>
+          <Link className="flex items-center gap-2 rounded-lg p-2 hover:bg-muted" to="/admin/payment-requests"><ClipboardList className="h-4 w-4 text-primary"/><span>Review tutor payment requests · {pendingRequests.length}</span></Link>
           {quickLink("Onboard a student","/admin/students",{add:true})}
-        </div>)}
-        {panel("alerts","Alerts & suggestions",nearlyFull.length+unassigned.length,<div className="space-y-3 text-sm">
-          {nearlyFull.slice(0,4).map((lesson)=><Link key={lesson.id} to="/admin/classes/$id" params={{id:lesson.id}} className="block rounded-lg bg-amber-50 p-2 text-amber-950">{lesson.name} · {enrolmentCount(lesson)}/{lesson.capacity} places filled</Link>)}
-          {unassigned.length>0 && <Link to="/admin/classes" className="block rounded-lg bg-pink-50 p-2 text-pink-900">{unassigned.length} classes need a tutor</Link>}
+        </div>,<ClipboardList className="h-4 w-4 text-primary"/>)}
+        {panel("alerts","Operational alerts & suggestions",nearlyFull.length+unassigned.length,<div className="space-y-3 text-sm">
+          {nearlyFull.slice(0,5).map((lesson)=><Link key={lesson.id} to="/admin/classes/$id" params={{id:lesson.id}} className="flex items-start gap-2 rounded-lg bg-amber-50 p-3 text-amber-950"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0"/><span><strong>{lesson.name}</strong> · {enrolmentCount(lesson)}/{lesson.capacity} places filled. Consider reviewing capacity.</span></Link>)}
+          {unassigned.length>0 && <Link to="/admin/classes" className="flex items-start gap-2 rounded-lg bg-pink-50 p-3 text-pink-900"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0"/><span>{unassigned.length} classes need a tutor</span></Link>}
           {!nearlyFull.length&&!unassigned.length&&<p className="text-muted-foreground">No capacity or staffing alerts from current records.</p>}
-        </div>)}
+        </div>,<AlertTriangle className="h-4 w-4 text-amber-600"/>)}
       </div>
       {panel("finance","Invoices & tutor payment requests",unpaidInvoices.length+pendingRequests.length,<div className="grid gap-3 sm:grid-cols-2">{quickLink("Manage invoices","/admin/payments")}{quickLink("Review payment requests","/admin/payment-requests")}</div>)}
       {panel("leaderboards","Leaderboards",null,<div className="grid gap-4 sm:grid-cols-2">
-        <div><h3 className="mb-2 font-bold">Tutors · scheduled hours</h3>{tutorLeaderboard.slice(0,5).map((item,i)=><Link key={item.tutor!.id} to="/admin/tutors/$id" params={{id:item.tutor!.id}} className="flex justify-between gap-2 border-b py-2 text-sm"><span>{i+1}. {fullName(item.tutor)}</span><b>{item.hours.toFixed(1)}h</b></Link>)}</div>
-        <div><h3 className="mb-2 font-bold">Students · recorded attendance</h3>{studentLeaderboard.slice(0,5).map((item,i)=><Link key={item.student!.id} to="/admin/students/$id" params={{id:item.student!.id}} className="flex justify-between gap-2 border-b py-2 text-sm"><span>{i+1}. {fullName(item.student)}</span><b>{item.attended}</b></Link>)}</div>
+        <div><h3 className="mb-2 font-bold">Tutors · scheduled hours</h3>{tutorLeaderboard.slice(0,5).map((item,i)=><Link key={item.tutor!.id} to="/admin/tutors/$id" params={{id:item.tutor!.id}} className="flex justify-between gap-2 border-b py-2 text-sm"><span className="flex min-w-0 items-center gap-2"><Avatar initials={initialsOf(fullName(item.tutor))} tone={avatarTone(fullName(item.tutor))} size="sm"/><span className="truncate">{i+1}. {fullName(item.tutor)}</span></span><b>{item.hours.toFixed(1)}h</b></Link>)}</div>
+        <div><h3 className="mb-2 font-bold">Students · recorded attendance</h3>{studentLeaderboard.slice(0,5).map((item,i)=><Link key={item.student!.id} to="/admin/students/$id" params={{id:item.student!.id}} className="flex justify-between gap-2 border-b py-2 text-sm"><span className="flex min-w-0 items-center gap-2"><Avatar initials={initialsOf(fullName(item.student))} tone={avatarTone(fullName(item.student))} size="sm"/><span className="truncate">{i+1}. {fullName(item.student)}</span></span><b>{item.attended}</b></Link>)}</div>
       </div>)}
       {panel("reports","Insights & reports",null,<div className="space-y-3">
         <p className="text-sm text-muted-foreground">Attendance: {attendancePercent===null?"No saved marks":attendancePercent+"%"} · {reportingPeriod}</p>
