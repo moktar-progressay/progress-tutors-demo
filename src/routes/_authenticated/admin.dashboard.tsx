@@ -679,6 +679,7 @@ function AdminDashboard() {
   const parentStudents = useTable("parent_students");
   const subscriptions = useTable("client_subscriptions");
   const [onboardingProgramme, setOnboardingProgramme] = useState<"tuition" | "football">("tuition");
+  const [funnelPreviewStage, setFunnelPreviewStage] = useState<"leads" | "registered" | "billing" | "enrolled">("leads");
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     attendance: true, upcoming: true, tasks: true, alerts: true,
     recap: true, finance: true, leaderboards: false, reports: false,
@@ -765,6 +766,19 @@ function AdminDashboard() {
     {label:"Currently enrolled",count:currentEnrolledIds.size,fill:"#23a6a0"},
   ];
   const maxFunnelCount = Math.max(1,...funnelCounts.map((step) => step.count));
+  const funnelPreviewStudents = (students.data ?? []).filter((student) => {
+    if (funnelPreviewStage === "leads") return !currentEnrolledIds.has(student.id);
+    if (funnelPreviewStage === "registered") return true;
+    if (funnelPreviewStage === "billing") return billedStudentIds.has(student.id);
+    return currentEnrolledIds.has(student.id);
+  });
+  const funnelPreviewTabs = [
+    {key:"leads",label:"Leads",count:leadStudents.length},
+    {key:"registered",label:"Registered",count:registeredStudentCount},
+    {key:"billing",label:"Billing",count:billedStudentCount},
+    {key:"enrolled",label:"Enrolled",count:currentEnrolledIds.size},
+  ] as const;
+
   const attendancePercent = attendanceAuditRate;
   const panel = (key: string, title: string, count: number | null, children: ReactNode, icon?: ReactNode) => (
     <section className="surface min-w-0 overflow-hidden">
@@ -866,11 +880,15 @@ function AdminDashboard() {
                 </div>
                 <p className="mt-2 text-xs text-muted-foreground">Live counts from student, billing and active enrolment records. Leads are students without an active class enrolment. Stages overlap and are not a strict conversion sequence.</p>
                 <div className="mt-3 rounded-lg border border-border p-2">
-                  <div className="mb-2 flex items-center justify-between gap-2"><strong className="text-xs">Lead preview ({leadStudents.length})</strong><Link to="/admin/students" className="text-xs text-primary underline">View full student list</Link></div>
-                  <div className="max-h-44 space-y-1 overflow-y-auto">
-                    {leadStudents.slice(0,8).map((student) => <Link key={student.id} to="/admin/students/$id" params={{id:student.id}} className="flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-xs hover:bg-muted"><span className="truncate">{fullName(student)}</span><span className="shrink-0 text-primary">View →</span></Link>)}
-                    {!leadStudents.length && <p className="text-xs text-muted-foreground">No unenrolled student records found.</p>}
+                  <div className="mb-2 flex flex-wrap gap-1" role="tablist" aria-label="Preview students by funnel stage">
+                    {funnelPreviewTabs.map((tab) => <button key={tab.key} type="button" role="tab" aria-selected={funnelPreviewStage===tab.key} onClick={() => setFunnelPreviewStage(tab.key)} className={cn("rounded-md px-2 py-1.5 text-xs font-semibold",funnelPreviewStage===tab.key ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/80")}>{tab.label} <span className="opacity-80">({tab.count})</span></button>)}
                   </div>
+                  <div className="mb-2 flex items-center justify-between gap-2"><strong className="text-xs capitalize">{funnelPreviewStage} preview ({funnelPreviewStudents.length})</strong><Link to="/admin/students" className="text-xs text-primary underline">View full student list</Link></div>
+                  <div className="max-h-44 space-y-1 overflow-y-auto" role="tabpanel" aria-label={`${funnelPreviewStage} student preview`}>
+                    {funnelPreviewStudents.slice(0,8).map((student) => <Link key={student.id} to="/admin/students/$id" params={{id:student.id}} className="flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-xs hover:bg-muted"><span className="truncate">{fullName(student)}</span><span className="shrink-0 text-primary">View →</span></Link>)}
+                    {!funnelPreviewStudents.length && <p className="text-xs text-muted-foreground">No students found for this stage.</p>}
+                  </div>
+                  {funnelPreviewStudents.length>8 && <p className="mt-2 text-xs text-muted-foreground">Showing 8 of {funnelPreviewStudents.length}. Use the full student list to browse more.</p>}
                 </div>
                 <div className="mt-3 grid grid-cols-3 gap-2 text-center text-xs">
                   <div className="rounded-lg bg-muted p-2"><strong className="block text-lg">{registeredStudentCount}</strong>All students</div>
