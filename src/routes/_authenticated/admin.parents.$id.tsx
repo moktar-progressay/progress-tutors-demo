@@ -650,8 +650,8 @@ function ClientDetail() {
         onOpenChange={setStudentDialogOpen}
         title="Link student"
         description={`Add an existing student to ${fullName(client)}'s account.`}
-        submitLabel="Link student"
-        busy={addStudentLink.isPending}
+        submitLabel={creatingStudent ? "Create and link student" : "Link student"}
+        busy={addStudentLink.isPending || createStudent.isPending}
         onSubmit={async () => {
           if (creatingStudent) {
             if (!newStudent.first_name.trim()) { toast.error("Enter the student’s first name"); return; }
@@ -683,7 +683,9 @@ function ClientDetail() {
           }
         }}
       >
-        <div className="space-y-2">
+        <div className="space-y-3">
+          <div className="flex gap-2 rounded-lg bg-muted p-1"><Button type="button" size="sm" variant={!creatingStudent ? "default" : "ghost"} onClick={() => setCreatingStudent(false)}>Find existing</Button><Button type="button" size="sm" variant={creatingStudent ? "default" : "ghost"} onClick={() => setCreatingStudent(true)}><Plus className="h-4 w-4"/> New student</Button></div>
+          {creatingStudent ? <div className="space-y-3"><label className="block text-sm font-semibold">First name<Input value={newStudent.first_name} onChange={(event) => setNewStudent((current) => ({...current,first_name:event.target.value}))} className="mt-1"/></label><label className="block text-sm font-semibold">Last name<Input value={newStudent.last_name} onChange={(event) => setNewStudent((current) => ({...current,last_name:event.target.value}))} className="mt-1"/></label><label className="block text-sm font-semibold">Date of birth (optional)<Input type="date" value={newStudent.date_of_birth} onChange={(event) => setNewStudent((current) => ({...current,date_of_birth:event.target.value}))} className="mt-1"/></label></div> : <>
           <label htmlFor="link-student-search" className="text-sm font-semibold">Search students</label>
           <div className="relative"><Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground"/><Input id="link-student-search" value={studentSearch} onChange={(event) => setStudentSearch(event.target.value)} placeholder="Search name or email" className="pl-9"/></div>
           <div className="max-h-52 overflow-y-auto rounded-xl border border-border">
