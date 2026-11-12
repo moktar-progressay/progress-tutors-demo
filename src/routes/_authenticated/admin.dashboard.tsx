@@ -791,7 +791,7 @@ function AdminDashboard() {
         <Link to="/admin/payments"><StatCard compact tone="blue" label="Invoices needing action" value={String(unpaidInvoices.length)} icon={<Info className="h-5 w-5" />} /></Link>
         <Link to="/admin/payment-requests"><StatCard compact tone="purple" label="Tutor requests to review" value={String(pendingRequests.length)} icon={<Users className="h-5 w-5" />} /></Link>
       </div>
-      <div className="grid min-w-0 gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(240px,1fr)]">
+      <div className="grid min-w-0 gap-3 lg:grid-cols-1">
         {panel("attendance","Attendance over time",null,
           <div className="min-w-0">
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
@@ -820,48 +820,14 @@ function AdminDashboard() {
             </div>
             <p className="mt-2 text-xs text-muted-foreground">Each bar represents a day with recorded attendance. Days without registers are blank, not 0%. Present and late count as attended.</p>
           </div>)}
-        <section className="surface p-4"><h2 className="mb-3 font-bold text-primary">Quick tasks</h2><div className="space-y-2">
-          {quickLink("Add student","/admin/students",{add:true})}
-          {quickLink("Add class","/admin/classes",{add:true})}
-          {quickLink("Create invoice","/admin/payments")}
-          {quickLink("Tutor payment requests","/admin/payment-requests")}
-        </div></section>
       </div>
       <div className="grid min-w-0 gap-3 lg:grid-cols-2">
         {panel("recap","Last week's recap",lastWeek.length,<div className="max-h-[310px] overflow-y-auto overscroll-contain pr-1" tabIndex={0} aria-label="Scroll last week's lessons"><p className="mb-2 text-xs text-muted-foreground">Previous 7 completed days. Attendance shown only when recorded.</p><div className="grid gap-2">{lastWeek.length ? lastWeek.map(lessonTile) : <Empty>No lessons in the previous 7 days.</Empty>}</div></div>,<CheckCircle2 className="h-4 w-4 text-emerald-600"/>)}
         {panel("upcoming","Upcoming lessons",upcoming.length,<div className="max-h-[310px] overflow-y-auto overscroll-contain pr-1" tabIndex={0} aria-label="Scroll upcoming lessons"><div className="grid gap-2">{upcoming.length ? upcoming.map(lessonTile) : <Empty>No upcoming lessons.</Empty>}</div></div>,<CalendarDays className="h-4 w-4 text-primary"/>)}
       </div>
-      <div className="grid min-w-0 gap-3 lg:grid-cols-2">
-        {panel("tasks","Tasks requiring action",unmarked.length+unassigned.length+unpaidInvoices.length+pendingRequests.length,<div className="space-y-3 text-sm">
-          <Link className="flex items-center gap-2 rounded-lg p-2 hover:bg-muted" to="/admin/classes"><ClipboardList className="h-4 w-4 text-primary"/><span>Complete attendance registers · {unmarked.length}</span></Link>
-          <Link className="flex items-center gap-2 rounded-lg p-2 hover:bg-muted" to="/admin/classes"><Users className="h-4 w-4 text-primary"/><span>Assign tutors · {unassigned.length} classes</span></Link>
-          <Link className="flex items-center gap-2 rounded-lg p-2 hover:bg-muted" to="/admin/payments"><ClipboardList className="h-4 w-4 text-primary"/><span>Review invoices · {unpaidInvoices.length}</span></Link>
-          <Link className="flex items-center gap-2 rounded-lg p-2 hover:bg-muted" to="/admin/payment-requests"><ClipboardList className="h-4 w-4 text-primary"/><span>Review tutor payment requests · {pendingRequests.length}</span></Link>
-          {quickLink("Onboard a student","/admin/students",{add:true})}
-        </div>,<ClipboardList className="h-4 w-4 text-primary"/>)}
-        {panel("alerts","Operational alerts & suggestions",nearlyFull.length+unassigned.length,<div className="space-y-3 text-sm">
-          {nearlyFull.slice(0,5).map((lesson)=><Link key={lesson.id} to="/admin/classes/$id" params={{id:lesson.id}} className="flex items-start gap-2 rounded-lg bg-amber-50 p-3 text-amber-950"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0"/><span><strong>{lesson.name}</strong> · {enrolmentCount(lesson)}/{lesson.capacity} places filled. Consider reviewing capacity.</span></Link>)}
-          {unassigned.length>0 && <Link to="/admin/classes" className="flex items-start gap-2 rounded-lg bg-pink-50 p-3 text-pink-900"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0"/><span>{unassigned.length} classes need a tutor</span></Link>}
-          {!nearlyFull.length&&!unassigned.length&&<p className="text-muted-foreground">No capacity or staffing alerts from current records.</p>}
-        </div>,<AlertTriangle className="h-4 w-4 text-amber-600"/>)}
-      </div>
-      {panel("finance","Invoices & enrolment billing",invoiceNeedsAction+pendingRequests.length,<div className="space-y-4">
-        <div className="grid gap-2 sm:grid-cols-3">
-          <Link to="/admin/payments" className="rounded-lg border border-border p-3 hover:bg-muted/50"><p className="text-xs text-muted-foreground">Invoices requiring attention</p><p className="text-2xl font-bold">{invoiceNeedsAction}</p><p className="text-xs text-primary">Review drafts and unpaid invoices →</p></Link>
-          <Link to="/admin/payments" className="rounded-lg border border-border p-3 hover:bg-muted/50"><p className="text-xs text-muted-foreground">Recent invoices</p><p className="text-2xl font-bold">{recentInvoices.length}</p><p className="text-xs text-primary">Open billing →</p></Link>
-          <Link to="/admin/payment-requests" className="rounded-lg border border-border p-3 hover:bg-muted/50"><p className="text-xs text-muted-foreground">Tutor payment requests</p><p className="text-2xl font-bold">{pendingRequests.length}</p><p className="text-xs text-primary">Review requests →</p></Link>
-        </div>
-        <div className="grid gap-4 lg:grid-cols-2">
-          <section className="min-w-0">
-            <h3 className="mb-2 text-sm font-bold">Recently created invoices</h3>
-            <div className="max-h-64 overflow-y-auto rounded-lg border border-border" tabIndex={0} aria-label="Recent invoices">
-              {recentInvoices.length ? recentInvoices.map((invoice) => <Link key={invoice.id} to="/admin/payments" className="flex items-center justify-between gap-3 border-b border-border px-3 py-2 text-xs last:border-0 hover:bg-muted/50">
-                <span className="min-w-0"><span className="block truncate font-semibold">{invoiceParentName(invoice.parent_id)}</span><span className="text-muted-foreground">{invoice.invoice_number ?? "Draft invoice"} · {String(invoice.created_at ?? "").slice(0,10) || "Date unavailable"}</span></span>
-                <span className="shrink-0 text-right"><span className="block font-semibold">{invoiceAmount(invoice.total)}</span><span className={cn("capitalize", ["overdue","unpaid"].includes(invoice.status ?? "") ? "text-rose-600" : "text-muted-foreground")}>{invoice.status ?? "Unknown"}</span></span>
-              </Link>) : <p className="p-3 text-xs text-muted-foreground">No invoices found in ProgressTutors billing records.</p>}
-            </div>
-          </section>
-          <section className="min-w-0">
+      {panel("finance","Student conversion funnel",null,<div className="space-y-4">
+        <p className="text-xs text-muted-foreground">Move each family from enquiry to registration, billing and enrolment. Stage totals are not yet a verified conversion funnel.</p>
+                  <section className="min-w-0">
             <h3 className="mb-2 text-sm font-bold">Student onboarding by programme</h3>
             <div className="mb-3 flex gap-2" role="group" aria-label="Choose onboarding programme">
               <button type="button" aria-pressed={onboardingProgramme === "tuition"} onClick={() => setOnboardingProgramme("tuition")} className={cn("rounded-lg px-3 py-2 text-xs font-bold",onboardingProgramme === "tuition" ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/70")}>Tuition</button>
@@ -882,8 +848,61 @@ function AdminDashboard() {
               <li className="rounded-lg border border-border p-2"><div className="flex justify-between gap-2"><strong>{onboardingProgramme === "tuition" ? "4" : "3"}. {onboardingProgramme === "tuition" ? "GoProgress course enrolment" : "Football group enrolment"}</strong><span className="text-muted-foreground">Not segmented</span></div><p className="text-muted-foreground">Assign the student to the correct {onboardingProgramme === "tuition" ? "course" : "football training group"}.</p><Link to="/admin/classes" className="text-primary underline">Manage classes and enrolments</Link></li>
             </ol>
           </section>
+
+        <div className="grid gap-3 lg:grid-cols-2">
+          <section className="min-w-0 rounded-lg border border-border p-3">
+            <h3 className="mb-2 text-sm font-bold">Tasks to move families forward</h3>
+            <div className="space-y-2 text-xs">
+              <p className="font-semibold">Leads and registration</p>
+              {quickLink("Add student","/admin/students",{add:true})}
+              <p className="font-semibold">Billing and UC documents</p>
+              {quickLink("Create invoice","/admin/payments")}
+              <Link to="/admin/payments" className="block text-primary underline">Review {invoiceNeedsAction} invoices needing attention</Link>
+              <p className="font-semibold">Course enrolment</p>
+              {quickLink("Assign students to classes","/admin/classes")}
+            </div>
+          </section>
+          <section className="min-w-0 rounded-lg border border-border p-3">
+            <h3 className="mb-2 text-sm font-bold">Insights and suggestions</h3>
+            <div className="space-y-2 text-xs">
+              <p>{invoiceNeedsAction} invoices need review. Follow up on draft and unpaid invoices to support collection.</p>
+              <p>{unassigned.length} classes have no tutor assigned.</p>
+              <p>{unmarked.length} attendance registers need completing.</p>
+              <p className="text-muted-foreground">Programme-level lead conversion, unpaid registrations and UC document completion require linked form and billing data before reliable automated recommendations are possible.</p>
+            </div>
+          </section>
         </div>
-        <p className="text-xs text-muted-foreground">Invoice list shows existing ProgressTutors records only. It does not yet identify unbilled Jotform submissions or sync new Zoho invoices automatically.</p>
+        <details className="rounded-lg border border-border p-3"><summary className="cursor-pointer text-sm font-bold">Recent invoices and payment requests</summary>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">          <section className="min-w-0">
+            <h3 className="mb-2 text-sm font-bold">Recently created invoices</h3>
+            <div className="max-h-64 overflow-y-auto rounded-lg border border-border" tabIndex={0} aria-label="Recent invoices">
+              {recentInvoices.length ? recentInvoices.map((invoice) => <Link key={invoice.id} to="/admin/payments" className="flex items-center justify-between gap-3 border-b border-border px-3 py-2 text-xs last:border-0 hover:bg-muted/50">
+                <span className="min-w-0"><span className="block truncate font-semibold">{invoiceParentName(invoice.parent_id)}</span><span className="text-muted-foreground">{invoice.invoice_number ?? "Draft invoice"} · {String(invoice.created_at ?? "").slice(0,10) || "Date unavailable"}</span></span>
+                <span className="shrink-0 text-right"><span className="block font-semibold">{invoiceAmount(invoice.total)}</span><span className={cn("capitalize", ["overdue","unpaid"].includes(invoice.status ?? "") ? "text-rose-600" : "text-muted-foreground")}>{invoice.status ?? "Unknown"}</span></span>
+              </Link>) : <p className="p-3 text-xs text-muted-foreground">No invoices found in ProgressTutors billing records.</p>}
+            </div>
+          </section>
+
+          <div className="space-y-2">        <div className="grid gap-2 sm:grid-cols-3">
+          <Link to="/admin/payments" className="rounded-lg border border-border p-3 hover:bg-muted/50"><p className="text-xs text-muted-foreground">Invoices requiring attention</p><p className="text-2xl font-bold">{invoiceNeedsAction}</p><p className="text-xs text-primary">Review drafts and unpaid invoices →</p></Link>
+          <Link to="/admin/payments" className="rounded-lg border border-border p-3 hover:bg-muted/50"><p className="text-xs text-muted-foreground">Recent invoices</p><p className="text-2xl font-bold">{recentInvoices.length}</p><p className="text-xs text-primary">Open billing →</p></Link>
+          <Link to="/admin/payment-requests" className="rounded-lg border border-border p-3 hover:bg-muted/50"><p className="text-xs text-muted-foreground">Tutor payment requests</p><p className="text-2xl font-bold">{pendingRequests.length}</p><p className="text-xs text-primary">Review requests →</p></Link>
+        </div>
+</div></div>
+        </details>
+        <details className="rounded-lg border border-border p-3"><summary className="cursor-pointer text-sm font-bold">Operational tasks and alerts</summary><div className="mt-3 grid gap-3 lg:grid-cols-2"><div>{panel("tasks","Tasks requiring action",unmarked.length+unassigned.length+unpaidInvoices.length+pendingRequests.length,<div className="space-y-3 text-sm">
+          <Link className="flex items-center gap-2 rounded-lg p-2 hover:bg-muted" to="/admin/classes"><ClipboardList className="h-4 w-4 text-primary"/><span>Complete attendance registers · {unmarked.length}</span></Link>
+          <Link className="flex items-center gap-2 rounded-lg p-2 hover:bg-muted" to="/admin/classes"><Users className="h-4 w-4 text-primary"/><span>Assign tutors · {unassigned.length} classes</span></Link>
+          <Link className="flex items-center gap-2 rounded-lg p-2 hover:bg-muted" to="/admin/payments"><ClipboardList className="h-4 w-4 text-primary"/><span>Review invoices · {unpaidInvoices.length}</span></Link>
+          <Link className="flex items-center gap-2 rounded-lg p-2 hover:bg-muted" to="/admin/payment-requests"><ClipboardList className="h-4 w-4 text-primary"/><span>Review tutor payment requests · {pendingRequests.length}</span></Link>
+          {quickLink("Onboard a student","/admin/students",{add:true})}
+        </div>,<ClipboardList className="h-4 w-4 text-primary"/>)}
+        </div><div>{panel("alerts","Operational alerts & suggestions",nearlyFull.length+unassigned.length,<div className="space-y-3 text-sm">
+          {nearlyFull.slice(0,5).map((lesson)=><Link key={lesson.id} to="/admin/classes/$id" params={{id:lesson.id}} className="flex items-start gap-2 rounded-lg bg-amber-50 p-3 text-amber-950"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0"/><span><strong>{lesson.name}</strong> · {enrolmentCount(lesson)}/{lesson.capacity} places filled. Consider reviewing capacity.</span></Link>)}
+          {unassigned.length>0 && <Link to="/admin/classes" className="flex items-start gap-2 rounded-lg bg-pink-50 p-3 text-pink-900"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0"/><span>{unassigned.length} classes need a tutor</span></Link>}
+          {!nearlyFull.length&&!unassigned.length&&<p className="text-muted-foreground">No capacity or staffing alerts from current records.</p>}
+        </div>,<AlertTriangle className="h-4 w-4 text-amber-600"/>)}
+</div></div></details>
       </div>)}
       {panel("leaderboards","Leaderboards",null,<div className="grid gap-4 sm:grid-cols-2">
         <div><h3 className="mb-2 font-bold">Tutors · scheduled hours</h3>{tutorLeaderboard.slice(0,5).map((item,i)=><Link key={item.tutor!.id} to="/admin/tutors/$id" params={{id:item.tutor!.id}} className="flex justify-between gap-2 border-b py-2 text-sm"><span className="flex min-w-0 items-center gap-2"><Avatar initials={initialsOf(fullName(item.tutor))} tone={avatarTone(fullName(item.tutor))} size="sm"/><span className="truncate">{i+1}. {fullName(item.tutor)}</span></span><b>{item.hours.toFixed(1)}h</b></Link>)}</div>
