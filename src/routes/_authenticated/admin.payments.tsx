@@ -197,6 +197,7 @@ function ParentPayments() {
     billing_frequency: "monthly",
     children_included: "1",
     active: "true",
+    class_id: "",
   });
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [documentOpen, setDocumentOpen] = useState(false);
@@ -339,6 +340,10 @@ function ParentPayments() {
           : String(values[0]).localeCompare(String(values[1]));
       return invoiceSortDirection === "asc" ? result : -result;
     });
+  const filteredProducts = (billingPlans.data ?? []).filter((plan) => {
+    const linked = (classes.data ?? []).find((lesson) => lesson.id === plan.class_id);
+    return `${plan.name} ${plan.description ?? ""} ${linked?.name ?? ""} ${linked?.subject ?? ""} ${linked?.level ?? ""}`.toLowerCase().includes(query.trim().toLowerCase());
+  });
   const filteredSubscriptions = (subscriptions.data ?? []).filter((item) => {
     const haystack = `${parentName(item.parent_id)} ${studentName(item.student_id)} ${
       item.plan_name ?? ""
@@ -449,6 +454,7 @@ function ParentPayments() {
       billing_frequency: "monthly",
       children_included: "1",
       active: "true",
+      class_id: "",
     });
     setProductOpen(true);
   }
@@ -462,6 +468,7 @@ function ParentPayments() {
       billing_frequency: item.billing_frequency,
       children_included: String(item.children_included),
       active: String(item.active),
+      class_id: item.class_id ?? "",
     });
     setProductOpen(true);
   }
@@ -646,6 +653,7 @@ function ParentPayments() {
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder={
+                view === "products" ? "Search products, lessons, subjects or levels" :
                 view === "subscriptions"
                   ? "Search subscriptions, clients or students"
                   : "Search invoices, clients or students"
@@ -1945,11 +1953,11 @@ function ParentPayments() {
             </Button>
           }
         >
-          {(billingPlans.data ?? []).length === 0 ? (
+          {filteredProducts.length === 0 ? (
             <Empty>No products or services have been added.</Empty>
           ) : displayMode === "cards" ? (
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-              {(billingPlans.data ?? []).map((plan) => (
+              {filteredProducts.map((plan) => (
                 <button
                   key={plan.id}
                   type="button"
@@ -1966,7 +1974,7 @@ function ParentPayments() {
                   </div>
                   <h3 className="mt-3 font-bold">{plan.name}</h3>
                   <p className="mt-1 truncate text-xs text-muted-foreground">
-                    {plan.description ?? "Billable ProgressTutors service"}
+                    {[(classes.data ?? []).find((lesson) => lesson.id === plan.class_id)?.subject, (classes.data ?? []).find((lesson) => lesson.id === plan.class_id)?.level].filter(Boolean).join(" · ") || plan.description || "Billable ProgressTutors service"}
                   </p>
                   <p className="mt-4 text-xl font-extrabold">{money(plan.unit_amount)}</p>
                 </button>
@@ -1986,7 +1994,7 @@ function ParentPayments() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {(billingPlans.data ?? []).map((plan) => (
+                  {filteredProducts.map((plan) => (
                     <tr key={plan.id} className="hover:bg-muted/45">
                       <td className="py-3 pr-4">
                         <button
@@ -2341,6 +2349,7 @@ function ParentPayments() {
             active: product.active === "true",
             currency: "GBP",
             source: "manual",
+            class_id: product.class_id || null,
           };
           if (editingProductId) await updateProduct.mutateAsync({ id: editingProductId, values });
           else await addProduct.mutateAsync(values);
@@ -2354,6 +2363,7 @@ function ParentPayments() {
           onChange={(value) => setProduct({ ...product, name: value })}
           required
         />
+        <label className="space-y-2"><span className="text-sm font-bold">Linked lesson / class</span><select value={product.class_id} onChange={(event) => setProduct({ ...product, class_id: event.target.value })} className="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm"><option value="">No linked class</option>{(classes.data ?? []).map((lesson) => <option key={lesson.id} value={lesson.id}>{lesson.name} · {lesson.subject || "Subject not set"} · {lesson.level || "Level not set"}</option>)}</select><span className="block text-xs text-muted-foreground">Subject and level are taken from the linked lesson.</span></label>
         <TextField
           label="Price (£)"
           type="number"
