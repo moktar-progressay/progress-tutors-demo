@@ -835,6 +835,9 @@ export type Database = {
       }
       parents: {
         Row: {
+          uc_childcare_declared: boolean | null
+          registration_status: string
+          childcare_letter_url: string | null
           billing_last_synced_at: string | null
           billing_status: string
           created_at: string
@@ -850,6 +853,9 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          uc_childcare_declared?: boolean | null
+          registration_status?: string
+          childcare_letter_url?: string | null
           billing_last_synced_at?: string | null
           billing_status?: string
           created_at?: string
@@ -865,6 +871,9 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          uc_childcare_declared?: boolean | null
+          registration_status?: string
+          childcare_letter_url?: string | null
           billing_last_synced_at?: string | null
           billing_status?: string
           created_at?: string
