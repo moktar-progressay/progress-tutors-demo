@@ -211,7 +211,7 @@ function ParentPayments() {
   const [invoiceSortOpen, setInvoiceSortOpen] = useState(false);
   const [invoiceSort, setInvoiceSort] = useState<
     "created" | "date" | "number" | "client" | "amount"
-  >("created");
+  >("date");
   const [invoiceSortDirection, setInvoiceSortDirection] = useState<"asc" | "desc">("desc");
   const [subscriptionFilter, setSubscriptionFilter] = useState<"active" | "cancelled" | "all">(
     "all",
