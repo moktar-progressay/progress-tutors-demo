@@ -671,7 +671,7 @@ function AdminDashboard() {
   }
 
   const paymentRequests = useTable("payment_requests");
-  const invoices = useTable("invoices");
+  const invoices = useTable("billing_invoices");
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     attendance: true, upcoming: true, tasks: true, alerts: true,
     actions: false, finance: false, leaderboards: false, reports: false,
