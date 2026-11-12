@@ -89,14 +89,14 @@ export function PaymentDocumentDialog({
   const undo = () => {
     if (!history.length) return;
     setFuture((previous) => [currentData.current, ...previous]);
-    setData(history[history.length - 1]);
+    setData(history[history.length - 1]!);
     setHistory((previous) => previous.slice(0, -1));
     setDirty(true);
   };
   const redo = () => {
     if (!future.length) return;
     setHistory((previous) => [...previous, currentData.current]);
-    setData(future[0]);
+    setData(future[0]!);
     setFuture((previous) => previous.slice(1));
     setDirty(true);
   };
@@ -242,7 +242,7 @@ export function PaymentDocumentDialog({
               <Field label="Document date">
                 <Input
                   type="date"
-                  value=<InlineField field="documentDate" value={data.documentDate} placeholder="YYYY-MM-DD" onCommit={applyChange} />
+                  value={data.documentDate}
                   onChange={(event) => update("documentDate", event.target.value)}
                 />
               </Field>
