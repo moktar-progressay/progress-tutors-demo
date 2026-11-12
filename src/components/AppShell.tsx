@@ -36,6 +36,7 @@ export const NAV: Record<Role, NavItem[]> = {
   admin: [
     { to: "/admin/dashboard", label: "Dashboard", icon: <Home className={iconCls} /> },
     { to: "/admin/classes", label: "Schedule", icon: <CalendarDays className={iconCls} /> },
+    { to: "/admin/attendance", label: "Attendance", icon: <ClipboardCheck className={iconCls} /> },
     { to: "/admin/contacts", label: "Contacts", icon: <Users className={iconCls} /> },
     { to: "/admin/payments", label: "Payments", icon: <CreditCard className={iconCls} /> },
     { to: "/admin/configuration", label: "Settings", icon: <Settings className={iconCls} /> },

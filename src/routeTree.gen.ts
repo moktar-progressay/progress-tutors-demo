@@ -14,6 +14,7 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedAdminContactsRouteImport } from './routes/_authenticated/admin.contacts'
 import { Route as AuthenticatedAdminDashboardRouteImport } from './routes/_authenticated/admin.dashboard'
+import { Route as AuthenticatedAdminAttendanceRouteImport } from './routes/_authenticated/admin.attendance'
 import { Route as AuthenticatedAdminConfigurationRouteImport } from './routes/_authenticated/admin.configuration'
 import { Route as AuthenticatedAdminOperationsRouteImport } from './routes/_authenticated/admin.operations'
 import { Route as AuthenticatedAdminPaymentRequestsRouteImport } from './routes/_authenticated/admin.payment-requests'
@@ -73,6 +74,12 @@ const AuthenticatedAdminDashboardRoute =
   AuthenticatedAdminDashboardRouteImport.update({
     id: '/admin/dashboard',
     path: '/admin/dashboard',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedAdminAttendanceRoute =
+  AuthenticatedAdminAttendanceRouteImport.update({
+    id: '/admin/attendance',
+    path: '/admin/attendance',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedAdminConfigurationRoute =
@@ -285,6 +292,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/admin/contacts': typeof AuthenticatedAdminContactsRoute
   '/admin/dashboard': typeof AuthenticatedAdminDashboardRoute
+  '/admin/attendance': typeof AuthenticatedAdminAttendanceRoute
   '/admin/configuration': typeof AuthenticatedAdminConfigurationRoute
   '/admin/operations': typeof AuthenticatedAdminOperationsRoute
   '/admin/payment-requests': typeof AuthenticatedAdminPaymentRequestsRoute
@@ -325,6 +333,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/admin/contacts': typeof AuthenticatedAdminContactsRoute
   '/admin/dashboard': typeof AuthenticatedAdminDashboardRoute
+  '/admin/attendance': typeof AuthenticatedAdminAttendanceRoute
   '/admin/configuration': typeof AuthenticatedAdminConfigurationRoute
   '/admin/operations': typeof AuthenticatedAdminOperationsRoute
   '/admin/payment-requests': typeof AuthenticatedAdminPaymentRequestsRoute
@@ -409,6 +418,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/admin/contacts'
     | '/admin/dashboard'
+    | '/admin/attendance'
     | '/admin/configuration'
     | '/admin/operations'
     | '/admin/payment-requests'
@@ -449,6 +459,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/admin/contacts'
     | '/admin/dashboard'
+    | '/admin/attendance'
     | '/admin/configuration'
     | '/admin/operations'
     | '/admin/payment-requests'
@@ -567,6 +578,13 @@ declare module '@tanstack/react-router' {
       path: '/admin/contacts'
       fullPath: '/admin/contacts'
       preLoaderRoute: typeof AuthenticatedAdminContactsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/admin/attendance': {
+      id: '/_authenticated/admin/attendance'
+      path: '/admin/attendance'
+      fullPath: '/admin/attendance'
+      preLoaderRoute: typeof AuthenticatedAdminAttendanceRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/admin/dashboard': {
@@ -827,6 +845,7 @@ const AuthenticatedAdminTutorsRouteWithChildren =
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminContactsRoute: typeof AuthenticatedAdminContactsRoute
   AuthenticatedAdminDashboardRoute: typeof AuthenticatedAdminDashboardRoute
+  AuthenticatedAdminAttendanceRoute: typeof AuthenticatedAdminAttendanceRoute
   AuthenticatedAdminConfigurationRoute: typeof AuthenticatedAdminConfigurationRoute
   AuthenticatedAdminOperationsRoute: typeof AuthenticatedAdminOperationsRoute
   AuthenticatedAdminPaymentRequestsRoute: typeof AuthenticatedAdminPaymentRequestsRoute
@@ -865,6 +884,7 @@ interface AuthenticatedRouteRouteChildren {
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminContactsRoute: AuthenticatedAdminContactsRoute,
   AuthenticatedAdminDashboardRoute: AuthenticatedAdminDashboardRoute,
+  AuthenticatedAdminAttendanceRoute: AuthenticatedAdminAttendanceRoute,
   AuthenticatedAdminConfigurationRoute: AuthenticatedAdminConfigurationRoute,
   AuthenticatedAdminOperationsRoute: AuthenticatedAdminOperationsRoute,
   AuthenticatedAdminPaymentRequestsRoute:
