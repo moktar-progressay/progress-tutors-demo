@@ -9,6 +9,7 @@ import {
   type NewInvoiceValues,
   type NewSubscriptionValues,
 } from "@/components/client-billing-create";
+import { PaymentDocumentDialog } from "@/components/payment-document-dialog";
 import { Avatar, Empty, Pill, avatarTone } from "@/components/kit";
 import { ConfirmDeleteDialog, FormDialog, SelectField } from "@/components/form-kit";
 import { Button } from "@/components/ui/button";
@@ -63,6 +64,8 @@ function ClientDetail() {
   const [createMode, setCreateMode] = useState<BillingCreateMode | null>(null);
   const [studentDialogOpen, setStudentDialogOpen] = useState(false);
   const [chosenStudentId, setChosenStudentId] = useState("");
+  const [studentSearch, setStudentSearch] = useState("");
+  const [childcareDialogOpen, setChildcareDialogOpen] = useState(false);
   const [linkPendingDelete, setLinkPendingDelete] = useState<{
     id: string;
     name: string;
@@ -387,7 +390,7 @@ function ClientDetail() {
                   </div>
                   {client.uc_childcare_declared === true && <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-muted p-3">
                     <div><strong>Childcare confirmation letter</strong><p className="text-xs text-muted-foreground">{client.childcare_letter_url ? "Document link saved" : "Not yet linked"}</p></div>
-                    {client.childcare_letter_url ? <a href={client.childcare_letter_url} target="_blank" rel="noopener noreferrer" className="text-xs font-semibold text-primary underline">Open document</a> : <Button size="sm" variant="outline" onClick={() => setEditing(true)}>Add document link</Button>}
+                    {client.childcare_letter_url ? <a href={client.childcare_letter_url} target="_blank" rel="noopener noreferrer" className="text-xs font-semibold text-primary underline">Open document</a> : <Button size="sm" variant="outline" onClick={() => setChildcareDialogOpen(true)}>Create childcare letter</Button>}
                   </div>}
                   <div className="flex flex-wrap items-center justify-between gap-2"><div><strong>3. Invoice or subscription</strong><p className="text-xs text-muted-foreground">{clientInvoices.length} invoices · {clientSubscriptions.length} subscriptions</p></div><Button size="sm" variant="outline" onClick={() => setCreateMode("invoice")}>Create invoice</Button></div>
                   <div className="flex flex-wrap items-center justify-between gap-2"><div><strong>4. Course enrolment</strong><p className="text-xs text-muted-foreground">{children.length} linked students</p></div><Link to="/admin/classes" className="text-xs font-semibold text-primary underline">Manage enrolments</Link></div>
@@ -402,6 +405,7 @@ function ClientDetail() {
                     variant="secondary"
                     onClick={() => {
                       setChosenStudentId("");
+                      setStudentSearch("");
                       setStudentDialogOpen(true);
                     }}
                   >
@@ -637,6 +641,7 @@ function ClientDetail() {
         </main>
       </div>
 
+      <PaymentDocumentDialog open={childcareDialogOpen} onOpenChange={setChildcareDialogOpen} initialParentId={client.id} parents={parents.data ?? []} students={students.data ?? []} links={links.data ?? []} />
       <FormDialog
         open={studentDialogOpen}
         onOpenChange={setStudentDialogOpen}
@@ -663,19 +668,15 @@ function ClientDetail() {
           }
         }}
       >
-        <SelectField
-          label="Student"
-          value={chosenStudentId}
-          onChange={setChosenStudentId}
-          options={[
-            { value: "", label: "Choose a student" },
-            ...availableStudents.map((student) => ({
-              value: student.id,
-              label: fullName(student),
-            })),
-          ]}
-          full
-        />
+        <div className="space-y-2">
+          <label htmlFor="link-student-search" className="text-sm font-semibold">Search students</label>
+          <div className="relative"><Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground"/><Input id="link-student-search" value={studentSearch} onChange={(event) => setStudentSearch(event.target.value)} placeholder="Search name or email" className="pl-9"/></div>
+          <div className="max-h-52 overflow-y-auto rounded-xl border border-border">
+            {availableStudents.filter((student) => [fullName(student), student.email ?? ""].join(" ").toLowerCase().includes(studentSearch.trim().toLowerCase())).slice(0,60).map((student) => <label key={student.id} className="flex cursor-pointer items-center gap-2 border-b border-border p-3 text-sm last:border-0 hover:bg-muted/50"><input type="radio" name="student-to-link" checked={chosenStudentId === student.id} onChange={() => setChosenStudentId(student.id)}/><span>{fullName(student)}<span className="block text-xs text-muted-foreground">{student.email ?? "No email"}</span></span></label>)}
+            {availableStudents.filter((student) => [fullName(student), student.email ?? ""].join(" ").toLowerCase().includes(studentSearch.trim().toLowerCase())).length === 0 && <p className="p-3 text-sm text-muted-foreground">No matching student. Create their record first.</p>}
+          </div>
+          <Link to="/admin/students" className="inline-flex items-center gap-1 text-sm font-semibold text-primary underline"><Plus className="h-4 w-4"/> Add a new student</Link>
+        </div>
       </FormDialog>
 
       <ConfirmDeleteDialog

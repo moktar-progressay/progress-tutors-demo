@@ -211,6 +211,12 @@ export type Database = {
           },
         ]
       }
+      payment_document_drafts: {
+        Row: { id: string; parent_id: string | null; student_id: string | null; document_type: string; document_data: Json; updated_at: string; created_at: string }
+        Insert: { id?: string; parent_id?: string | null; student_id?: string | null; document_type?: string; document_data?: Json; updated_at?: string; created_at?: string }
+        Update: { id?: string; parent_id?: string | null; student_id?: string | null; document_type?: string; document_data?: Json; updated_at?: string; created_at?: string }
+        Relationships: []
+      }
       billing_plans: {
         Row: {
           subjects: string[]
