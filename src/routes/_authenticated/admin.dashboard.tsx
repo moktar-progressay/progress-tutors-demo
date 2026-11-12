@@ -752,6 +752,19 @@ function AdminDashboard() {
   const billedStudentCount = (students.data ?? []).filter((student) => billedStudentIds.has(student.id)).length;
   const enrolledStudentIds = new Set((enrolments.data ?? []).map((item) => item.student_id));
   const enrolledStudentCount = (students.data ?? []).filter((student) => enrolledStudentIds.has(student.id)).length;
+  // A lead is a student without a current active class enrolment. This is a
+  // provisional definition until programme-specific enrolment states are linked.
+  const currentEnrolledIds = new Set((enrolments.data ?? [])
+    .filter((enrolment) => enrolment.status === "active")
+    .map((enrolment) => enrolment.student_id));
+  const leadStudents = (students.data ?? []).filter((student) => !currentEnrolledIds.has(student.id));
+  const funnelCounts = [
+    {label:"Leads",count:leadStudents.length,fill:"#5997d2"},
+    {label:"Registered",count:registeredStudentCount,fill:"#ed8037"},
+    {label:"Linked to billing",count:billedStudentCount,fill:"#9d79a9"},
+    {label:"Currently enrolled",count:currentEnrolledIds.size,fill:"#23a6a0"},
+  ];
+  const maxFunnelCount = Math.max(1,...funnelCounts.map((step) => step.count));
   const attendancePercent = attendanceAuditRate;
   const panel = (key: string, title: string, count: number | null, children: ReactNode, icon?: ReactNode) => (
     <section className="surface min-w-0 overflow-hidden">
@@ -842,37 +855,34 @@ function AdminDashboard() {
             <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
               <section className="min-w-0 rounded-xl border border-border p-3">
                 <h4 className="mb-1 text-sm font-semibold">Conversion funnel</h4>
-                <p className="mb-3 text-xs text-muted-foreground">Illustrative stages. Programme-level conversion data is not yet linked.</p>
-                <svg viewBox="0 0 340 335" className="h-auto w-full max-w-[380px]" role="img" aria-label="Conversion funnel stages: leads, registration, billing, optional childcare confirmation, and enrolment">
-                  {(onboardingProgramme === "tuition" ? [
-                    {label:"Leads",y:4,top:322,bottom:276,fill:"#5997d2"},
-                    {label:"Registered",y:68,top:272,bottom:224,fill:"#ed8037"},
-                    {label:"Billing",y:132,top:220,bottom:168,fill:"#9d79a9"},
-                    {label:"UC confirmation*",y:196,top:164,bottom:110,fill:"#eab84c"},
-                    {label:"Enrolled",y:260,top:106,bottom:54,fill:"#23a6a0"},
-                  ] : [
-                    {label:"Leads",y:4,top:322,bottom:256,fill:"#5997d2"},
-                    {label:"Registered",y:84,top:252,bottom:184,fill:"#ed8037"},
-                    {label:"Billing",y:164,top:180,bottom:112,fill:"#9d79a9"},
-                    {label:"Enrolled",y:244,top:108,bottom:42,fill:"#23a6a0"},
-                  ]).map((step,i) => <g key={step.label}>
-                    <polygon points={`${170-step.top/2},${step.y} ${170+step.top/2},${step.y} ${170+step.bottom/2},${step.y+61} ${170-step.bottom/2},${step.y+61}`} fill={step.fill}/>
-                    <text x="170" y={step.y+27} textAnchor="middle" fill="#fff" fontSize="13" fontWeight="600">{step.label}</text>
-                    <text x="170" y={step.y+46} textAnchor="middle" fill="#fff" fontSize="11">{i===0 || (onboardingProgramme==="tuition" && i===3) ? "Not tracked" : "Not segmented"}</text>
-                  </g>)}
-                </svg>
-                {onboardingProgramme === "tuition" && <p className="text-xs text-muted-foreground">*UC confirmation is only required for applicable families.</p>}
+                <p className="mb-3 text-xs text-muted-foreground">Counts update from ProgressTutors records. Programme-level attribution is not yet linked.</p>
+                <div className="space-y-2" role="img" aria-label="Current student counts by onboarding stage">
+                  {funnelCounts.map((step) => <div key={step.label} className="flex items-center gap-2">
+                    <span className="w-28 shrink-0 text-xs font-medium">{step.label}</span>
+                    <div className="h-9 min-w-0 flex-1 rounded-md bg-muted/60">
+                      <div className="flex h-full min-w-[3rem] items-center justify-end rounded-md px-2 text-xs font-bold text-white transition-[width] duration-300" style={{width:`${Math.max(12,step.count/maxFunnelCount*100)}%`,backgroundColor:step.fill}}>{step.count}</div>
+                    </div>
+                  </div>)}
+                </div>
+                <p className="mt-2 text-xs text-muted-foreground">Live counts from student, billing and active enrolment records. Leads are students without an active class enrolment. Stages overlap and are not a strict conversion sequence.</p>
+                <div className="mt-3 rounded-lg border border-border p-2">
+                  <div className="mb-2 flex items-center justify-between gap-2"><strong className="text-xs">Lead preview ({leadStudents.length})</strong><Link to="/admin/students" className="text-xs text-primary underline">View full student list</Link></div>
+                  <div className="max-h-44 space-y-1 overflow-y-auto">
+                    {leadStudents.slice(0,8).map((student) => <Link key={student.id} to="/admin/students/$id" params={{id:student.id}} className="flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-xs hover:bg-muted"><span className="truncate">{fullName(student)}</span><span className="shrink-0 text-primary">View →</span></Link>)}
+                    {!leadStudents.length && <p className="text-xs text-muted-foreground">No unenrolled student records found.</p>}
+                  </div>
+                </div>
                 <div className="mt-3 grid grid-cols-3 gap-2 text-center text-xs">
                   <div className="rounded-lg bg-muted p-2"><strong className="block text-lg">{registeredStudentCount}</strong>All students</div>
                   <div className="rounded-lg bg-muted p-2"><strong className="block text-lg">{billedStudentCount}</strong>Linked to billing</div>
                   <div className="rounded-lg bg-muted p-2"><strong className="block text-lg">{enrolledStudentCount}</strong>Class enrolments</div>
                 </div>
-                <p className="mt-2 text-xs text-muted-foreground">Totals cover all programmes and are not conversion rates.</p>
+                <p className="mt-2 text-xs text-muted-foreground">Totals cover all programmes; do not interpret them as conversion rates.</p>
               </section>
               <section className="min-w-0">
                 <h4 className="mb-2 text-sm font-semibold">Stage actions and links</h4>
                 <div className="max-h-[460px] space-y-2 overflow-y-auto pr-1" tabIndex={0} aria-label="Scroll stage actions">
-                  <div className="rounded-lg border border-border p-3"><strong className="text-xs">0. Leads</strong><p className="my-1 text-xs text-muted-foreground">Capture enquiries and follow up before registration. Not yet tracked.</p><Link to="/admin/students" className="text-xs text-primary underline">View students</Link></div>
+                  <div className="rounded-lg border border-border p-3"><strong className="text-xs">0. Leads · {leadStudents.length}</strong><p className="my-1 text-xs text-muted-foreground">Follow up with students without an active class enrolment. Includes previously enrolled students; unregistered enquiries are not yet captured.</p><Link to="/admin/students" className="text-xs text-primary underline">View students</Link></div>
                   <div className="rounded-lg border border-border p-3"><strong className="text-xs">1. Registration</strong><p className="my-1 text-xs text-muted-foreground">Send registration form and check submissions.</p>{onboardingProgramme==="tuition" ? <div className="flex flex-wrap gap-3 text-xs"><a className="text-primary underline" href="https://form.jotform.com/Alqaderi/tuition" target="_blank" rel="noopener noreferrer">Tuition Jotform</a><a className="text-primary underline" href="https://form.jotform.com/252443149600350" target="_blank" rel="noopener noreferrer">Chelsea form</a><a className="text-primary underline" href="https://progressay.com/forms/f858c51c-e12f-4105-abf8-1f0f0a883967" target="_blank" rel="noopener noreferrer">Future Progressay form</a></div> : <a className="text-xs text-primary underline" href="https://form.jotform.com/Alqaderi/Ken-impact-KIDS" target="_blank" rel="noopener noreferrer">Football registration</a>}</div>
                   <div className="rounded-lg border border-border p-3"><strong className="text-xs">2. Billing</strong><p className="my-1 text-xs text-muted-foreground">{invoiceNeedsAction} invoices require attention across all programmes. Create subscriptions and follow up unpaid invoices.</p><Link to="/admin/payments" className="text-xs text-primary underline">Review billing</Link></div>
                   {onboardingProgramme==="tuition" && <div className="rounded-lg border border-border p-3"><strong className="text-xs">3. UC childcare confirmation, if applicable</strong><p className="my-1 text-xs text-muted-foreground">Check eligibility and prepare confirmation. Not tracked yet.</p><Link to="/admin/payments" className="text-xs text-primary underline">Billing records</Link></div>}
