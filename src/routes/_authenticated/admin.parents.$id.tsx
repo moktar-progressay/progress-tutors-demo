@@ -50,6 +50,8 @@ function ClientDetail() {
   const payments = useTable("client_payments", "payment_date");
   const billingPlans = useTable("billing_plans", "name");
   const update = useUpdateRow("parents");
+  const deleteClient = useDeleteRow("parents");
+  const [deleteClientOpen, setDeleteClientOpen] = useState(false);
   const addSubscription = useUpsert("client_subscriptions");
   const addInvoice = useUpsert("billing_invoices");
   const addInvoiceItem = useUpsert("billing_invoice_items");
@@ -92,6 +94,8 @@ function ClientDetail() {
     (student) => !childIds.includes(student.id),
   );
   const clientSubscriptions = (subscriptions.data ?? []).filter((item) => item.parent_id === id);
+  const hasFinancialHistory = clientSubscriptions.length > 0 || (invoices.data ?? []).some((item) => item.parent_id === id) || (payments.data ?? []).some((item) => item.parent_id === id);
+  const canDeleteClient = !hasFinancialHistory && children.length === 0;
   const clientInvoices = (invoices.data ?? [])
     .filter((item) => item.parent_id === id)
     .slice()
@@ -318,6 +322,7 @@ function ClientDetail() {
                 <Pencil className="h-4 w-4" />
                 <span className="hidden sm:inline">Edit</span>
               </Button>
+              <Button variant="outline" size="sm" onClick={() => setDeleteClientOpen(true)}><Trash2 className="h-4 w-4" /> <span className="hidden sm:inline">Delete</span></Button>
               <Button className="hidden sm:inline-flex" onClick={() => setCreateMode("invoice")}>
                 <Plus className="h-4 w-4" /> New invoice
               </Button>
@@ -369,6 +374,24 @@ function ClientDetail() {
                     </Pill>
                   </Detail>
                 </dl>
+              </RecordPanel>
+              <RecordPanel title="Registration and childcare funding" subtitle="Track each family's next steps">
+                <div className="space-y-4 py-3 text-sm">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div><strong>1. Registration form</strong><p className="text-xs text-muted-foreground">Status: {client.registration_status.replaceAll("_"," ")}</p></div>
+                    <a href="https://form.jotform.com/Alqaderi/tuition" target="_blank" rel="noopener noreferrer" className="text-xs font-semibold text-primary underline">Open tuition registration</a>
+                  </div>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div><strong>2. Universal Credit childcare funding</strong><p className="text-xs text-muted-foreground">Declared: {client.uc_childcare_declared === null ? "Not confirmed" : client.uc_childcare_declared ? "Yes" : "No"}</p></div>
+                    <Button size="sm" variant="secondary" onClick={() => setEditing(true)}>Update status</Button>
+                  </div>
+                  {client.uc_childcare_declared === true && <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-muted p-3">
+                    <div><strong>Childcare confirmation letter</strong><p className="text-xs text-muted-foreground">{client.childcare_letter_url ? "Document link saved" : "Not yet linked"}</p></div>
+                    {client.childcare_letter_url ? <a href={client.childcare_letter_url} target="_blank" rel="noopener noreferrer" className="text-xs font-semibold text-primary underline">Open document</a> : <Button size="sm" variant="outline" onClick={() => setEditing(true)}>Add document link</Button>}
+                  </div>}
+                  <div className="flex flex-wrap items-center justify-between gap-2"><div><strong>3. Invoice or subscription</strong><p className="text-xs text-muted-foreground">{clientInvoices.length} invoices · {clientSubscriptions.length} subscriptions</p></div><Button size="sm" variant="outline" onClick={() => setCreateMode("invoice")}>Create invoice</Button></div>
+                  <div className="flex flex-wrap items-center justify-between gap-2"><div><strong>4. Course enrolment</strong><p className="text-xs text-muted-foreground">{children.length} linked students</p></div><Link to="/admin/classes" className="text-xs font-semibold text-primary underline">Manage enrolments</Link></div>
+                </div>
               </RecordPanel>
               <RecordPanel
                 title="Students"
@@ -656,6 +679,19 @@ function ClientDetail() {
       </FormDialog>
 
       <ConfirmDeleteDialog
+        open={deleteClientOpen}
+        onOpenChange={setDeleteClientOpen}
+        title={`Delete ${fullName(client)}?`}
+        description={canDeleteClient ? "This permanently deletes the client contact record. This cannot be undone." : "This client has linked students or financial history. Unlink students first; clients with invoices, subscriptions or payments cannot be deleted to protect accounting records. Set their account status to inactive instead."}
+        confirmLabel="Delete client"
+        busy={deleteClient.isPending}
+        onConfirm={async () => {
+          if (!canDeleteClient) { toast.error("Cannot delete a client with linked records"); return; }
+          try { await deleteClient.mutateAsync(client.id); window.location.assign("/progress-tutors-demo/#/admin/parents"); }
+          catch (error) { toast.error(error instanceof Error ? error.message : "Could not delete client"); }
+        }}
+      />
+      <ConfirmDeleteDialog
         open={Boolean(linkPendingDelete)}
         onOpenChange={(open) => {
           if (!open && !removeStudentLink.isPending) setLinkPendingDelete(null);
@@ -698,6 +734,9 @@ function ClientEditScreen({
     status: client.status,
     billing_status: client.billing_status,
     notes: client.notes ?? "",
+    uc_childcare_declared: client.uc_childcare_declared,
+    registration_status: client.registration_status,
+    childcare_letter_url: client.childcare_letter_url ?? "",
   });
 
   return (
@@ -726,6 +765,7 @@ function ClientEditScreen({
             email: form.email || null,
             phone: form.phone || null,
             notes: form.notes || null,
+            childcare_letter_url: form.childcare_letter_url.trim() || null,
           });
         }}
       >
@@ -767,6 +807,10 @@ function ClientEditScreen({
           onChange={(value) => setForm({ ...form, billing_status: value })}
           options={["active", "hold", "inactive"]}
         />
+        <div className="sm:col-span-2"><h2 className="text-lg font-black">Registration and childcare funding</h2><p className="text-sm text-muted-foreground">Record declared status, not verified entitlement.</p></div>
+        <label className="space-y-2"><span className="text-sm font-bold">Registration status</span><select className="h-11 w-full rounded-xl border border-input bg-background px-3" value={form.registration_status} onChange={(event)=>setForm({...form,registration_status:event.target.value})}><option value="unknown">Not confirmed</option><option value="not_started">Not started</option><option value="sent">Form sent</option><option value="completed">Completed</option></select></label>
+        <label className="space-y-2"><span className="text-sm font-bold">Eligible for UC childcare funding? (declared)</span><select className="h-11 w-full rounded-xl border border-input bg-background px-3" value={form.uc_childcare_declared === null ? "unknown" : form.uc_childcare_declared ? "yes" : "no"} onChange={(event)=>setForm({...form,uc_childcare_declared:event.target.value==="unknown" ? null : event.target.value==="yes"})}><option value="unknown">Not confirmed</option><option value="yes">Yes</option><option value="no">No</option></select></label>
+        {form.uc_childcare_declared === true && <label className="space-y-2 sm:col-span-2"><span className="text-sm font-bold">Childcare confirmation letter URL</span><input type="url" value={form.childcare_letter_url} onChange={(event)=>setForm({...form,childcare_letter_url:event.target.value})} placeholder="https://... (secure document link)" className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm"/><p className="text-xs text-muted-foreground">Use a secure document link. Do not paste private document contents here.</p></label>}
         <label className="space-y-2 sm:col-span-2">
           <span className="text-sm font-bold">Notes</span>
           <textarea
