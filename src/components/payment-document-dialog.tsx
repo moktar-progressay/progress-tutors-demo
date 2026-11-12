@@ -1,5 +1,7 @@
 import { Download, ExternalLink, FileText } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Link } from "@tanstack/react-router";
+import { supabase } from "@/integrations/supabase/client";
 import type { ReactNode } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -53,6 +55,7 @@ export function PaymentDocumentDialog({
   parents,
   students,
   links,
+  initialParentId,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -60,10 +63,53 @@ export function PaymentDocumentDialog({
   parents: ParentOption[];
   students: StudentOption[];
   links: ParentStudentOption[];
+  initialParentId?: string;
 }) {
   const [data, setData] = useState<PaymentDocumentData>(emptyDocument);
   const [parentId, setParentId] = useState("");
   const [studentId, setStudentId] = useState("");
+  const [parentSearch, setParentSearch] = useState("");
+  const [studentSearch, setStudentSearch] = useState("");
+  const [drafts, setDrafts] = useState<Array<{id:string;parent_id:string|null;student_id:string|null;document_data:unknown;updated_at:string}>>([]);
+  const [activeDraftId, setActiveDraftId] = useState<string | null>(null);
+  const [savingDraft, setSavingDraft] = useState(false);
+  useEffect(() => {
+    if (!open) return;
+    if (initialParentId) {
+      const parent = parents.find((item) => item.id === initialParentId);
+      if (parent) {
+        setParentId(parent.id);
+        setData((current) => ({...current, parentName: fullName(parent), parentEmail: parent.email ?? ""}));
+      }
+    }
+    void supabase.from("payment_document_drafts").select("id,parent_id,student_id,document_data,updated_at").order("updated_at", {ascending:false}).then(({data:rows,error}) => {
+      if (error) toast.error("Could not load document drafts");
+      else setDrafts(rows ?? []);
+    });
+  }, [open, initialParentId]);
+  const saveDraft = async () => {
+    setSavingDraft(true);
+    try {
+      const values = {parent_id:parentId || null,student_id:studentId || null,document_type:data.type,document_data:JSON.parse(JSON.stringify(data)),updated_at:new Date().toISOString()};
+      const result = activeDraftId
+        ? await supabase.from("payment_document_drafts").update(values).eq("id",activeDraftId).select("id,parent_id,student_id,document_data,updated_at").single()
+        : await supabase.from("payment_document_drafts").insert(values).select("id,parent_id,student_id,document_data,updated_at").single();
+      if (result.error || !result.data) throw result.error ?? new Error("Could not save draft");
+      setActiveDraftId(result.data.id);
+      setDrafts((current) => [result.data, ...current.filter((item) => item.id !== result.data.id)]);
+      toast.success("Draft saved securely. You can return to it later.");
+    } catch (error) { toast.error(error instanceof Error ? error.message : "Could not save draft"); }
+    finally { setSavingDraft(false); }
+  };
+  const restoreDraft = (id:string) => {
+    const draft = drafts.find((item) => item.id === id);
+    if (!draft) return;
+    setActiveDraftId(id);
+    setParentId(draft.parent_id ?? "");
+    setStudentId(draft.student_id ?? "");
+    setData(draft.document_data as PaymentDocumentData);
+    toast.success("Draft restored");
+  };
   const update = <K extends keyof PaymentDocumentData>(key: K, value: PaymentDocumentData[K]) =>
     setData((current) => ({ ...current, [key]: value }));
   const title = data.type === "invoice" ? "Invoice" : "Childcare payment confirmation";
@@ -90,7 +136,7 @@ export function PaymentDocumentDialog({
   };
   const chooseStudent = (id: string) => {
     setStudentId(id);
-    const student = children.find((item) => item.id === id);
+    const student = students.find((item) => item.id === id);
     update("studentName", student ? fullName(student) : "");
   };
 
@@ -124,43 +170,22 @@ export function PaymentDocumentDialog({
                 <option value="payment_request">Tutor payment request</option>
               </select>
             </Field>
-            <div className="grid grid-cols-2 gap-2">
-              <Field label="Choose parent">
-                <select
-                  value={parentId}
-                  onChange={(event) => chooseParent(event.target.value)}
-                  className="h-10 w-full rounded-xl border border-border bg-card px-3 text-sm"
-                >
-                  <option value="">Select</option>
-                  {parents.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {fullName(item)}
-                    </option>
-                  ))}
-                </select>
+            <div className="space-y-2 rounded-xl border border-border p-3">
+              <label className="text-xs font-semibold">Saved drafts</label>
+              <select className="h-10 w-full rounded-xl border border-border bg-card px-3 text-sm" value={activeDraftId ?? ""} onChange={(event) => { if (event.target.value) restoreDraft(event.target.value); }}><option value="">New document / choose a draft</option>{drafts.map((draft) => <option key={draft.id} value={draft.id}>{(draft.document_data as PaymentDocumentData).parentName || "Untitled"} · {(draft.document_data as PaymentDocumentData).type} · {new Date(draft.updated_at).toLocaleDateString("en-GB")}</option>)}</select>
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <Field label="Find parent">
+                <Input value={parentSearch} onChange={(event) => setParentSearch(event.target.value)} placeholder="Search name or email"/>
+                <select value={parentId} onChange={(event) => chooseParent(event.target.value)} className="mt-1 h-10 w-full rounded-xl border border-border bg-card px-3 text-sm"><option value="">Select parent</option>{parents.filter((item) => item.id === parentId || [fullName(item),item.email ?? ""].join(" ").toLowerCase().includes(parentSearch.toLowerCase())).slice(0,60).map((item) => <option key={item.id} value={item.id}>{fullName(item)}</option>)}</select>
               </Field>
-              <Field label="Choose student">
-                <select
-                  value={studentId}
-                  onChange={(event) => chooseStudent(event.target.value)}
-                  disabled={!parentId || children.length === 0}
-                  className="h-10 w-full rounded-xl border border-border bg-card px-3 text-sm"
-                >
-                  <option value="">
-                    {!parentId
-                      ? "Choose parent first"
-                      : children.length === 0
-                        ? "No linked children"
-                        : "Select child"}
-                  </option>
-                  {children.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {fullName(item)}
-                    </option>
-                  ))}
-                </select>
+              <Field label="Find student">
+                <Input value={studentSearch} onChange={(event) => setStudentSearch(event.target.value)} placeholder="Search child name"/>
+                <select value={studentId} onChange={(event) => chooseStudent(event.target.value)} className="mt-1 h-10 w-full rounded-xl border border-border bg-card px-3 text-sm"><option value="">Select child</option>{students.filter((item) => item.id === studentId || fullName(item).toLowerCase().includes(studentSearch.toLowerCase())).slice(0,60).map((item) => <option key={item.id} value={item.id}>{fullName(item)}{children.some((child) => child.id === item.id) ? "" : " (not linked)"}</option>)}</select>
               </Field>
             </div>
+            {studentId && parentId && !links.some((item) => item.parent_id === parentId && item.student_id === studentId) ? <p className="rounded-lg bg-amber-50 p-2 text-xs text-amber-900">This child is not linked to the selected parent. Verify the relationship before issuing the document.</p> : null}
+            <Link to="/admin/students" className="text-xs font-semibold text-primary underline">Add a new student in Contacts</Link>
             <Field label="Parent name">
               <Input
                 value={data.parentName}
@@ -309,7 +334,7 @@ export function PaymentDocumentDialog({
             </div>
           </div>
         </div>
-        <div className="flex flex-wrap justify-end gap-2 border-t border-border px-5 py-4">
+        <div className="flex flex-wrap justify-end gap-2 border-t border-border px-5 py-4">\n          <Button variant="secondary" onClick={saveDraft} disabled={savingDraft}>{savingDraft ? "Saving…" : "Save draft"}</Button>
           {data.type === "invoice" && data.paymentLink ? (
             <Button
               variant="secondary"
