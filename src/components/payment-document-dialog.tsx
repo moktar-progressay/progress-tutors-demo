@@ -334,7 +334,8 @@ export function PaymentDocumentDialog({
             </div>
           </div>
         </div>
-        <div className="flex flex-wrap justify-end gap-2 border-t border-border px-5 py-4">\n          <Button variant="secondary" onClick={saveDraft} disabled={savingDraft}>{savingDraft ? "Saving…" : "Save draft"}</Button>
+        <div className="flex flex-wrap justify-end gap-2 border-t border-border px-5 py-4">
+          <Button variant="secondary" onClick={saveDraft} disabled={savingDraft}>{savingDraft ? "Saving…" : "Save draft"}</Button>
           {data.type === "invoice" && data.paymentLink ? (
             <Button
               variant="secondary"
