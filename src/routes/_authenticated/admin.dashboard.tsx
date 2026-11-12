@@ -675,9 +675,10 @@ function AdminDashboard() {
 
   const paymentRequests = useTable("payment_requests");
   const invoices = useTable("billing_invoices");
+  const parents = useTable("parents", "first_name");
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     attendance: true, upcoming: true, tasks: true, alerts: true,
-    recap: true, finance: false, leaderboards: false, reports: false,
+    recap: true, finance: true, leaderboards: false, reports: false,
   });
   const toggleSection = (key: string) => setOpenSections((previous) => ({ ...previous, [key]: !previous[key] }));
   const today = new Date();
@@ -729,6 +730,13 @@ function AdminDashboard() {
   const unmarked = filteredSessions.filter((session) => !filteredAttendance.some((mark) => mark.session_id === session.id));
   const pendingRequests = (paymentRequests.data ?? []).filter((request) => request.status === "submitted");
   const unpaidInvoices = (invoices.data ?? []).filter((invoice) => ["draft", "unpaid", "overdue", "sent"].includes(invoice.status ?? ""));
+  const recentInvoices = [...(invoices.data ?? [])].sort((a, b) => String(b.created_at ?? "").localeCompare(String(a.created_at ?? ""))).slice(0, 8);
+  const invoiceNeedsAction = (invoices.data ?? []).filter((invoice) => ["draft", "unpaid", "overdue", "sent"].includes(invoice.status ?? "")).length;
+  const invoiceParentName = (parentId: string | null | undefined) => {
+    const parent = (parents.data ?? []).find((item) => item.id === parentId);
+    return parent ? fullName(parent) : "Parent not linked";
+  };
+  const invoiceAmount = (value: number | null | undefined) => new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP" }).format(value ?? 0);
   const attendancePercent = attendanceAuditRate;
   const panel = (key: string, title: string, count: number | null, children: ReactNode, icon?: ReactNode) => (
     <section className="surface min-w-0 overflow-hidden">
@@ -822,7 +830,35 @@ function AdminDashboard() {
           {!nearlyFull.length&&!unassigned.length&&<p className="text-muted-foreground">No capacity or staffing alerts from current records.</p>}
         </div>,<AlertTriangle className="h-4 w-4 text-amber-600"/>)}
       </div>
-      {panel("finance","Invoices & tutor payment requests",unpaidInvoices.length+pendingRequests.length,<div className="grid gap-3 sm:grid-cols-2">{quickLink("Manage invoices","/admin/payments")}{quickLink("Review payment requests","/admin/payment-requests")}</div>)}
+      {panel("finance","Invoices & enrolment billing",invoiceNeedsAction+pendingRequests.length,<div className="space-y-4">
+        <div className="grid gap-2 sm:grid-cols-3">
+          <Link to="/admin/payments" className="rounded-lg border border-border p-3 hover:bg-muted/50"><p className="text-xs text-muted-foreground">Invoices requiring attention</p><p className="text-2xl font-bold">{invoiceNeedsAction}</p><p className="text-xs text-primary">Review drafts and unpaid invoices →</p></Link>
+          <Link to="/admin/payments" className="rounded-lg border border-border p-3 hover:bg-muted/50"><p className="text-xs text-muted-foreground">Recent invoices</p><p className="text-2xl font-bold">{recentInvoices.length}</p><p className="text-xs text-primary">Open billing →</p></Link>
+          <Link to="/admin/payment-requests" className="rounded-lg border border-border p-3 hover:bg-muted/50"><p className="text-xs text-muted-foreground">Tutor payment requests</p><p className="text-2xl font-bold">{pendingRequests.length}</p><p className="text-xs text-primary">Review requests →</p></Link>
+        </div>
+        <div className="grid gap-4 lg:grid-cols-2">
+          <section className="min-w-0">
+            <h3 className="mb-2 text-sm font-bold">Recently created invoices</h3>
+            <div className="max-h-64 overflow-y-auto rounded-lg border border-border" tabIndex={0} aria-label="Recent invoices">
+              {recentInvoices.length ? recentInvoices.map((invoice) => <Link key={invoice.id} to="/admin/payments" className="flex items-center justify-between gap-3 border-b border-border px-3 py-2 text-xs last:border-0 hover:bg-muted/50">
+                <span className="min-w-0"><span className="block truncate font-semibold">{invoiceParentName(invoice.parent_id)}</span><span className="text-muted-foreground">{invoice.invoice_number ?? "Draft invoice"} · {String(invoice.created_at ?? "").slice(0,10) || "Date unavailable"}</span></span>
+                <span className="shrink-0 text-right"><span className="block font-semibold">{invoiceAmount(invoice.total)}</span><span className={cn("capitalize", ["overdue","unpaid"].includes(invoice.status ?? "") ? "text-rose-600" : "text-muted-foreground")}>{invoice.status ?? "Unknown"}</span></span>
+              </Link>) : <p className="p-3 text-xs text-muted-foreground">No invoices found in ProgressTutors billing records.</p>}
+            </div>
+          </section>
+          <section className="min-w-0">
+            <h3 className="mb-2 text-sm font-bold">New student billing checklist</h3>
+            <p className="mb-2 text-xs text-muted-foreground">Use this for each new enrolment. Outstanding steps are not automatically detected yet.</p>
+            <ol className="space-y-2 text-xs">
+              <li className="rounded-lg border border-border p-2"><strong>1. Registration</strong><p className="text-muted-foreground">Complete the Progressay Tutors registration form.</p><a className="text-primary underline" href="https://form.jotform.com/Alqaderi/tuition" target="_blank" rel="noopener noreferrer">Open Jotform registration</a></li>
+              <li className="rounded-lg border border-border p-2"><strong>2. Billing</strong><p className="text-muted-foreground">Create a subscription or invoice for the family.</p><Link to="/admin/payments" className="text-primary underline">Manage subscriptions and invoices</Link></li>
+              <li className="rounded-lg border border-border p-2"><strong>3. UC childcare funding, if applicable</strong><p className="text-muted-foreground">Prepare the childcare confirmation document. Check details before issuing.</p><Link to="/admin/payments" className="text-primary underline">Open billing documents</Link></li>
+              <li className="rounded-lg border border-border p-2"><strong>4. Course enrolment</strong><p className="text-muted-foreground">Assign the student to their GoProgress course.</p><Link to="/admin/classes" className="text-primary underline">Manage classes and enrolments</Link></li>
+            </ol>
+          </section>
+        </div>
+        <p className="text-xs text-muted-foreground">Invoice list shows existing ProgressTutors records only. It does not yet identify unbilled Jotform submissions or sync new Zoho invoices automatically.</p>
+      </div>)}
       {panel("leaderboards","Leaderboards",null,<div className="grid gap-4 sm:grid-cols-2">
         <div><h3 className="mb-2 font-bold">Tutors · scheduled hours</h3>{tutorLeaderboard.slice(0,5).map((item,i)=><Link key={item.tutor!.id} to="/admin/tutors/$id" params={{id:item.tutor!.id}} className="flex justify-between gap-2 border-b py-2 text-sm"><span className="flex min-w-0 items-center gap-2"><Avatar initials={initialsOf(fullName(item.tutor))} tone={avatarTone(fullName(item.tutor))} size="sm"/><span className="truncate">{i+1}. {fullName(item.tutor)}</span></span><b>{item.hours.toFixed(1)}h</b></Link>)}</div>
         <div><h3 className="mb-2 font-bold">Students · recorded attendance</h3>{studentLeaderboard.slice(0,5).map((item,i)=><Link key={item.student!.id} to="/admin/students/$id" params={{id:item.student!.id}} className="flex justify-between gap-2 border-b py-2 text-sm"><span className="flex min-w-0 items-center gap-2"><Avatar initials={initialsOf(fullName(item.student))} tone={avatarTone(fullName(item.student))} size="sm"/><span className="truncate">{i+1}. {fullName(item.student)}</span></span><b>{item.attended}</b></Link>)}</div>
