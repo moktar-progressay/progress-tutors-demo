@@ -1,5 +1,5 @@
-import { Download, ExternalLink, FileText } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Download, ExternalLink, FileText, Undo2, Redo2, Save, CheckCircle2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import type { ReactNode } from "react";
@@ -73,6 +73,33 @@ export function PaymentDocumentDialog({
   const [drafts, setDrafts] = useState<Array<{id:string;parent_id:string|null;student_id:string|null;document_data:unknown;updated_at:string}>>([]);
   const [activeDraftId, setActiveDraftId] = useState<string | null>(null);
   const [savingDraft, setSavingDraft] = useState(false);
+  const [history, setHistory] = useState<PaymentDocumentData[]>([]);
+  const [future, setFuture] = useState<PaymentDocumentData[]>([]);
+  const [dirty, setDirty] = useState(false);
+  const currentData = useRef(data);
+  currentData.current = data;
+  const applyChange = (key: keyof PaymentDocumentData, value: string) => {
+    const current = currentData.current;
+    if (current[key] === value) return;
+    setHistory((previous) => [...previous.slice(-29), current]);
+    setFuture([]);
+    setDirty(true);
+    setData({ ...current, [key]: value });
+  };
+  const undo = () => {
+    if (!history.length) return;
+    setFuture((previous) => [currentData.current, ...previous]);
+    setData(history[history.length - 1]!);
+    setHistory((previous) => previous.slice(0, -1));
+    setDirty(true);
+  };
+  const redo = () => {
+    if (!future.length) return;
+    setHistory((previous) => [...previous, currentData.current]);
+    setData(future[0]!);
+    setFuture((previous) => previous.slice(1));
+    setDirty(true);
+  };
   useEffect(() => {
     if (!open) return;
     if (initialParentId) {
@@ -97,6 +124,7 @@ export function PaymentDocumentDialog({
       if (result.error || !result.data) throw result.error ?? new Error("Could not save draft");
       setActiveDraftId(result.data.id);
       setDrafts((current) => [result.data, ...current.filter((item) => item.id !== result.data.id)]);
+      setDirty(false);
       toast.success("Draft saved securely. You can return to it later.");
     } catch (error) { toast.error(error instanceof Error ? error.message : "Could not save draft"); }
     finally { setSavingDraft(false); }
@@ -108,10 +136,10 @@ export function PaymentDocumentDialog({
     setParentId(draft.parent_id ?? "");
     setStudentId(draft.student_id ?? "");
     setData(draft.document_data as PaymentDocumentData);
+    setHistory([]); setFuture([]); setDirty(false);
     toast.success("Draft restored");
   };
-  const update = <K extends keyof PaymentDocumentData>(key: K, value: PaymentDocumentData[K]) =>
-    setData((current) => ({ ...current, [key]: value }));
+  const update = <K extends keyof PaymentDocumentData>(key: K, value: PaymentDocumentData[K]) => applyChange(key, value);
   const title = data.type === "invoice" ? "Invoice" : "Childcare payment confirmation";
   const children = useMemo(() => {
     const childIds = new Set(
@@ -143,14 +171,19 @@ export function PaymentDocumentDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex h-[100dvh] w-screen max-w-none flex-col overflow-hidden rounded-none border-0 p-0 sm:h-[calc(100dvh-1rem)] sm:w-[calc(100vw-1rem)] sm:max-w-none sm:rounded-2xl sm:border">
-        <DialogHeader className="border-b border-border px-5 py-4 text-left">
-          <DialogTitle>Create document</DialogTitle>
-          <DialogDescription>
-            Edit the details, review the preview, then download the PDF.
-          </DialogDescription>
+        <DialogHeader className="shrink-0 border-b border-border px-5 py-3 text-left">
+          <div className="flex flex-wrap items-center justify-between gap-3 pr-8">
+            <div><DialogTitle className="flex items-center gap-2"><FileText className="h-5 w-5 text-primary" />{title}</DialogTitle>
+              <DialogDescription className="mt-1 text-xs">Edit on the document or using the form · {dirty ? "Unsaved changes" : activeDraftId ? "Draft saved" : "New document"}</DialogDescription></div>
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="outline" aria-label="Undo" disabled={!history.length} onClick={undo}><Undo2 className="h-4 w-4" /></Button>
+              <Button size="sm" variant="outline" aria-label="Redo" disabled={!future.length} onClick={redo}><Redo2 className="h-4 w-4" /></Button>
+              <Button size="sm" variant="outline" disabled={savingDraft} onClick={saveDraft}><Save className="h-4 w-4" /> {savingDraft ? "Saving…" : "Save draft"}</Button>
+            </div>
+          </div>
         </DialogHeader>
-        <div className="grid min-h-0 flex-1 overflow-y-auto lg:grid-cols-[380px_1fr] lg:overflow-hidden">
-          <div className="space-y-3 border-b border-border p-4 lg:overflow-y-auto lg:border-r lg:border-b-0">
+        <div className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden lg:grid-cols-[360px_minmax(0,1fr)]">
+          <div className="min-h-0 space-y-3 overflow-y-auto border-b border-border p-4 lg:border-r lg:border-b-0">
             <Field label="Document type">
               <select
                 value={data.type}
@@ -302,8 +335,8 @@ export function PaymentDocumentDialog({
             )}
           </div>
 
-          <div className="bg-muted p-3 sm:p-6">
-            <div className="mx-auto aspect-[210/297] w-full max-w-[640px] overflow-hidden rounded-xl bg-white shadow-lg">
+          <div className="min-h-0 overflow-y-auto bg-muted p-3 sm:p-6">
+            <div className="mx-auto aspect-[210/297] w-full max-w-[720px] rounded-lg bg-white shadow-lg">
               <div className="flex h-full flex-col text-slate-900">
                 <div className="bg-primary px-6 py-5 text-xl font-extrabold text-white sm:px-10 sm:text-2xl">
                   {title.toUpperCase()}
@@ -316,15 +349,15 @@ export function PaymentDocumentDialog({
                       <p>London, W10 6TT</p>
                     </div>
                     <div className="text-right">
-                      <p className="font-bold">{data.parentName || "Parent name"}</p>
-                      <p>{data.parentEmail || "Parent email"}</p>
-                      <p className="mt-2">{data.documentDate}</p>
+                      <p className="font-bold"><InlineField field="parentName" value={data.parentName} placeholder="Parent name" onCommit={applyChange} /></p>
+                      <p><InlineField field="parentEmail" value={data.parentEmail} placeholder="Parent email" onCommit={applyChange} /></p>
+                      <p className="mt-2"><InlineField field="documentDate" value={data.documentDate} placeholder="YYYY-MM-DD" onCommit={applyChange} /></p>
                     </div>
                   </div>
                   {data.type === "childcare" ? (
-                    <ChildcarePreview data={data} />
+                    <ChildcarePreview data={data} onCommit={applyChange} />
                   ) : (
-                    <InvoicePreview data={data} />
+                    <InvoicePreview data={data} onCommit={applyChange} />
                   )}
                   <p className="mt-auto border-t pt-3 text-center text-[7px] text-slate-500 sm:text-[9px]">
                     Progressay Impact CIC · Company number 12294686 · www.progressayimpact.co.uk
@@ -362,6 +395,20 @@ export function PaymentDocumentDialog({
   );
 }
 
+function InlineField({field,value,placeholder,onCommit}:{
+  field:keyof PaymentDocumentData;value:string;placeholder:string;
+  onCommit:(field:keyof PaymentDocumentData,value:string)=>void;
+}) {
+  const element=useRef<HTMLSpanElement>(null);
+  useEffect(()=>{if(element.current && document.activeElement!==element.current) element.current.textContent=value||placeholder;},[value,placeholder]);
+  return <span ref={element} role="textbox" aria-label={field} contentEditable suppressContentEditableWarning tabIndex={0}
+    onFocus={event=>{if(!value && event.currentTarget.textContent===placeholder)event.currentTarget.textContent="";}}
+    onBlur={()=>{const next=element.current?.textContent?.trim()??"";onCommit(field,next===placeholder&&!value?"":next);}}
+    onKeyDown={event=>{if(event.key==="Enter"){event.preventDefault();event.currentTarget.blur();}if(event.key==="Escape"){event.currentTarget.textContent=value||placeholder;event.currentTarget.blur();}}}
+    className="inline-block min-w-5 cursor-text rounded-sm border-b border-dashed border-primary/50 px-0.5 outline-none hover:bg-primary/10 focus:bg-primary/10 focus:ring-2 focus:ring-primary/40"
+    title="Click to edit">{value||placeholder}</span>;
+}
+
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="block min-w-0 text-xs font-semibold text-muted-foreground">
@@ -371,12 +418,12 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-function ChildcarePreview({ data }: { data: PaymentDocumentData }) {
+function ChildcarePreview({ data, onCommit }: { data: PaymentDocumentData; onCommit: (key: keyof PaymentDocumentData, value: string) => void }) {
   return (
     <div className="mt-8">
       <div className="flex justify-between gap-3">
-        <p>Dear {data.parentName || "Parent"},</p>
-        <p className="font-bold">{data.reference || "Reference"}</p>
+        <p>Dear <InlineField field="parentName" value={data.parentName} placeholder="Parent" onCommit={onCommit} />,</p>
+        <p className="font-bold"><InlineField field="reference" value={data.reference} placeholder="Reference" onCommit={onCommit} /></p>
       </div>
       <h3 className="mt-6 font-bold underline">Re: CHILDCARE CONFIRMATION FOR UNIVERSAL CREDIT</h3>
       <p className="mt-3 leading-relaxed">
@@ -384,7 +431,7 @@ function ChildcarePreview({ data }: { data: PaymentDocumentData }) {
         that the charges shown relate to their childcare.
       </p>
       <div className="mt-4 border-2 border-slate-900 p-3 font-bold">
-        {data.studentName || "Student name"}
+        <InlineField field="studentName" value={data.studentName} placeholder="Student name" onCommit={onCommit} />
       </div>
       <h3 className="mt-6 font-bold">Payment details</h3>
       <div className="mt-2 grid grid-cols-6 overflow-hidden border border-slate-900 text-center">
@@ -394,12 +441,12 @@ function ChildcarePreview({ data }: { data: PaymentDocumentData }) {
         <Cell head>Until</Cell>
         <Cell head>Rate</Cell>
         <Cell head>Total</Cell>
-        <Cell>{data.service}</Cell>
-        <Cell>{data.hours}</Cell>
-        <Cell>{data.fromDate}</Cell>
-        <Cell>{data.untilDate}</Cell>
-        <Cell>{data.rate}</Cell>
-        <Cell>{data.total}</Cell>
+        <Cell><InlineField field="service" value={data.service} placeholder="service" onCommit={onCommit} /></Cell>
+        <Cell><InlineField field="hours" value={data.hours} placeholder="hours" onCommit={onCommit} /></Cell>
+        <Cell><InlineField field="fromDate" value={data.fromDate} placeholder="fromDate" onCommit={onCommit} /></Cell>
+        <Cell><InlineField field="untilDate" value={data.untilDate} placeholder="untilDate" onCommit={onCommit} /></Cell>
+        <Cell><InlineField field="rate" value={data.rate} placeholder="rate" onCommit={onCommit} /></Cell>
+        <Cell><InlineField field="total" value={data.total} placeholder="total" onCommit={onCommit} /></Cell>
       </div>
       <p className="mt-8">Yours sincerely,</p>
       <p className="mt-4 font-bold">Moktar Alqaderi (PGCE, QTS)</p>
@@ -408,31 +455,31 @@ function ChildcarePreview({ data }: { data: PaymentDocumentData }) {
   );
 }
 
-function InvoicePreview({ data }: { data: PaymentDocumentData }) {
+function InvoicePreview({ data, onCommit }: { data: PaymentDocumentData; onCommit: (key: keyof PaymentDocumentData, value: string) => void }) {
   return (
     <div className="mt-8">
       <div className="flex justify-between">
         <div>
-          <p className="font-bold">Invoice {data.reference || "Draft"}</p>
+          <p className="font-bold">Invoice <InlineField field="reference" value={data.reference} placeholder="Draft" onCommit={onCommit} /></p>
           <p className="mt-4 font-bold">Bill to</p>
-          <p>{data.parentName}</p>
-          <p>For: {data.studentName}</p>
+          <p><InlineField field="parentName" value={data.parentName} placeholder="Parent" onCommit={onCommit} /></p>
+          <p>For: <InlineField field="studentName" value={data.studentName} placeholder="Student" onCommit={onCommit} /></p>
         </div>
-        <p>Due: {data.dueDate}</p>
+        <p>Due: <InlineField field="dueDate" value={data.dueDate} placeholder="YYYY-MM-DD" onCommit={onCommit} /></p>
       </div>
       <div className="mt-8 grid grid-cols-[2fr_2fr_1fr] overflow-hidden border border-slate-300">
         <Cell head>Service</Cell>
         <Cell head>Period</Cell>
         <Cell head>Amount</Cell>
-        <Cell>{data.service}</Cell>
+        <Cell><InlineField field="service" value={data.service} placeholder="service" onCommit={onCommit} /></Cell>
         <Cell>
-          {data.fromDate} - {data.untilDate}
+          <InlineField field="fromDate" value={data.fromDate} placeholder="From" onCommit={onCommit} /> - <InlineField field="untilDate" value={data.untilDate} placeholder="Until" onCommit={onCommit} />
         </Cell>
-        <Cell>{data.total}</Cell>
+        <Cell><InlineField field="total" value={data.total} placeholder="total" onCommit={onCommit} /></Cell>
       </div>
       <div className="mt-5 flex justify-end">
         <p className="border-t border-slate-500 px-4 pt-2 text-base font-extrabold">
-          Total {data.total || "£0"}
+          Total <InlineField field="total" value={data.total} placeholder="£0" onCommit={onCommit} />
         </p>
       </div>
       {data.paymentLink ? (
@@ -443,7 +490,7 @@ function InvoicePreview({ data }: { data: PaymentDocumentData }) {
       {data.notes ? (
         <div className="mt-6">
           <p className="font-bold">Notes</p>
-          <p>{data.notes}</p>
+          <p><InlineField field="notes" value={data.notes} placeholder="Notes" onCommit={onCommit} /></p>
         </div>
       ) : null}
     </div>
