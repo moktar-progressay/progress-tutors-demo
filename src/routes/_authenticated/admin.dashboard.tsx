@@ -676,6 +676,8 @@ function AdminDashboard() {
   const paymentRequests = useTable("payment_requests");
   const invoices = useTable("billing_invoices");
   const parents = useTable("parents", "first_name");
+  const parentStudents = useTable("parent_students");
+  const subscriptions = useTable("client_subscriptions");
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     attendance: true, upcoming: true, tasks: true, alerts: true,
     recap: true, finance: true, leaderboards: false, reports: false,
@@ -737,6 +739,18 @@ function AdminDashboard() {
     return parent ? fullName(parent) : "Parent not linked";
   };
   const invoiceAmount = (value: number | null | undefined) => new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP" }).format(value ?? 0);
+  // Stage totals are independently observed records, not a mutually exclusive funnel.
+  const registeredStudentCount = (students.data ?? []).length;
+  const billedParentIds = new Set<string>([
+    ...(invoices.data ?? []).map((invoice) => invoice.parent_id).filter((id): id is string => Boolean(id)),
+    ...(subscriptions.data ?? []).map((subscription) => subscription.parent_id).filter((id): id is string => Boolean(id)),
+  ]);
+  const billedStudentIds = new Set((parentStudents.data ?? [])
+    .filter((link) => billedParentIds.has(link.parent_id))
+    .map((link) => link.student_id));
+  const billedStudentCount = (students.data ?? []).filter((student) => billedStudentIds.has(student.id)).length;
+  const enrolledStudentIds = new Set((enrolments.data ?? []).map((item) => item.student_id));
+  const enrolledStudentCount = (students.data ?? []).filter((student) => enrolledStudentIds.has(student.id)).length;
   const attendancePercent = attendanceAuditRate;
   const panel = (key: string, title: string, count: number | null, children: ReactNode, icon?: ReactNode) => (
     <section className="surface min-w-0 overflow-hidden">
@@ -847,13 +861,14 @@ function AdminDashboard() {
             </div>
           </section>
           <section className="min-w-0">
-            <h3 className="mb-2 text-sm font-bold">New student billing checklist</h3>
-            <p className="mb-2 text-xs text-muted-foreground">Use this for each new enrolment. Outstanding steps are not automatically detected yet.</p>
+            <h3 className="mb-2 text-sm font-bold">Student onboarding stages</h3>
+            <p className="mb-2 text-xs text-muted-foreground">Counts reflect records currently available in ProgressTutors. A student may appear in several stages.</p>
             <ol className="space-y-2 text-xs">
-              <li className="rounded-lg border border-border p-2"><strong>1. Registration</strong><p className="text-muted-foreground">Complete the Progressay Tutors registration form.</p><a className="text-primary underline" href="https://form.jotform.com/Alqaderi/tuition" target="_blank" rel="noopener noreferrer">Open Jotform registration</a></li>
-              <li className="rounded-lg border border-border p-2"><strong>2. Billing</strong><p className="text-muted-foreground">Create a subscription or invoice for the family.</p><Link to="/admin/payments" className="text-primary underline">Manage subscriptions and invoices</Link></li>
-              <li className="rounded-lg border border-border p-2"><strong>3. UC childcare funding, if applicable</strong><p className="text-muted-foreground">Prepare the childcare confirmation document. Check details before issuing.</p><Link to="/admin/payments" className="text-primary underline">Open billing documents</Link></li>
-              <li className="rounded-lg border border-border p-2"><strong>4. Course enrolment</strong><p className="text-muted-foreground">Assign the student to their GoProgress course.</p><Link to="/admin/classes" className="text-primary underline">Manage classes and enrolments</Link></li>
+              <li className="rounded-lg border border-border p-2"><div className="flex items-center justify-between gap-2"><strong>0. Leads</strong><span className="rounded-full bg-muted px-2 py-0.5 font-semibold">Not tracked</span></div><p className="text-muted-foreground">Interested families who have not completed registration. Requires a lead list or CRM connection.</p></li>
+              <li className="rounded-lg border border-border p-2"><div className="flex items-center justify-between gap-2"><strong>1. Registration</strong><span className="rounded-full bg-primary/10 px-2 py-0.5 font-semibold text-primary">{registeredStudentCount} students</span></div><p className="text-muted-foreground">Student records in ProgressTutors, not verified Jotform submissions.</p><div className="flex flex-wrap gap-x-3 gap-y-1"><a className="text-primary underline" href="https://form.jotform.com/Alqaderi/tuition" target="_blank" rel="noopener noreferrer">Current Jotform</a><a className="text-primary underline" href="https://progressay.com/forms/f858c51c-e12f-4105-abf8-1f0f0a883967" target="_blank" rel="noopener noreferrer">New Progressay form</a></div></li>
+              <li className="rounded-lg border border-border p-2"><div className="flex items-center justify-between gap-2"><strong>2. Billing</strong><span className="rounded-full bg-primary/10 px-2 py-0.5 font-semibold text-primary">{billedStudentCount} linked students</span></div><p className="text-muted-foreground">Students linked to a parent with an invoice or subscription. This does not confirm payment or identify all students awaiting billing.</p><Link to="/admin/payments" className="text-primary underline">Manage subscriptions and invoices</Link></li>
+              <li className="rounded-lg border border-border p-2"><div className="flex items-center justify-between gap-2"><strong>3. UC childcare confirmation</strong><span className="rounded-full bg-muted px-2 py-0.5 font-semibold">Not tracked</span></div><p className="text-muted-foreground">Only applicable to families using UC childcare support. Completion status needs to be recorded.</p><Link to="/admin/payments" className="text-primary underline">Open billing documents</Link></li>
+              <li className="rounded-lg border border-border p-2"><div className="flex items-center justify-between gap-2"><strong>4. Course enrolment</strong><span className="rounded-full bg-primary/10 px-2 py-0.5 font-semibold text-primary">{enrolledStudentCount} students</span></div><p className="text-muted-foreground">Students linked to a class in ProgressTutors. External GoProgress course membership is not independently verified.</p><Link to="/admin/classes" className="text-primary underline">Manage classes and enrolments</Link></li>
             </ol>
           </section>
         </div>
