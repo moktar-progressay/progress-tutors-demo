@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Check, CircleHelp, Filter, WalletCards, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Page } from "@/components/AppShell";
 import { FilterDialog } from "@/components/filter-dialog";
@@ -49,7 +49,7 @@ const statusLabel = (status: string) =>
             ? "Declined"
             : status;
 
-function AdminPaymentRequests() {
+export function TutorPaymentReview() {
   const requests = useTable("payment_requests", "submitted_at");
   const items = useTable("payment_request_items");
   const tutors = useTable("tutors");
@@ -92,24 +92,7 @@ function AdminPaymentRequests() {
   }
 
   return (
-    <Page>
-      <PageHeader
-        title="Payments"
-        subtitle="Manage money coming in from parents and requests from tutors."
-      />
-
-      <div className="flex gap-1 rounded-xl bg-muted p-1">
-        <Link
-          to="/admin/payments"
-          className="flex-1 rounded-lg px-4 py-2 text-center text-sm font-bold text-muted-foreground hover:text-foreground"
-        >
-          Parent payments
-        </Link>
-        <span className="flex-1 rounded-lg bg-card px-4 py-2 text-center text-sm font-bold text-primary shadow-sm">
-          Tutor requests
-        </span>
-      </div>
-
+    <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard label="Needs review" value={String(submitted.length)} tone="amber" />
         <StatCard label="Approved" value={String(approved.length)} tone="green" />
@@ -271,6 +254,11 @@ function AdminPaymentRequests() {
           </select>
         </label>
       </FilterDialog>
-    </Page>
+    </div>
   );
+}
+
+function AdminPaymentRequests() {
+  useEffect(() => { window.location.replace(`${window.location.pathname}#/admin/payments?tab=tutor-requests`); }, []);
+  return <Page><Empty>Opening tutor requests in Payments…</Empty></Page>;
 }

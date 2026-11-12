@@ -1,3 +1,4 @@
+import { TutorPaymentReview } from "./admin.payment-requests";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   ArrowDownLeft,
@@ -153,7 +154,7 @@ function ParentPayments() {
   const deleteProduct = useDeleteRow("billing_plans");
 
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [view, setView] = useState<PaymentView>("overview");
+  const [view, setView] = useState<PaymentView>(() => window.location.hash.includes("tab=tutor-requests") ? "tutor-requests" : "overview");
   const [invoiceLimit, setInvoiceLimit] = useState(10);
   const [invoiceFilter, setInvoiceFilter] = useState<
     "all" | "draft" | "unpaid" | "paid" | "overdue"
@@ -1888,63 +1889,7 @@ function ParentPayments() {
         </Section>
       ) : null}
 
-      {view === "tutor-requests" ? (
-        <Section
-          id="payment-tutor-requests"
-          title="Tutor payment requests"
-          subtitle="Review submitted claims and lesson evidence"
-          action={
-            <div className="flex gap-2">
-              <Button size="sm" variant="secondary" onClick={() => setTutorRequestOpen(true)}>
-                <Plus className="h-4 w-4" /> New request
-              </Button>
-              <Button size="sm" asChild>
-                <Link to="/admin/payment-requests">Open full review</Link>
-              </Button>
-            </div>
-          }
-        >
-          {(paymentRequests.data ?? []).length === 0 ? (
-            <Empty>No tutor requests have been submitted.</Empty>
-          ) : (
-            <div className="divide-y divide-border">
-              {(paymentRequests.data ?? [])
-                .slice()
-                .reverse()
-                .map((request) => {
-                  const tutor = (tutors.data ?? []).find((item) => item.id === request.tutor_id);
-                  return (
-                    <div key={request.id} className="flex items-center gap-3 py-3">
-                      <Avatar
-                        initials={initialsOf(fullName(tutor))}
-                        tone={avatarTone(fullName(tutor))}
-                      />
-                      <div className="min-w-0 flex-1">
-                        <p className="font-bold">{fullName(tutor)}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {request.reference ?? "Payment request"} · {num(request.total_hours)}{" "}
-                          hours
-                        </p>
-                      </div>
-                      <Pill
-                        tone={
-                          request.status === "paid"
-                            ? "blue"
-                            : request.status === "approved"
-                              ? "green"
-                              : "amber"
-                        }
-                      >
-                        {request.status}
-                      </Pill>
-                      <strong>{money(request.total_amount)}</strong>
-                    </div>
-                  );
-                })}
-            </div>
-          )}
-        </Section>
-      ) : null}
+      {view === "tutor-requests" ? <TutorPaymentReview /> : null}
 
       {view === "documents" ? (
         <Section
