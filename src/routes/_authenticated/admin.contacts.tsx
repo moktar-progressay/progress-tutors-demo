@@ -34,9 +34,9 @@ const TABS: { id: ContactTab; label: string }[] = [
 ];
 
 function ContactsPage() {
-  const students = useTable("students", "first_name");
-  const parents = useTable("parents", "first_name");
-  const tutors = useTable("tutors", "first_name");
+  const students = useTable("students", "created_at");
+  const parents = useTable("parents", "created_at");
+  const tutors = useTable("tutors", "created_at");
   const links = useTable("parent_students");
   const enrolments = useTable("class_enrolments");
   const classes = useTable("classes", "name");
@@ -54,7 +54,7 @@ function ContactsPage() {
         : tab === "parents"
           ? (parents.data ?? [])
           : (tutors.data ?? []);
-    return source.filter((record) =>
+    return [...source].sort((a, b) => b.created_at.localeCompare(a.created_at)).filter((record) =>
       [fullName(record), record.email, record.phone]
         .filter(Boolean)
         .join(" ")
@@ -71,7 +71,7 @@ function ContactsPage() {
       <PageHeader
         title="Contacts"
         subtitle="Students, parents and tutors, connected in one searchable workspace."
-        actions={tab === "parents" ? <Button onClick={() => setAddParentOpen(true)}><Plus className="h-4 w-4"/> Add parent</Button> : <Button asChild><Link to={destination}><Users className="h-4 w-4"/> Manage {tab}</Link></Button>}
+        actions={tab === "parents" ? <Button onClick={() => setAddParentOpen(true)}><Plus className="h-4 w-4"/> Add parent</Button> : <Button asChild><Link to={destination}><Plus className="h-4 w-4"/> {tab === "students" ? "Add student" : "Manage tutors"}</Link></Button>}
       />
 
       <div className="grid grid-cols-3 gap-2 sm:gap-3">
