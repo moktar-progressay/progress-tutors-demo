@@ -76,6 +76,52 @@ import {
   type Row,
 } from "@/lib/db";
 
+type ProductTagsProps = {
+  label: string;
+  values: string[];
+  suggestions: string[];
+  onChange: (values: string[]) => void;
+};
+function ProductTags({ label, values, suggestions, onChange }: ProductTagsProps) {
+  const [draft, setDraft] = useState("");
+  const add = (value: string) => {
+    const trimmed = value.trim();
+    if (trimmed && !values.some((item) => item.toLowerCase() === trimmed.toLowerCase()))
+      onChange([...values, trimmed]);
+    setDraft("");
+  };
+  return (
+    <div className="space-y-2">
+      <span className="text-sm font-bold">{label}</span>
+      <div className="flex min-h-11 flex-wrap items-center gap-1.5 rounded-xl border border-input bg-background p-2">
+        {values.map((value) => (
+          <span key={value} className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">
+            {value}
+            <button type="button" aria-label={`Remove ${value}`} onClick={() => onChange(values.filter((item) => item !== value))}><X className="h-3 w-3" /></button>
+          </span>
+        ))}
+        <input
+          aria-label={`Add ${label.toLowerCase()}`}
+          className="min-w-24 flex-1 bg-transparent px-1 py-1 text-sm outline-none"
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === ",") { event.preventDefault(); add(draft); }
+            if (event.key === "Backspace" && !draft && values.length) onChange(values.slice(0, -1));
+          }}
+          onBlur={() => { if (draft.trim()) add(draft); }}
+          placeholder={values.length ? "Add another…" : "Type and press Enter"}
+          list={`product-${label.toLowerCase().replaceAll(" ", "-")}`}
+        />
+        <datalist id={`product-${label.toLowerCase().replaceAll(" ", "-")}`}>
+          {suggestions.filter((item) => !values.some((value) => value.toLowerCase() === item.toLowerCase())).map((item) => <option key={item} value={item} />)}
+        </datalist>
+      </div>
+      <p className="text-xs text-muted-foreground">Add one or more tags. Press Enter after each.</p>
+    </div>
+  );
+}
+
 export const Route = createFileRoute("/_authenticated/admin/payments")({
   head: () => ({
     meta: [
@@ -197,7 +243,9 @@ function ParentPayments() {
     billing_frequency: "monthly",
     children_included: "1",
     active: "true",
-    class_id: "",
+    class_ids: [] as string[],
+    subjects: [] as string[],
+    levels: [] as string[],
   });
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [documentOpen, setDocumentOpen] = useState(false);
@@ -341,8 +389,9 @@ function ParentPayments() {
       return invoiceSortDirection === "asc" ? result : -result;
     });
   const filteredProducts = (billingPlans.data ?? []).filter((plan) => {
-    const linked = (classes.data ?? []).find((lesson) => lesson.id === plan.class_id);
-    return `${plan.name} ${plan.description ?? ""} ${linked?.name ?? ""} ${linked?.subject ?? ""} ${linked?.level ?? ""}`.toLowerCase().includes(query.trim().toLowerCase());
+    const linked = (classes.data ?? []).filter((lesson) => plan.class_ids.includes(lesson.id) || lesson.id === plan.class_id);
+    return [plan.name, plan.description ?? "", ...plan.subjects, ...plan.levels, ...linked.flatMap((lesson) => [lesson.name, lesson.subject ?? "", lesson.level ?? ""])]
+      .join(" ").toLowerCase().includes(query.trim().toLowerCase());
   });
   const filteredSubscriptions = (subscriptions.data ?? []).filter((item) => {
     const haystack = `${parentName(item.parent_id)} ${studentName(item.student_id)} ${
@@ -454,7 +503,9 @@ function ParentPayments() {
       billing_frequency: "monthly",
       children_included: "1",
       active: "true",
-      class_id: "",
+      class_ids: [],
+      subjects: [],
+      levels: [],
     });
     setProductOpen(true);
   }
@@ -468,7 +519,9 @@ function ParentPayments() {
       billing_frequency: item.billing_frequency,
       children_included: String(item.children_included),
       active: String(item.active),
-      class_id: item.class_id ?? "",
+      class_ids: item.class_ids.length ? item.class_ids : item.class_id ? [item.class_id] : [],
+      subjects: item.subjects,
+      levels: item.levels,
     });
     setProductOpen(true);
   }
@@ -1974,7 +2027,7 @@ function ParentPayments() {
                   </div>
                   <h3 className="mt-3 font-bold">{plan.name}</h3>
                   <p className="mt-1 truncate text-xs text-muted-foreground">
-                    {[(classes.data ?? []).find((lesson) => lesson.id === plan.class_id)?.subject, (classes.data ?? []).find((lesson) => lesson.id === plan.class_id)?.level].filter(Boolean).join(" · ") || plan.description || "Billable ProgressTutors service"}
+                    {[...plan.subjects, ...plan.levels].join(" · ") || plan.description || "Billable ProgressTutors service"}
                   </p>
                   <p className="mt-4 text-xl font-extrabold">{money(plan.unit_amount)}</p>
                 </button>
@@ -2349,7 +2402,10 @@ function ParentPayments() {
             active: product.active === "true",
             currency: "GBP",
             source: "manual",
-            class_id: product.class_id || null,
+            class_id: product.class_ids[0] ?? null,
+            class_ids: product.class_ids,
+            subjects: product.subjects,
+            levels: product.levels,
           };
           if (editingProductId) await updateProduct.mutateAsync({ id: editingProductId, values });
           else await addProduct.mutateAsync(values);
@@ -2363,7 +2419,21 @@ function ParentPayments() {
           onChange={(value) => setProduct({ ...product, name: value })}
           required
         />
-        <label className="space-y-2"><span className="text-sm font-bold">Linked lesson / class</span><select value={product.class_id} onChange={(event) => setProduct({ ...product, class_id: event.target.value })} className="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm"><option value="">No linked class</option>{(classes.data ?? []).map((lesson) => <option key={lesson.id} value={lesson.id}>{lesson.name} · {lesson.subject || "Subject not set"} · {lesson.level || "Level not set"}</option>)}</select><span className="block text-xs text-muted-foreground">Subject and level are taken from the linked lesson.</span></label>
+        <ProductTags label="Subjects" values={product.subjects} onChange={(subjects) => setProduct({ ...product, subjects })} suggestions={[...new Set(["Maths", "English", "Football", "Science", ...(classes.data ?? []).map((item) => item.subject).filter((value): value is string => Boolean(value)))].sort()} />
+        <ProductTags label="Levels" values={product.levels} onChange={(levels) => setProduct({ ...product, levels })} suggestions={[...new Set(["Primary", "KS1", "KS2", "KS3", "GCSE", "A Level", ...(classes.data ?? []).map((item) => item.level).filter((value): value is string => Boolean(value)))].sort()} />
+        <div className="space-y-2 sm:col-span-2">
+          <span className="text-sm font-bold">Linked classes (optional)</span>
+          <p className="text-xs text-muted-foreground">Select as many classes as this product covers. Subjects and levels above are independent.</p>
+          <div className="max-h-40 space-y-1 overflow-y-auto rounded-xl border border-input p-2">
+            {(classes.data ?? []).length === 0 ? <p className="p-2 text-xs text-muted-foreground">No classes available.</p> : (classes.data ?? []).map((lesson) => (
+              <label key={lesson.id} className="flex cursor-pointer items-start gap-2 rounded-lg px-2 py-1.5 hover:bg-muted">
+                <input type="checkbox" className="mt-1 accent-primary" checked={product.class_ids.includes(lesson.id)} onChange={(event) => setProduct({ ...product, class_ids: event.target.checked ? [...product.class_ids, lesson.id] : product.class_ids.filter((id) => id !== lesson.id) })} />
+                <span className="text-xs"><strong>{lesson.name}</strong><span className="block text-muted-foreground">{[lesson.subject, lesson.level].filter(Boolean).join(" · ")}</span></span>
+              </label>
+            ))}
+          </div>
+          <p className="text-xs text-muted-foreground">{product.class_ids.length} classes selected</p>
+        </div>
         <TextField
           label="Price (£)"
           type="number"
