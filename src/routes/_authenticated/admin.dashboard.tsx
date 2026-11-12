@@ -770,15 +770,33 @@ function AdminDashboard() {
       </div>
       <div className="grid min-w-0 gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(240px,1fr)]">
         {panel("attendance","Attendance over time",null,
-          <div className="h-64 min-w-0"><ResponsiveContainer width="100%" height="100%">
-            <LineChart data={attendanceAudit} margin={{top:12,right:15,left:-12,bottom:8}}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false}/>
-              <XAxis dataKey="dateLabel" tick={{fontSize:10}}/>
-              <YAxis domain={[0,100]} tickFormatter={(v)=>v+"%"} tick={{fontSize:10}}/>
-              <Tooltip formatter={(v)=>[v===null?"Not recorded":v+"%","Attendance"]}/>
-              <Line type="monotone" dataKey="attendanceRate" connectNulls={false} stroke="#ec2d70" strokeWidth={3} dot={{r:3}}/>
-            </LineChart>
-          </ResponsiveContainer><p className="text-xs text-muted-foreground">Present or late as a percentage of recorded attendance. Missing registers are not counted as absences.</p></div>)}
+          <div className="min-w-0">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+              <span>Daily attendance on days with recorded registers</span>
+              <span>{attendanceAudit.filter((day) => day.attendanceRate !== null).length} recorded days</span>
+            </div>
+            <div className="h-64 min-w-0">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={attendanceAudit} margin={{top:12,right:10,left:-12,bottom:8}} barCategoryGap="35%">
+                  <CartesianGrid strokeDasharray="3 3" vertical={false}/>
+                  <XAxis dataKey="dateLabel" tick={{fontSize:10}} minTickGap={26} interval="preserveStartEnd"/>
+                  <YAxis domain={[0,100]} ticks={[0,25,50,75,100]} tickFormatter={(v)=>v+"%"} tick={{fontSize:10}}/>
+                  <Tooltip content={({active,payload}) => {
+                    if (!active || !payload?.length) return null;
+                    const point = payload[0]?.payload as (typeof attendanceAudit)[number] | undefined;
+                    if (!point) return null;
+                    return <div className="rounded-lg border border-border bg-background px-3 py-2 text-xs shadow-md">
+                      <p className="font-semibold">{point.dateLabel}</p>
+                      <p>{point.attendanceRate === null ? "Attendance not recorded" : point.attendanceRate + "% attendance"}</p>
+                      <p className="text-muted-foreground">{point.attendedMarks}/{point.attendanceMarks} marked present or late</p>
+                    </div>;
+                  }}/>
+                  <Bar dataKey="attendanceRate" name="Attendance" fill="#ec2d70" radius={[4,4,0,0]} maxBarSize={28}/>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <p className="mt-2 text-xs text-muted-foreground">Each bar represents a day with recorded attendance. Days without registers are blank, not 0%. Present and late count as attended.</p>
+          </div>)}
         <section className="surface p-4"><h2 className="mb-3 font-bold text-primary">Quick tasks</h2><div className="space-y-2">
           {quickLink("Add student","/admin/students",{add:true})}
           {quickLink("Add class","/admin/classes",{add:true})}
