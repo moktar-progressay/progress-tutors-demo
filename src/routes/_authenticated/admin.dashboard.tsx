@@ -18,6 +18,7 @@ import {
 import {
   BarChart3,
   CalendarDays,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Filter,
@@ -669,626 +670,110 @@ function AdminDashboard() {
     setDeliveryFilter("all");
   }
 
+  const paymentRequests = useTable("payment_requests");
+  const invoices = useTable("billing_invoices");
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({
+    attendance: true, upcoming: true, tasks: true, alerts: true,
+    actions: false, finance: false, leaderboards: false, reports: false,
+  });
+  const toggleSection = (key: string) => setOpenSections((previous) => ({ ...previous, [key]: !previous[key] }));
+  const today = new Date();
+  const upcoming = filteredLessons.flatMap((lesson) =>
+    Array.from({ length: 14 }, (_, offset) => addDays(today, offset))
+      .filter((date) => lessonRunsOn(lesson, date))
+      .map((date) => ({ lesson, date }))
+  ).sort((a, b) => a.date.getTime() - b.date.getTime() || (a.lesson.start_time ?? "").localeCompare(b.lesson.start_time ?? "")).slice(0, 6);
+  const unassigned = filteredLessons.filter((lesson) => !lesson.tutor_id);
+  const nearlyFull = filteredLessons.filter((lesson) => lesson.capacity > 0 && enrolmentCount(lesson) / lesson.capacity >= 0.9);
+  const unmarked = filteredSessions.filter((session) => !filteredAttendance.some((mark) => mark.session_id === session.id));
+  const pendingRequests = (paymentRequests.data ?? []).filter((request) => request.status === "submitted");
+  const unpaidInvoices = (invoices.data ?? []).filter((invoice) => ["draft", "unpaid", "overdue", "sent"].includes(invoice.status ?? ""));
+  const attendancePercent = attendanceAuditRate;
+  const panel = (key: string, title: string, count: number | null, children: ReactNode) => (
+    <section className="surface min-w-0 overflow-hidden">
+      <button type="button" aria-expanded={Boolean(openSections[key])} onClick={() => toggleSection(key)}
+        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-muted/40">
+        <span className="flex min-w-0 items-center gap-2 font-bold">{title}{count !== null && <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">{count}</span>}</span>
+        <ChevronDown className={cn("h-4 w-4 shrink-0 transition-transform", openSections[key] && "rotate-180")} />
+      </button>
+      {openSections[key] && <div className="border-t border-border p-4">{children}</div>}
+    </section>
+  );
+  const quickLink = (label: string, to: "/admin/students" | "/admin/classes" | "/admin/payments" | "/admin/payment-requests", search?: { add: boolean }) => (
+    <Link to={to} search={search} className="flex min-h-11 items-center justify-between rounded-xl bg-primary/5 px-3 py-2 text-sm font-semibold hover:bg-primary/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">
+      {label}<ChevronRight className="h-4 w-4 text-primary" />
+    </Link>
+  );
   return (
-    <Page className="space-y-5">
-      <PageHeader
-        title="Operations dashboard"
-        subtitle="Schedule, attendance and teaching activity. Financial information stays in Payments."
-        actions={
-          <div className="flex flex-wrap gap-2">
-            <Button variant="secondary" asChild>
-              <Link to="/admin/students" search={{ add: true }}>
-                <UserPlus className="h-4 w-4" /> Add student
-              </Link>
-            </Button>
-            <Button variant="secondary" asChild>
-              <Link to="/admin/tutors" search={{ add: true }}>
-                <Users className="h-4 w-4" /> Add teacher
-              </Link>
-            </Button>
-            <Button asChild>
-              <Link to="/admin/classes" search={{ add: true }}>
-                <Plus className="h-4 w-4" /> Add lesson
-              </Link>
-            </Button>
+    <Page className="space-y-4 pb-24">
+      <div className="sticky top-0 z-30 -mx-3 border-b border-border bg-background/95 px-3 py-3 backdrop-blur sm:-mx-5 sm:px-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div><h1 className="text-xl font-extrabold">Operations dashboard</h1><p className="text-xs text-muted-foreground">Classes, attendance and actions requiring attention</p></div>
+          <div className="flex flex-wrap items-center gap-2">
+            <SelectField label="Period" value={rangeDays} onChange={setRangeDays} options={RANGE_OPTIONS} />
+            <Button size="sm" variant="secondary" onClick={() => setFiltersOpen(true)}><Filter className="h-4 w-4" /> Filters {activeFilterCount || ""}</Button>
           </div>
-        }
-      />
-
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-xs text-muted-foreground">
-          {activeFilterCount
-            ? `${activeFilterCount} active filter${activeFilterCount === 1 ? "" : "s"}`
-            : "Showing all activity"}
-        </p>
-        <Button variant="secondary" onClick={() => setFiltersOpen(true)}>
-          <Filter className="h-4 w-4" /> Filters{activeFilterCount ? ` ${activeFilterCount}` : ""}
-        </Button>
+        </div>
       </div>
-
-      <FilterDialog
-        open={filtersOpen}
-        onOpenChange={setFiltersOpen}
-        title="Filter dashboard"
-        description="Choose the reporting period and lesson filters. The dashboard updates immediately."
-        onClear={resetFilters}
-      >
-        <SelectField
-          label="Reporting period"
-          value={rangeDays}
-          onChange={setRangeDays}
-          options={RANGE_OPTIONS}
-        />
-        {rangeDays === "custom" ? (
-          <>
-            <label className="space-y-1.5">
-              <span className="text-xs font-bold text-muted-foreground">From</span>
-              <Input
-                type="date"
-                value={customStartDate}
-                max={customEndDate}
-                onChange={(event) => setCustomStartDate(event.target.value)}
-                className="h-10 w-40 rounded-xl"
-              />
-            </label>
-            <label className="space-y-1.5">
-              <span className="text-xs font-bold text-muted-foreground">To</span>
-              <Input
-                type="date"
-                value={customEndDate}
-                min={customStartDate}
-                max={format(new Date(), "yyyy-MM-dd")}
-                onChange={(event) => setCustomEndDate(event.target.value)}
-                className="h-10 w-40 rounded-xl"
-              />
-            </label>
-          </>
-        ) : null}
-        <SelectField
-          label="Site"
-          value={siteFilter}
-          onChange={setSiteFilter}
-          options={[
-            { value: "all", label: "All sites" },
-            ...(sites.data ?? []).map((site) => ({ value: site.id, label: site.name })),
-          ]}
-        />
-        <SelectField
-          label="Teacher"
-          value={tutorFilter}
-          onChange={setTutorFilter}
-          options={[
-            { value: "all", label: "All teachers" },
-            { value: "unassigned", label: "Unassigned" },
-            ...(tutors.data ?? []).map((tutor) => ({
-              value: tutor.id,
-              label: fullName(tutor),
-            })),
-          ]}
-        />
-        <SelectField
-          label="Subject"
-          value={subjectFilter}
-          onChange={setSubjectFilter}
-          options={[
-            { value: "all", label: "All subjects" },
-            ...subjects.map((subject) => ({ value: subject, label: subject })),
-          ]}
-        />
-        <SelectField
-          label="Delivery"
-          value={deliveryFilter}
-          onChange={setDeliveryFilter}
-          options={[
-            { value: "all", label: "All delivery" },
-            { value: "in_person", label: "Face-to-face" },
-            { value: "online", label: "Online" },
-            { value: "hybrid", label: "Hybrid" },
-          ]}
-        />
+      <FilterDialog open={filtersOpen} onOpenChange={setFiltersOpen} title="Dashboard filters" description="Filters apply to operational metrics and lessons." onClear={resetFilters}>
+        {rangeDays === "custom" && <div className="flex flex-wrap gap-2"><Input type="date" aria-label="Start date" value={customStartDate} max={customEndDate} onChange={(e) => setCustomStartDate(e.target.value)} /><Input type="date" aria-label="End date" value={customEndDate} min={customStartDate} onChange={(e) => setCustomEndDate(e.target.value)} /></div>}
+        <SelectField label="Site" value={siteFilter} onChange={setSiteFilter} options={[{value:"all",label:"All sites"},...(sites.data??[]).map((site)=>({value:site.id,label:site.name}))]} />
+        <SelectField label="Tutor" value={tutorFilter} onChange={setTutorFilter} options={[{value:"all",label:"All tutors"},{value:"unassigned",label:"Unassigned"},...(tutors.data??[]).map((tutor)=>({value:tutor.id,label:fullName(tutor)}))]} />
+        <SelectField label="Subject" value={subjectFilter} onChange={setSubjectFilter} options={[{value:"all",label:"All subjects"},...subjects.map((subject)=>({value:subject,label:subject}))]} />
       </FilterDialog>
-
-      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <Link to="/admin/classes" className="block rounded-2xl focus:outline-none focus:ring-2">
-          <StatCard
-            label="Lessons in period"
-            value={String(lessonOccurrences)}
-            tone="pink"
-            icon={<CalendarDays className="h-5 w-5" />}
-            compact
-          />
-        </Link>
-        <Link to="/admin/students" className="block rounded-2xl focus:outline-none focus:ring-2">
-          <StatCard
-            label="Students"
-            value={String(filteredStudentIds.size)}
-            tone="green"
-            icon={<GraduationCap className="h-5 w-5" />}
-            compact
-          />
-        </Link>
-        <Link to="/admin/tutors" className="block rounded-2xl focus:outline-none focus:ring-2">
-          <StatCard
-            label="Teachers"
-            value={String(tutorLeaderboard.length)}
-            tone="purple"
-            icon={<Users className="h-5 w-5" />}
-            compact
-          />
-        </Link>
-        <StatCard
-          label="Attendance"
-          value={filteredAttendance.length ? `${attendanceRate}%` : "No data"}
-          hint={`${filteredAttendance.length} register marks`}
-          tone="blue"
-          icon={<BarChart3 className="h-5 w-5" />}
-          compact
-        />
+      <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+        <Link to="/admin/classes"><StatCard compact tone="pink" label="Lessons in period" value={String(lessonOccurrences)} icon={<CalendarDays className="h-5 w-5" />} /></Link>
+        <Link to="/admin/classes"><StatCard compact tone="green" label="Attendance" value={attendancePercent === null ? "Not recorded" : attendancePercent+"%"} hint={attendedMarks+"/"+filteredAttendance.length+" marked present or late"} icon={<BarChart3 className="h-5 w-5" />} /></Link>
+        <Link to="/admin/payments"><StatCard compact tone="blue" label="Invoices needing action" value={String(unpaidInvoices.length)} icon={<Info className="h-5 w-5" />} /></Link>
+        <Link to="/admin/payment-requests"><StatCard compact tone="purple" label="Tutor requests to review" value={String(pendingRequests.length)} icon={<Users className="h-5 w-5" />} /></Link>
       </div>
-
-      <ChartCard
-        title="Attendance over time"
-        subtitle={`Students marked present or late across all lessons each day · ${reportingPeriod}`}
-        help="This totals Present and Late marks across every filtered lesson on each day. A student attending two lessons on the same day counts twice."
-      >
-        <div className="flex h-full min-w-0">
-          <div className="relative z-10 h-full w-12 shrink-0 bg-card">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart
-                data={attendanceTimeline}
-                margin={{ top: 24, right: 0, left: -20, bottom: 50 }}
-              >
-                <YAxis
-                  allowDecimals={false}
-                  domain={[0, attendanceYAxisMax]}
-                  tick={{ fontSize: 11 }}
-                  width={48}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="min-w-0 flex-1 overflow-x-auto">
-            <div
-              className="h-full"
-              style={{ minWidth: `${Math.max(640, attendanceTimeline.length * 64)}px` }}
-            >
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart
-                  data={attendanceTimeline}
-                  margin={{ top: 24, right: 18, left: 0, bottom: 8 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis
-                    dataKey="dateLabel"
-                    tick={<AttendanceDateTick />}
-                    interval={0}
-                    height={42}
-                  />
-                  <YAxis domain={[0, attendanceYAxisMax]} hide />
-                  <Tooltip
-                    contentStyle={tooltipStyle}
-                    formatter={(value) => [Number(value), "Students attended"]}
-                    labelFormatter={(label, payload) =>
-                      String(payload[0]?.payload?.fullDate ?? label)
-                    }
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="studentsAttended"
-                    name="Students attended"
-                    stroke="#ec2d70"
-                    strokeWidth={3}
-                    dot={{ r: 4 }}
-                    activeDot={{ r: 6 }}
-                  >
-                    <LabelList
-                      dataKey="studentsAttended"
-                      position="top"
-                      className="fill-foreground text-xs font-bold"
-                      formatter={(value: unknown) => (Number(value) > 0 ? Number(value) : "")}
-                    />
-                  </Line>
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        </div>
-      </ChartCard>
-
-      <section className="surface overflow-hidden">
-        <div className="border-b border-border px-3 py-3 sm:px-5">
-          <div className="flex items-center gap-1.5">
-            <h2 className="font-bold">Daily attendance</h2>
-            <InfoButton label="This table compares scheduled lessons with saved student attendance for each day. All figures follow the dashboard filters." />
-          </div>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Compare attendance performance by day · {reportingPeriod}
-          </p>
-        </div>
-        {attendanceAudit.length ? (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[620px] text-left text-sm">
-              <thead className="bg-muted/50 text-xs text-muted-foreground">
-                <tr>
-                  <th className="px-3 py-3 sm:px-5">Date</th>
-                  <th className="px-3 py-3 text-center">
-                    <span className="inline-flex items-center gap-1">
-                      Scheduled lessons
-                      <InfoButton label="The number of lessons expected to run on this date from the timetable, after applying the selected filters." />
-                    </span>
-                  </th>
-                  <th className="min-w-52 px-3 py-3 text-center">
-                    <span className="inline-flex items-center gap-1">
-                      Attendance
-                      <InfoButton label="The percentage of saved attendance marks recorded as Present or Late. Days without saved marks show Not recorded." />
-                    </span>
-                  </th>
-                  <th className="px-3 py-3 text-center">
-                    <span className="inline-flex items-center gap-1">
-                      Attendance marks
-                      <InfoButton label="The number of individual student attendance results saved. Each Present, Late or Absent result counts as one mark." />
-                    </span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {attendanceAudit.map((row) => (
-                  <tr key={row.date} className="hover:bg-muted/30">
-                    <td className="px-3 py-3 sm:px-5">
-                      <Link
-                        to="/admin/classes"
-                        search={{ date: row.date, view: "day" }}
-                        className="inline-flex items-center gap-1 font-bold text-primary hover:underline"
-                      >
-                        {row.dateLabel}
-                        <ChevronRight className="h-4 w-4" />
-                      </Link>
-                    </td>
-                    <td className="px-3 py-3 text-center font-bold">{row.scheduledLessons}</td>
-                    <td className="px-3 py-3">
-                      {row.attendanceRate === null ? (
-                        <p className="text-center text-xs font-bold text-amber-700">Not recorded</p>
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-muted">
-                            <div
-                              className={cn(
-                                "h-full rounded-full",
-                                row.attendanceRate >= 90
-                                  ? "bg-emerald-600"
-                                  : row.attendanceRate >= 70
-                                    ? "bg-blue-600"
-                                    : row.attendanceRate >= 50
-                                      ? "bg-amber-400"
-                                      : "bg-pink-600",
-                              )}
-                              style={{ width: `${row.attendanceRate}%` }}
-                            />
-                          </div>
-                          <span className="w-10 text-right text-xs font-extrabold">
-                            {row.attendanceRate}%
-                          </span>
-                        </div>
-                      )}
-                    </td>
-                    <td
-                      className={cn(
-                        "px-3 py-3 text-center font-bold",
-                        row.scheduledLessons > 0 && row.attendanceMarks === 0 && "text-amber-700",
-                      )}
-                    >
-                      {row.attendanceMarks}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot className="border-t-2 border-border bg-muted/60">
-                <tr>
-                  <th className="px-3 py-3 font-extrabold sm:px-5">Total</th>
-                  <td className="px-3 py-3 text-center font-extrabold">
-                    {attendanceAuditTotals.scheduledLessons}
-                  </td>
-                  <td className="px-3 py-3 text-center font-extrabold">
-                    {attendanceAuditRate === null ? "Not recorded" : `${attendanceAuditRate}%`}
-                  </td>
-                  <td className="px-3 py-3 text-center font-extrabold">
-                    {attendanceAuditTotals.attendanceMarks}
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-        ) : (
-          <div className="p-4 sm:p-5">
-            <Empty>No scheduled lessons or attendance records match these filters.</Empty>
-          </div>
-        )}
-      </section>
-
-      <section className="surface p-3 sm:p-5">
-        <div className="flex flex-wrap items-center gap-2">
-          <div>
-            <h2 className="font-bold">Schedule</h2>
-            <p className="text-xs text-muted-foreground">A compact view of the main timetable.</p>
-          </div>
-          <div className="ml-auto flex flex-wrap items-center gap-1">
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => setSelectedDate(format(new Date(), "yyyy-MM-dd"))}
-            >
-              Today
-            </Button>
-            <Button
-              size="icon"
-              variant="ghost"
-              onClick={() => moveCalendar(-1)}
-              aria-label="Previous"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Button size="icon" variant="ghost" onClick={() => moveCalendar(1)} aria-label="Next">
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-            <Button size="sm" variant="secondary" asChild>
-              <Link to="/admin/classes">Open schedule</Link>
-            </Button>
-          </div>
-        </div>
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-          <p className="text-sm font-extrabold sm:text-base">{calendarTitle}</p>
-          <div className="flex rounded-xl bg-muted p-1">
-            {(["day", "week", "month"] as CalendarView[]).map((view) => (
-              <button
-                key={view}
-                type="button"
-                onClick={() => setCalendarView(view)}
-                className={cn(
-                  "rounded-lg px-3 py-1.5 text-xs font-bold capitalize",
-                  calendarView === view
-                    ? "bg-card text-primary shadow-sm"
-                    : "text-muted-foreground",
-                )}
-              >
-                {view}
-              </button>
-            ))}
-          </div>
-        </div>
-        {calendarView === "day" ? compactTimeline([anchor]) : null}
-        {calendarView === "week" ? compactTimeline(calendarDays) : null}
-        {calendarView === "month" ? (
-          <div className="mt-3 grid max-h-[430px] grid-cols-7 overflow-auto rounded-xl border border-border bg-card">
-            {Array.from({ length: 7 }, (_, index) => addDays(weekStart, index)).map((day) => (
-              <div
-                key={format(day, "EEEE")}
-                className="sticky top-0 z-10 border-b border-r border-border bg-card p-1.5 text-center text-[9px] font-bold uppercase text-muted-foreground"
-              >
-                {format(day, "EEE")}
-              </div>
-            ))}
-            {calendarDays.map((day) => {
-              const dayLessons = filteredLessons.filter((lesson) => lessonRunsOn(lesson, day));
-              return (
-                <button
-                  key={day.toISOString()}
-                  type="button"
-                  onClick={() => {
-                    setSelectedDate(format(day, "yyyy-MM-dd"));
-                    setCalendarView("day");
-                  }}
-                  className={cn(
-                    "min-h-20 border-b border-r border-border p-1 text-left hover:bg-muted/40",
-                    !isSameMonth(day, anchor) && "bg-muted/30 text-muted-foreground",
-                  )}
-                >
-                  <span className="text-[10px] font-bold">{format(day, "d")}</span>
-                  <span className="mt-1 block space-y-1">
-                    {dayLessons.slice(0, 2).map((lesson) => (
-                      <span
-                        key={lesson.id}
-                        className={cn(
-                          "block truncate rounded px-1 py-0.5 text-[8px] font-bold",
-                          scheduleColour(lesson),
-                        )}
-                      >
-                        {hhmm(lesson.start_time)} {lesson.name}
-                      </span>
-                    ))}
-                    {dayLessons.length > 2 ? (
-                      <span className="block text-[8px] font-bold text-primary">
-                        +{dayLessons.length - 2} more
-                      </span>
-                    ) : null}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        ) : null}
-      </section>
-
-      <div className="grid min-w-0 gap-5 xl:grid-cols-2">
-        <ChartCard
-          title="Attendance by gender"
-          subtitle={`Present students only · ${reportingPeriod}`}
-          help="This compares Present and Late attendance marks for students recorded as boys or girls. Students without recorded gender data are not assigned to either group."
-        >
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie
-                data={genderAttendance}
-                dataKey="value"
-                nameKey="name"
-                cx="50%"
-                cy="48%"
-                innerRadius={48}
-                outerRadius={88}
-                paddingAngle={2}
-                label={({ name, value }) => `${name}: ${value}`}
-              >
-                {genderAttendance.map((entry) => (
-                  <Cell key={entry.name} fill={entry.colour} />
-                ))}
-              </Pie>
-              <Tooltip
-                contentStyle={tooltipStyle}
-                formatter={(value) => [Number(value), "Present"]}
-              />
-              <Legend wrapperStyle={{ fontSize: 12 }} />
-            </PieChart>
-          </ResponsiveContainer>
-        </ChartCard>
-
-        <ChartCard
-          title={`Attendance by lesson · ${reportingPeriod}`}
-          subtitle="Unique students marked present or late for each lesson"
-          help="Each bar shows the number of different students with at least one Present or Late mark for that lesson during the filtered period."
-        >
-          <div className="h-full overflow-y-auto">
-            <div
-              className="w-full"
-              style={{ height: `${Math.max(256, lessonAttendance.length * 42)}px` }}
-            >
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  layout="vertical"
-                  data={lessonAttendance}
-                  margin={{ top: 4, right: 28, left: 4, bottom: 4 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                  <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} />
-                  <YAxis
-                    type="category"
-                    dataKey="lesson"
-                    interval={0}
-                    width={138}
-                    tick={{ fontSize: 10 }}
-                  />
-                  <Tooltip
-                    contentStyle={tooltipStyle}
-                    formatter={(value) => [Number(value), "Unique students attended"]}
-                  />
-                  <Bar
-                    dataKey="studentsAttended"
-                    name="Unique students attended"
-                    fill="#7c3aed"
-                    radius={[0, 8, 8, 0]}
-                  >
-                    <LabelList
-                      dataKey="studentsAttended"
-                      position="right"
-                      className="fill-foreground text-xs font-bold"
-                    />
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        </ChartCard>
-
-        <section className="surface min-w-0 p-4 sm:p-5">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <div className="flex items-center gap-1.5">
-                <h2 className="font-bold">Teacher leaderboard</h2>
-                <InfoButton label="Ranks teachers by scheduled teaching hours in the filtered period. This is timetable data, not tutor payment data." />
-              </div>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Scheduled teaching hours in the selected reporting period
-              </p>
-            </div>
-            <Link to="/admin/tutors" className="text-xs font-bold text-primary">
-              All teachers
-            </Link>
-          </div>
-          {tutorLeaderboard.length === 0 ? (
-            <div className="mt-4">
-              <Empty>No assigned teaching hours match these filters.</Empty>
-            </div>
-          ) : (
-            <ol className="mt-4 space-y-2">
-              {tutorLeaderboard.map((item, index) => {
-                const name = fullName(item.tutor);
-                return (
-                  <li key={item.tutor!.id}>
-                    <Link
-                      to="/admin/tutors/$id"
-                      params={{ id: item.tutor!.id }}
-                      className="flex items-center gap-3 rounded-xl border border-border px-3 py-2.5 hover:border-primary/40"
-                    >
-                      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-xs font-black text-primary-foreground">
-                        {index + 1}
-                      </span>
-                      <Avatar initials={initialsOf(name)} tone={avatarTone(name)} size="sm" />
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-bold">{name}</span>
-                        <span className="block text-xs text-muted-foreground">
-                          {item.lessons} lesson{item.lessons === 1 ? "" : "s"}
-                        </span>
-                      </span>
-                      <span className="text-sm font-extrabold text-primary">
-                        {item.hours.toFixed(item.hours % 1 ? 1 : 0)}h
-                      </span>
-                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                    </Link>
-                  </li>
-                );
-              })}
-            </ol>
-          )}
-        </section>
-
-        <section className="surface min-w-0 p-4 sm:p-5">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <div className="flex items-center gap-1.5">
-                <h2 className="font-bold">Student attendance leaderboard</h2>
-                <InfoButton label="Ranks students by the number of Present or Late marks saved during the filtered period. Attending two lessons counts as two attendances." />
-              </div>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Most lessons attended in the selected reporting period
-              </p>
-            </div>
-            <Link to="/admin/students" className="text-xs font-bold text-primary">
-              All students
-            </Link>
-          </div>
-          {studentLeaderboard.length === 0 ? (
-            <div className="mt-4">
-              <Empty>No student attendance matches these filters.</Empty>
-            </div>
-          ) : (
-            <ol className="mt-4 space-y-2">
-              {studentLeaderboard.map((item, index) => {
-                const name = fullName(item.student);
-                return (
-                  <li key={item.student!.id}>
-                    <Link
-                      to="/admin/students/$id"
-                      params={{ id: item.student!.id }}
-                      className="flex items-center gap-3 rounded-xl border border-border px-3 py-2.5 hover:border-primary/40"
-                    >
-                      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-600 text-xs font-black text-white">
-                        {index + 1}
-                      </span>
-                      <Avatar initials={initialsOf(name)} tone={avatarTone(name)} size="sm" />
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-bold">{name}</span>
-                        <span className="block text-xs text-muted-foreground">Present or late</span>
-                      </span>
-                      <span className="text-sm font-extrabold text-blue-700">
-                        {item.attended} lesson{item.attended === 1 ? "" : "s"}
-                      </span>
-                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                    </Link>
-                  </li>
-                );
-              })}
-            </ol>
-          )}
-        </section>
+      <div className="grid min-w-0 gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(240px,1fr)]">
+        {panel("attendance","Attendance over time",null,
+          <div className="h-64 min-w-0"><ResponsiveContainer width="100%" height="100%">
+            <LineChart data={attendanceAudit} margin={{top:12,right:15,left:-12,bottom:8}}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false}/>
+              <XAxis dataKey="dateLabel" tick={{fontSize:10}}/>
+              <YAxis domain={[0,100]} tickFormatter={(v)=>v+"%"} tick={{fontSize:10}}/>
+              <Tooltip formatter={(v)=>[v===null?"Not recorded":v+"%","Attendance"]}/>
+              <Line type="monotone" dataKey="attendanceRate" connectNulls={false} stroke="#ec2d70" strokeWidth={3} dot={{r:3}}/>
+            </LineChart>
+          </ResponsiveContainer><p className="text-xs text-muted-foreground">Present or late as a percentage of recorded attendance. Missing registers are not counted as absences.</p></div>)}
+        <section className="surface p-4"><h2 className="mb-3 font-bold text-primary">Quick tasks</h2><div className="space-y-2">
+          {quickLink("Add student","/admin/students",{add:true})}
+          {quickLink("Add class","/admin/classes",{add:true})}
+          {quickLink("Create invoice","/admin/payments")}
+          {quickLink("Tutor payment requests","/admin/payment-requests")}
+        </div></section>
       </div>
+      {panel("actions","Actions required",unmarked.length+unassigned.length+pendingRequests.length,
+        <div className="space-y-2 text-sm">
+          <Link className="block hover:text-primary" to="/admin/classes">{unmarked.length} sessions without attendance records · Open schedule</Link>
+          <Link className="block hover:text-primary" to="/admin/classes">{unassigned.length} classes without tutors · Assign tutor</Link>
+          <Link className="block hover:text-primary" to="/admin/payment-requests">{pendingRequests.length} tutor requests awaiting review</Link>
+        </div>)}
+      <div className="grid min-w-0 gap-3 lg:grid-cols-3">
+        {panel("upcoming","Upcoming lessons",upcoming.length,<div className="space-y-2">{upcoming.length ? upcoming.map(({lesson,date},i)=><Link key={lesson.id+"-"+i} to="/admin/classes/$id" params={{id:lesson.id}} className="block rounded-lg border border-border p-2 hover:border-primary"><span className="block truncate font-semibold">{lesson.name}</span><span className="text-xs text-muted-foreground">{format(date,"EEE d MMM")} · {hhmm(lesson.start_time)} · {hhmm(lesson.end_time)}</span></Link>) : <Empty>No upcoming lessons.</Empty>}</div>)}
+        {panel("tasks","Tasks pending",unmarked.length+unpaidInvoices.length+pendingRequests.length,<div className="space-y-3 text-sm">
+          <Link className="block hover:text-primary" to="/admin/classes">Mark attendance · {unmarked.length} sessions</Link>
+          <Link className="block hover:text-primary" to="/admin/payments">Review invoices · {unpaidInvoices.length}</Link>
+          <Link className="block hover:text-primary" to="/admin/payment-requests">Review tutor payment requests · {pendingRequests.length}</Link>
+          {quickLink("Onboard a student","/admin/students",{add:true})}
+        </div>)}
+        {panel("alerts","Alerts & suggestions",nearlyFull.length+unassigned.length,<div className="space-y-3 text-sm">
+          {nearlyFull.slice(0,4).map((lesson)=><Link key={lesson.id} to="/admin/classes/$id" params={{id:lesson.id}} className="block rounded-lg bg-amber-50 p-2 text-amber-950">{lesson.name} · {enrolmentCount(lesson)}/{lesson.capacity} places filled</Link>)}
+          {unassigned.length>0 && <Link to="/admin/classes" className="block rounded-lg bg-pink-50 p-2 text-pink-900">{unassigned.length} classes need a tutor</Link>}
+          {!nearlyFull.length&&!unassigned.length&&<p className="text-muted-foreground">No capacity or staffing alerts from current records.</p>}
+        </div>)}
+      </div>
+      {panel("finance","Invoices & tutor payment requests",unpaidInvoices.length+pendingRequests.length,<div className="grid gap-3 sm:grid-cols-2">{quickLink("Manage invoices","/admin/payments")}{quickLink("Review payment requests","/admin/payment-requests")}</div>)}
+      {panel("leaderboards","Leaderboards",null,<div className="grid gap-4 sm:grid-cols-2">
+        <div><h3 className="mb-2 font-bold">Tutors · scheduled hours</h3>{tutorLeaderboard.slice(0,5).map((item,i)=><Link key={item.tutor!.id} to="/admin/tutors/$id" params={{id:item.tutor!.id}} className="flex justify-between gap-2 border-b py-2 text-sm"><span>{i+1}. {fullName(item.tutor)}</span><b>{item.hours.toFixed(1)}h</b></Link>)}</div>
+        <div><h3 className="mb-2 font-bold">Students · recorded attendance</h3>{studentLeaderboard.slice(0,5).map((item,i)=><Link key={item.student!.id} to="/admin/students/$id" params={{id:item.student!.id}} className="flex justify-between gap-2 border-b py-2 text-sm"><span>{i+1}. {fullName(item.student)}</span><b>{item.attended}</b></Link>)}</div>
+      </div>)}
+      {panel("reports","Insights & reports",null,<div className="space-y-3">
+        <p className="text-sm text-muted-foreground">Attendance: {attendancePercent===null?"No saved marks":attendancePercent+"%"} · {reportingPeriod}</p>
+        <Link to="/admin/reports" className="font-semibold text-primary hover:underline">Open detailed reports</Link>
+      </div>)}
     </Page>
   );
 }
