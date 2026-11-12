@@ -40,7 +40,7 @@ function ContactsPage() {
   const links = useTable("parent_students");
   const enrolments = useTable("class_enrolments");
   const classes = useTable("classes", "name");
-  const [tab, setTab] = useState<ContactTab>(() => window.location.hash.includes("tab=parents") ? "parents" : "students");
+  const [tab, setTab] = useState<ContactTab>(() => "parents");
   const createParent = useUpsert("parents");
   const [addParentOpen, setAddParentOpen] = useState(false);
   const [newParent, setNewParent] = useState({first_name:"",last_name:"",email:"",phone:""});
