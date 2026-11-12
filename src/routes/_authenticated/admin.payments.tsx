@@ -153,7 +153,7 @@ function ParentPayments() {
   const deleteProduct = useDeleteRow("billing_plans");
 
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [view, setView] = useState<PaymentView>("invoices");
+  const [view, setView] = useState<PaymentView>("overview");
   const [invoiceLimit, setInvoiceLimit] = useState(10);
   const [invoiceFilter, setInvoiceFilter] = useState<
     "all" | "draft" | "unpaid" | "paid" | "overdue"
