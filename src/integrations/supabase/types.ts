@@ -213,6 +213,7 @@ export type Database = {
       }
       billing_plans: {
         Row: {
+          class_id: string | null
           active: boolean
           billing_frequency: string
           children_included: number
@@ -230,6 +231,7 @@ export type Database = {
           zoho_plan_code: string | null
         }
         Insert: {
+          class_id?: string | null
           active?: boolean
           billing_frequency?: string
           children_included?: number
@@ -247,6 +249,7 @@ export type Database = {
           zoho_plan_code?: string | null
         }
         Update: {
+          class_id?: string | null
           active?: boolean
           billing_frequency?: string
           children_included?: number
