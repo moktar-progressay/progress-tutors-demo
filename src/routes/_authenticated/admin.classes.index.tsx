@@ -140,7 +140,7 @@ const CARD_COLOUR_NAMES = Object.keys(CARD_COLOURS) as CardColour[];
 
 const HOURS = Array.from({ length: 13 }, (_, index) => index + 8);
 const CALENDAR_HOUR_HEIGHT = 60;
-const CALENDAR_ZOOM_MIN = 1;
+const CALENDAR_ZOOM_MIN = 0.65;
 const CALENDAR_ZOOM_MAX = 2;
 const CALENDAR_ZOOM_STEP = 0.25;
 
@@ -976,7 +976,7 @@ function SchedulePage() {
       if (!element) return;
       const viewport = window.visualViewport?.height ?? window.innerHeight;
       const viewportTop = window.visualViewport?.offsetTop ?? 0;
-      const bottomNavigation = window.matchMedia("(max-width: 639px)").matches ? 76 : 16;
+      const bottomNavigation = window.matchMedia("(max-width: 639px)").matches ? 24 : 16;
       setTimetableHeight(Math.max(220, Math.floor(viewport + viewportTop - element.getBoundingClientRect().top - bottomNavigation)));
     };
     update();
@@ -1028,12 +1028,12 @@ function SchedulePage() {
       const marked = summaries.reduce((sum, item) => sum + item.marked, 0);
       return { present, expected, marked, percentage: marked && expected ? Math.round((present / expected) * 100) : null };
     };
-    const columnWidth = 220;
-    const gridTemplateColumns = `4rem repeat(${columns.length}, minmax(${columnWidth}px, 1fr)) 68px`;
+    const columnWidth = typeof window !== "undefined" && window.matchMedia("(max-width: 639px)").matches ? 152 : 220;
+    const gridTemplateColumns = `${columnWidth === 152 ? "3rem" : "4rem"} repeat(${columns.length}, minmax(${columnWidth}px, 1fr)) ${columnWidth === 152 ? "46px" : "68px"}`;
 
     return (
       <div ref={timetableRef} style={timetableHeight === null ? undefined : { height: `${timetableHeight}px` }} className="relative isolate z-0 h-[calc(100dvh-285px)] min-h-[220px] max-w-full overflow-auto overscroll-contain rounded-2xl border border-border bg-card" aria-label={scheduleGrouping === "tutor" ? "Teacher timetable" : "Room timetable"} tabIndex={0}>
-        <div style={{ minWidth: `${64 + columns.length * columnWidth + 68}px` }}>
+        <div style={{ minWidth: `${(columnWidth === 152 ? 48 : 64) + columns.length * columnWidth + (columnWidth === 152 ? 46 : 68)}px` }}>
           {view !== "day" && <div className="sticky top-0 z-30 grid border-b border-border bg-card" style={{ gridTemplateColumns }}>
             <div className="sticky left-0 z-50 bg-card p-2" />
             {lanesByDay.map(({ day, lanes }) => (
@@ -1250,8 +1250,8 @@ function SchedulePage() {
       </div>
 
       <section className="rounded-xl border border-border bg-card px-2 py-1 sm:px-3 sm:py-1.5">
-        <div className="flex flex-wrap items-center gap-2">
-          <Button size="sm" variant="secondary" onClick={() => setSelectedDate(currentDateIso())}>
+        <div className="flex flex-nowrap items-center gap-1 sm:gap-2">
+          <Button size="sm" variant="secondary" className="h-8 px-2 text-xs sm:px-3" onClick={() => setSelectedDate(currentDateIso())}>
             Today
           </Button>
           <Button size="icon" variant="ghost" onClick={() => move(-1)} aria-label="Previous">
@@ -1260,7 +1260,7 @@ function SchedulePage() {
           <Button size="icon" variant="ghost" onClick={() => move(1)} aria-label="Next">
             <ChevronRight className="h-4 w-4" />
           </Button>
-          <p className="min-w-40 flex-1 text-sm font-extrabold sm:text-base">{dateTitle}</p>
+          <p className="min-w-0 flex-1 whitespace-nowrap text-xs font-extrabold sm:min-w-40 sm:text-base">{dateTitle}</p>
           <div className="order-3 sm:order-none">
             <label className="sr-only" htmlFor="schedule-calendar-view">Calendar view</label>
             <select
@@ -1269,7 +1269,7 @@ function SchedulePage() {
               onChange={(event) => setView(event.target.value as CalendarView)}
               aria-label="Calendar view"
               title="Change calendar view"
-              className="h-8 min-w-[88px] cursor-pointer rounded-xl border border-border bg-card px-2 text-xs font-bold text-primary outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              className="h-8 w-[70px] cursor-pointer rounded-xl border border-border bg-card px-1 text-xs font-bold text-primary sm:w-[88px] sm:px-2 outline-none focus-visible:ring-2 focus-visible:ring-primary"
             >
               <option value="day">Day</option>
               <option value="week">Week</option>
