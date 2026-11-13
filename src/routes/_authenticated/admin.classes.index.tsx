@@ -1181,60 +1181,11 @@ function SchedulePage() {
         <div className="flex min-w-0 flex-wrap items-center gap-1.5">
           {searchOpen || search ? <div className="relative w-40 sm:w-56"><Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" /><Input autoFocus aria-label="Search lessons" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search lessons" className="h-8 rounded-lg pl-8 pr-7 text-xs" /><button type="button" aria-label="Close search" className="absolute right-2 top-1/2 -translate-y-1/2" onClick={() => { setSearch(""); setSearchOpen(false); }}>×</button></div> : <Button size="icon" variant="ghost" className="h-8 w-8" aria-label="Search lessons" onClick={() => setSearchOpen(true)}><Search className="h-4 w-4" /></Button>}
           
-          <Button size="sm" variant="ghost" className="h-8" onClick={downloadTeachingReport}><Download className="h-4 w-4" /><span className="hidden sm:inline">Report</span></Button>
-          <Button size="icon" className="h-8 w-8 shrink-0 rounded-full" onClick={() => openNew()} aria-label="Add lesson" title="Add lesson"><Plus className="h-4 w-4" /></Button>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-4 gap-1 sm:gap-1.5" aria-label="Schedule overview">
-        <div className="flex items-center justify-between rounded-lg bg-pink-50 px-1.5 py-1 sm:px-3 sm:py-1.5 text-pink-800 dark:bg-pink-950/40 dark:text-pink-200"><span className="text-[9px] font-semibold sm:text-xs">Lessons</span><strong className="text-xs tabular-nums sm:text-sm">{summaryOccurrences}</strong></div>
-        <div className="flex items-center justify-between rounded-lg bg-emerald-50 px-1.5 py-1 sm:px-3 sm:py-1.5 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200"><span className="text-[9px] font-semibold sm:text-xs">Students</span><strong className="text-xs tabular-nums sm:text-sm">{summaryStudents}</strong></div>
-        <div className="flex items-center justify-between rounded-lg bg-violet-50 px-1.5 py-1 sm:px-3 sm:py-1.5 text-violet-800 dark:bg-violet-950/40 dark:text-violet-200"><span className="text-[9px] font-semibold sm:text-xs">Teachers</span><strong className="text-xs tabular-nums sm:text-sm">{summaryTutors}</strong></div>
-        <button type="button" onClick={() => setFiltersOpen(true)} className="flex min-w-0 items-center justify-between gap-2 rounded-lg bg-sky-50 px-1.5 py-1 sm:px-3 sm:py-1.5 text-left text-sky-800 hover:ring-2 hover:ring-sky-400 focus-visible:outline focus-visible:outline-2 dark:bg-sky-950/40 dark:text-sky-200" aria-label="Filter lessons by attendance">
-          <span className="min-w-0"><span className="block truncate text-[9px] font-semibold sm:text-xs">Attendance <Filter className="inline h-3 w-3" /></span><span className="hidden truncate text-[10px] sm:block">{summaryAttendanceMarks.length ? `${summaryPresentMarks}/${summaryExpectedStudents} present` : "Not marked"}</span></span>
-          <strong className="shrink-0 text-xs tabular-nums sm:text-base">{summaryAttendancePercentage === null ? "—" : `${summaryAttendancePercentage}%`}</strong>
-        </button>
-      </div>
-
-      <section className="rounded-xl border border-border bg-card px-2 py-1 sm:px-3 sm:py-1.5">
-        <div className="flex flex-wrap items-center gap-2">
-          <Button size="sm" variant="secondary" onClick={() => setSelectedDate(currentDateIso())}>
-            Today
-          </Button>
-          <Button size="icon" variant="ghost" onClick={() => move(-1)} aria-label="Previous">
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <Button size="icon" variant="ghost" onClick={() => move(1)} aria-label="Next">
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-          <p className="min-w-40 flex-1 text-sm font-extrabold sm:text-base">{dateTitle}</p>
           {(view === "day" || view === "week") && <div className="mr-1 flex items-center gap-1 rounded-xl border border-primary/20 bg-primary/5 p-0.5 sm:mr-5 sm:p-1" aria-label="Schedule grouping">
             <button type="button" onClick={() => setScheduleGrouping("tutor")} title="By tutor" aria-label="By tutor" className={cn("inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-bold", scheduleGrouping === "tutor" ? "bg-card text-primary shadow-sm" : "text-muted-foreground")}><Users className="h-3.5 w-3.5" /><span className="hidden sm:inline">By tutor</span></button>
             <button type="button" onClick={() => setScheduleGrouping("location")} title="By location" aria-label="By location" className={cn("inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-bold", scheduleGrouping === "location" ? "bg-card text-primary shadow-sm" : "text-muted-foreground")}><MapPin className="h-3.5 w-3.5" /><span className="hidden sm:inline">By location</span></button>
           </div>}
-          <div className="order-3 sm:order-none">
-            <label className="sr-only" htmlFor="schedule-calendar-view">Calendar view</label>
-            <select
-              id="schedule-calendar-view"
-              value={view}
-              onChange={(event) => setView(event.target.value as CalendarView)}
-              aria-label="Calendar view"
-              title="Change calendar view"
-              className="h-8 min-w-[88px] cursor-pointer rounded-xl border border-border bg-card px-2 text-xs font-bold text-primary outline-none focus-visible:ring-2 focus-visible:ring-primary"
-            >
-              <option value="day">Day</option>
-              <option value="week">Week</option>
-              <option value="month">Month</option>
-              <option value="list">List</option>
-            </select>
-          </div>
           {(view === "day" || view === "week") && <button type="button" onClick={() => { setQuickFiltersOpen((open) => !open); }} aria-expanded={quickFiltersOpen} aria-controls="schedule-quick-filters" aria-label="Toggle timetable filters" title="Filters" className={cn("inline-flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-xs font-bold", quickFiltersOpen || activeFilterCount ? "bg-primary/10 text-primary" : "bg-card text-muted-foreground")}><Filter className="h-4 w-4" />{activeFilterCount ? <span className="text-[10px]">{activeFilterCount}</span> : null}</button>}
-          {(view === "day" || view === "week") && quickFiltersOpen && <div id="schedule-quick-filters" className="flex flex-wrap items-center gap-1.5">
-            <label className="inline-flex items-center gap-1 rounded-lg border border-border bg-card px-2 py-1 text-xs"><Users className="h-3.5 w-3.5" /><select aria-label="Filter tutor" className="max-w-28 bg-transparent outline-none" value={tutorId} onChange={(event) => setTutorId(event.target.value)}><option value="all">All tutors</option><option value="unassigned">Unassigned</option>{(tutors.data ?? []).map((tutor) => <option key={tutor.id} value={tutor.id}>{fullName(tutor)}</option>)}</select></label>
-            <label className="inline-flex items-center gap-1 rounded-lg border border-border bg-card px-2 py-1 text-xs"><MapPin className="h-3.5 w-3.5" /><select aria-label="Filter location" className="max-w-28 bg-transparent outline-none" value={siteId} onChange={(event) => {setSiteId(event.target.value);setRoomFilter("all");}}><option value="all">All locations</option>{(sites.data ?? []).map((site) => <option key={site.id} value={site.id}>{site.name}</option>)}</select></label>
-            <label className="inline-flex items-center gap-1 rounded-lg border border-border bg-card px-2 py-1 text-xs"><span aria-hidden="true">▣</span><select aria-label="Filter room" className="max-w-32 bg-transparent outline-none" value={roomFilter} onChange={(event) => setRoomFilter(event.target.value)}><option value="all">All rooms</option>{Array.from(new Set((lessons.data ?? []).filter((lesson) => siteId === "all" || lesson.site_id === siteId).map((lesson) => lesson.room?.trim() || "Room not assigned"))).sort().map((room) => <option key={room} value={room}>{room}</option>)}</select></label>
-            <button type="button" onClick={() => setFiltersOpen(true)} className="rounded-lg border border-border px-2 py-1 text-xs font-semibold text-primary hover:bg-primary/5" title="More filter options">More options</button>
-          </div>}
           {view === "day" || view === "week" ? (
             <details className="group relative">
               <summary className="flex h-8 w-8 cursor-pointer list-none items-center justify-center rounded-lg border border-border bg-card text-muted-foreground hover:text-primary [&::-webkit-details-marker]:hidden" title="Zoom timetable" aria-label="Zoom timetable"><SearchCheck className="h-4 w-4" /></summary>
@@ -1283,6 +1234,56 @@ function SchedulePage() {
               </div>
             </details>
           ) : null}
+          <Button size="sm" variant="ghost" className="h-8" onClick={downloadTeachingReport}><Download className="h-4 w-4" /><span className="hidden sm:inline">Report</span></Button>
+          <Button size="icon" className="h-8 w-8 shrink-0 rounded-full" onClick={() => openNew()} aria-label="Add lesson" title="Add lesson"><Plus className="h-4 w-4" /></Button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-4 gap-1 sm:gap-1.5" aria-label="Schedule overview">
+        <div className="flex items-center justify-between rounded-lg bg-pink-50 px-1.5 py-1 sm:px-3 sm:py-1.5 text-pink-800 dark:bg-pink-950/40 dark:text-pink-200"><span className="text-[9px] font-semibold sm:text-xs">Lessons</span><strong className="text-xs tabular-nums sm:text-sm">{summaryOccurrences}</strong></div>
+        <div className="flex items-center justify-between rounded-lg bg-emerald-50 px-1.5 py-1 sm:px-3 sm:py-1.5 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200"><span className="text-[9px] font-semibold sm:text-xs">Students</span><strong className="text-xs tabular-nums sm:text-sm">{summaryStudents}</strong></div>
+        <div className="flex items-center justify-between rounded-lg bg-violet-50 px-1.5 py-1 sm:px-3 sm:py-1.5 text-violet-800 dark:bg-violet-950/40 dark:text-violet-200"><span className="text-[9px] font-semibold sm:text-xs">Teachers</span><strong className="text-xs tabular-nums sm:text-sm">{summaryTutors}</strong></div>
+        <button type="button" onClick={() => setFiltersOpen(true)} className="flex min-w-0 items-center justify-between gap-2 rounded-lg bg-sky-50 px-1.5 py-1 sm:px-3 sm:py-1.5 text-left text-sky-800 hover:ring-2 hover:ring-sky-400 focus-visible:outline focus-visible:outline-2 dark:bg-sky-950/40 dark:text-sky-200" aria-label="Filter lessons by attendance">
+          <span className="min-w-0"><span className="block truncate text-[9px] font-semibold sm:text-xs">Attendance <Filter className="inline h-3 w-3" /></span><span className="hidden truncate text-[10px] sm:block">{summaryAttendanceMarks.length ? `${summaryPresentMarks}/${summaryExpectedStudents} present` : "Not marked"}</span></span>
+          <strong className="shrink-0 text-xs tabular-nums sm:text-base">{summaryAttendancePercentage === null ? "—" : `${summaryAttendancePercentage}%`}</strong>
+        </button>
+      </div>
+
+      <section className="rounded-xl border border-border bg-card px-2 py-1 sm:px-3 sm:py-1.5">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button size="sm" variant="secondary" onClick={() => setSelectedDate(currentDateIso())}>
+            Today
+          </Button>
+          <Button size="icon" variant="ghost" onClick={() => move(-1)} aria-label="Previous">
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <Button size="icon" variant="ghost" onClick={() => move(1)} aria-label="Next">
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+          <p className="min-w-40 flex-1 text-sm font-extrabold sm:text-base">{dateTitle}</p>
+          <div className="order-3 sm:order-none">
+            <label className="sr-only" htmlFor="schedule-calendar-view">Calendar view</label>
+            <select
+              id="schedule-calendar-view"
+              value={view}
+              onChange={(event) => setView(event.target.value as CalendarView)}
+              aria-label="Calendar view"
+              title="Change calendar view"
+              className="h-8 min-w-[88px] cursor-pointer rounded-xl border border-border bg-card px-2 text-xs font-bold text-primary outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              <option value="day">Day</option>
+              <option value="week">Week</option>
+              <option value="month">Month</option>
+              <option value="list">List</option>
+            </select>
+          </div>
+          {(view === "day" || view === "week") && quickFiltersOpen && <div id="schedule-quick-filters" className="flex flex-wrap items-center gap-1.5">
+            <label className="inline-flex items-center gap-1 rounded-lg border border-border bg-card px-2 py-1 text-xs"><Users className="h-3.5 w-3.5" /><select aria-label="Filter tutor" className="max-w-28 bg-transparent outline-none" value={tutorId} onChange={(event) => setTutorId(event.target.value)}><option value="all">All tutors</option><option value="unassigned">Unassigned</option>{(tutors.data ?? []).map((tutor) => <option key={tutor.id} value={tutor.id}>{fullName(tutor)}</option>)}</select></label>
+            <label className="inline-flex items-center gap-1 rounded-lg border border-border bg-card px-2 py-1 text-xs"><MapPin className="h-3.5 w-3.5" /><select aria-label="Filter location" className="max-w-28 bg-transparent outline-none" value={siteId} onChange={(event) => {setSiteId(event.target.value);setRoomFilter("all");}}><option value="all">All locations</option>{(sites.data ?? []).map((site) => <option key={site.id} value={site.id}>{site.name}</option>)}</select></label>
+            <label className="inline-flex items-center gap-1 rounded-lg border border-border bg-card px-2 py-1 text-xs"><span aria-hidden="true">▣</span><select aria-label="Filter room" className="max-w-32 bg-transparent outline-none" value={roomFilter} onChange={(event) => setRoomFilter(event.target.value)}><option value="all">All rooms</option>{Array.from(new Set((lessons.data ?? []).filter((lesson) => siteId === "all" || lesson.site_id === siteId).map((lesson) => lesson.room?.trim() || "Room not assigned"))).sort().map((room) => <option key={room} value={room}>{room}</option>)}</select></label>
+            <button type="button" onClick={() => setFiltersOpen(true)} className="rounded-lg border border-border px-2 py-1 text-xs font-semibold text-primary hover:bg-primary/5" title="More filter options">More options</button>
+          </div>}
+
         </div>
       </section>
       </div>
