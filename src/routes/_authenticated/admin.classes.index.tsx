@@ -231,7 +231,7 @@ const SCHEDULE_PREFERENCES_KEY = "progress-tutors:schedule-preferences:v1";
 type SchedulePreferences = {
   date?: string; view?: CalendarView; grouping?: "tutor" | "location";
   zoom?: number; tutorId?: string; siteId?: string; room?: string;
-  format?: string; subject?: string; attendance?: string; quickFiltersOpen?: boolean;
+  format?: string; subject?: string; attendance?: string; quickFiltersOpen?: boolean; showStudentAvatars?: boolean;
 };
 function readSchedulePreferences(): SchedulePreferences {
   try {
@@ -252,6 +252,7 @@ function readSchedulePreferences(): SchedulePreferences {
       subject: typeof p.subject === "string" ? p.subject : "all",
       attendance: typeof p.attendance === "string" ? p.attendance : "all",
       quickFiltersOpen: p.quickFiltersOpen === true,
+      showStudentAvatars: p.showStudentAvatars === true,
     };
   } catch { return {}; }
 }
@@ -288,6 +289,7 @@ function SchedulePage() {
   const [attendanceFilter, setAttendanceFilter] = useState(savedPreferences.attendance ?? "all");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [quickFiltersOpen, setQuickFiltersOpen] = useState(savedPreferences.quickFiltersOpen ?? false);
+  const [showStudentAvatars, setShowStudentAvatars] = useState(savedPreferences.showStudentAvatars ?? false);
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [cloningId, setCloningId] = useState<string | null>(null);
@@ -316,11 +318,11 @@ function SchedulePage() {
     const preferences: SchedulePreferences = {
       date: selectedDate, view, grouping: scheduleGrouping, zoom: calendarZoom,
       tutorId, siteId, room: roomFilter, format: formatFilter, subject: subjectFilter,
-      attendance: attendanceFilter, quickFiltersOpen,
+      attendance: attendanceFilter, quickFiltersOpen, showStudentAvatars,
     };
     try { window.localStorage.setItem(SCHEDULE_PREFERENCES_KEY, JSON.stringify(preferences)); }
     catch { /* Private browsing or disabled storage: schedule still works in memory. */ }
-  }, [selectedDate, view, scheduleGrouping, calendarZoom, tutorId, siteId, roomFilter, formatFilter, subjectFilter, attendanceFilter, quickFiltersOpen]);
+  }, [selectedDate, view, scheduleGrouping, calendarZoom, tutorId, siteId, roomFilter, formatFilter, subjectFilter, attendanceFilter, quickFiltersOpen, showStudentAvatars]);
   const [showMore, setShowMore] = useState(false);
   const [studentSearch, setStudentSearch] = useState("");
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
@@ -950,6 +952,14 @@ function SchedulePage() {
             </span>
           </div>
         )}
+        {showStudentAvatars && enrolled > 0 ? (
+          <div className="absolute bottom-7 left-1 z-10 flex max-w-[calc(100%-2rem)] items-center -space-x-1 overflow-hidden" aria-label={`${enrolled} enrolled students`}>
+            {studentsFor(lesson).slice(0, 4).map((student) => (
+              <span key={student.id} title={fullName(student)} className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-white bg-white text-[7px] font-extrabold text-slate-800 shadow-sm" aria-label={fullName(student)}>{initialsOf(fullName(student)).slice(0, 2)}</span>
+            ))}
+            {enrolled > 4 ? <span className="rounded-full bg-white px-1 text-[8px] font-bold text-slate-800">+{enrolled - 4}</span> : null}
+          </div>
+        ) : null}
         <div className="absolute inset-x-1 bottom-1 flex h-5 min-w-0 items-center gap-1 rounded-md bg-slate-950/90 px-1.5 shadow-sm" aria-label={attendanceSummary.marked ? `Attendance ${attendanceSummary.percentage}%: ${attendanceSummary.present} of ${attendanceSummary.total} present` : "Attendance not marked"}>
           <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-white/40" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={attendanceSummary.percentage ?? undefined}>
             <div className="h-full rounded-full bg-white" style={{ width: `${attendanceSummary.percentage ?? 0}%` }} />
@@ -1281,6 +1291,7 @@ function SchedulePage() {
             <label className="inline-flex items-center gap-1 rounded-lg border border-border bg-card px-2 py-1 text-xs"><Users className="h-3.5 w-3.5" /><select aria-label="Filter tutor" className="max-w-28 bg-transparent outline-none" value={tutorId} onChange={(event) => setTutorId(event.target.value)}><option value="all">All tutors</option><option value="unassigned">Unassigned</option>{(tutors.data ?? []).map((tutor) => <option key={tutor.id} value={tutor.id}>{fullName(tutor)}</option>)}</select></label>
             <label className="inline-flex items-center gap-1 rounded-lg border border-border bg-card px-2 py-1 text-xs"><MapPin className="h-3.5 w-3.5" /><select aria-label="Filter location" className="max-w-28 bg-transparent outline-none" value={siteId} onChange={(event) => {setSiteId(event.target.value);setRoomFilter("all");}}><option value="all">All locations</option>{(sites.data ?? []).map((site) => <option key={site.id} value={site.id}>{site.name}</option>)}</select></label>
             <label className="inline-flex items-center gap-1 rounded-lg border border-border bg-card px-2 py-1 text-xs"><span aria-hidden="true">▣</span><select aria-label="Filter room" className="max-w-32 bg-transparent outline-none" value={roomFilter} onChange={(event) => setRoomFilter(event.target.value)}><option value="all">All rooms</option>{Array.from(new Set((lessons.data ?? []).filter((lesson) => siteId === "all" || lesson.site_id === siteId).map((lesson) => lesson.room?.trim() || "Room not assigned"))).sort().map((room) => <option key={room} value={room}>{room}</option>)}</select></label>
+            <label className="inline-flex items-center gap-2 rounded-lg border border-border bg-white px-2 py-1 text-xs font-semibold dark:bg-slate-900"><input type="checkbox" className="accent-[var(--color-primary)]" checked={showStudentAvatars} onChange={(event) => setShowStudentAvatars(event.target.checked)} /> Student avatars</label>
             <button type="button" onClick={() => setFiltersOpen(true)} className="rounded-lg border border-border px-2 py-1 text-xs font-semibold text-primary hover:bg-primary/5" title="More filter options">More options</button>
           </div>}
 
