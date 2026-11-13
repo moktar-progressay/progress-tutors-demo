@@ -1072,7 +1072,7 @@ function SchedulePage() {
               const tutor = scheduleGrouping === "tutor" ? (tutors.data ?? []).find((person) => person.id === id) : undefined;
               const roomName = id.split("::").slice(1).join("::");
               return (
-                <div key={`${format(day, "yyyy-MM-dd")}-${id}`} className="min-w-0 border-l border-border bg-slate-50 px-2 py-2 dark:bg-slate-900">
+                <div key={`${format(day, "yyyy-MM-dd")}-${id}`} className="min-w-0 overflow-hidden border-l border-border bg-slate-50 px-2 py-2 dark:bg-slate-900">
                   <div className="flex min-w-0 items-center gap-2">
                     {scheduleGrouping === "tutor" ? <Avatar size="md" initials={tutor ? initialsOf(fullName(tutor)) : "?"} tone={tutor ? avatarTone(fullName(tutor)) : "neutral"} /> : <MapPin className="h-4 w-4 text-primary" />}
                     <span className={cn("truncate text-xs font-bold", !tutor && "text-muted-foreground")}>{scheduleGrouping === "location" ? roomName : (tutor ? fullName(tutor) : "Not assigned")}</span>
@@ -1081,8 +1081,8 @@ function SchedulePage() {
                     const totals = tutorAttendanceFor(day, id);
                     return (
                       <div className="mt-1.5" title={scheduleGrouping === "location" ? `${totals.present}/${totals.expected} peak room occupancy` : totals.marked ? `${totals.present} present out of ${totals.expected} expected; ${totals.marked} marked` : "Attendance not marked"}>
-                        <div className="mb-1 flex min-w-0 flex-nowrap items-center justify-between gap-1 text-[9px] font-bold tabular-nums sm:text-[11px]">
-                          <span className="min-w-0 truncate text-muted-foreground">{scheduleGrouping === "tutor" ? "Attendance" : "Students"}</span>
+                        <div className="mb-1 grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-1 text-[9px] font-bold tabular-nums sm:text-[10px]">
+                          <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-muted-foreground">{scheduleGrouping === "tutor" ? "Attendance" : "Students"}</span>
                           <span className="shrink-0 whitespace-nowrap">{totals.percentage === null ? "Not marked" : `${totals.percentage}% (${totals.present}/${totals.expected})`}</span>
                         </div>
                         <div
@@ -1096,7 +1096,7 @@ function SchedulePage() {
                         >
                           <div
                             className="h-full min-h-full rounded-full bg-[#e92e73] transition-[width] duration-200"
-                            style={{ width: `${totals.percentage ?? 0}%` }}
+                            style={{ width: `${Math.min(100, Math.max(0, totals.percentage ?? 0))}%` }}
                           />
                         </div>
                       </div>
