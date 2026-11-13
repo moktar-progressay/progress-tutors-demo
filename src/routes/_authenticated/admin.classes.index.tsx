@@ -1081,9 +1081,9 @@ function SchedulePage() {
                     const totals = tutorAttendanceFor(day, id);
                     return (
                       <div className="mt-1.5" title={scheduleGrouping === "location" ? `${totals.present}/${totals.expected} peak room occupancy` : totals.marked ? `${totals.present} present out of ${totals.expected} expected; ${totals.marked} marked` : "Attendance not marked"}>
-                        <div className="mb-1 flex flex-wrap items-center justify-between gap-1 text-[11px] font-bold tabular-nums">
-                          <span className="text-muted-foreground">{scheduleGrouping === "tutor" ? "Attendance" : "Students"}</span>
-                          <span>{totals.percentage === null ? "Not marked" : `${totals.percentage}% (${totals.present}/${totals.expected})`}</span>
+                        <div className="mb-1 flex min-w-0 flex-nowrap items-center justify-between gap-1 text-[9px] font-bold tabular-nums sm:text-[11px]">
+                          <span className="min-w-0 truncate text-muted-foreground">{scheduleGrouping === "tutor" ? "Attendance" : "Students"}</span>
+                          <span className="shrink-0 whitespace-nowrap">{totals.percentage === null ? "Not marked" : `${totals.percentage}% (${totals.present}/${totals.expected})`}</span>
                         </div>
                         <div
                           className="h-2.5 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700"
