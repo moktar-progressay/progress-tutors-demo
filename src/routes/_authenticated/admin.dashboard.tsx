@@ -65,6 +65,7 @@ import {
 } from "@/components/ui/tooltip";
 import { fullName, hhmm, initialsOf, useTable, type ClassRow } from "@/lib/db";
 import { cn } from "@/lib/utils";
+import { useCatalogue } from "@/lib/teaching-catalogue";
 
 export const Route = createFileRoute("/_authenticated/admin/dashboard")({
   head: () => ({
@@ -228,6 +229,7 @@ function AdminDashboard() {
   const sessions = useTable("sessions", "session_date");
   const attendance = useTable("student_attendance", "recorded_at");
   const sites = useTable("sites", "name");
+  const siteRooms = useCatalogue("site_rooms");
 
   const [selectedDate, setSelectedDate] = useState(() => format(new Date(), "yyyy-MM-dd"));
   const [calendarView, setCalendarView] = useState<CalendarView>("day");
@@ -684,7 +686,7 @@ function AdminDashboard() {
   const [funnelPreviewStage, setFunnelPreviewStage] = useState<"leads" | "registered" | "billing" | "enrolled">("leads");
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     attendance: true, upcoming: true, tasks: true, alerts: true,
-    recap: true, finance: true, leaderboards: false, reports: false,
+    recap: true, finance: true, leaderboards: false, reports: false, sites: true,
   });
   const toggleSection = (key: string) => setOpenSections((previous) => ({ ...previous, [key]: !previous[key] }));
   const today = new Date();
@@ -781,6 +783,24 @@ function AdminDashboard() {
     {key:"enrolled",label:"Enrolled",count:currentEnrolledIds.size},
   ] as const;
 
+  const siteInsights = (sites.data ?? []).map((site) => {
+    const siteClasses = (lessons.data ?? []).filter((lesson) => lesson.site_id === site.id);
+    const siteIds = new Set(siteClasses.map((lesson) => lesson.id));
+    const siteEnrolments = (enrolments.data ?? []).filter((enrolment) => enrolment.status === "active" && siteIds.has(enrolment.class_id));
+    const rooms = (siteRooms.data ?? []).filter((room) => room.site_id === site.id && room.active);
+    const roomInsights = rooms.map((room) => {
+      const roomClasses = siteClasses.filter((lesson) => lesson.room === room.name);
+      const roomIds = new Set(roomClasses.map((lesson) => lesson.id));
+      return { id: room.id, name: room.floor && !room.name.toLowerCase().includes(room.floor.toLowerCase()) ? `${room.name} (${room.floor})` : room.name, classes: roomClasses.length, enrolled: siteEnrolments.filter((enrolment) => roomIds.has(enrolment.class_id)).length, capacity: room.capacity };
+    });
+    const unassigned = siteClasses.filter((lesson) => !lesson.room || !rooms.some((room) => room.name === lesson.room));
+    if (unassigned.length) {
+      const ids = new Set(unassigned.map((lesson) => lesson.id));
+      roomInsights.push({ id: `unassigned-${site.id}`, name: "Room not assigned", classes: unassigned.length, enrolled: siteEnrolments.filter((enrolment) => ids.has(enrolment.class_id)).length, capacity: null });
+    }
+    return { id: site.id, name: site.name, classes: siteClasses.length, enrolled: siteEnrolments.length, rooms: roomInsights };
+  });
+  const maxSiteEnrolments = Math.max(1, ...siteInsights.map((site) => site.enrolled));
   const attendancePercent = attendanceAuditRate;
   const panel = (key: string, title: string, count: number | null, children: ReactNode, icon?: ReactNode) => (
     <section className="surface min-w-0 overflow-hidden">
@@ -983,6 +1003,20 @@ function AdminDashboard() {
         <div><h3 className="mb-2 font-bold">Tutors · scheduled hours</h3>{tutorLeaderboard.slice(0,5).map((item,i)=><Link key={item.tutor!.id} to="/admin/tutors/$id" params={{id:item.tutor!.id}} className="flex justify-between gap-2 border-b py-2 text-sm"><span className="flex min-w-0 items-center gap-2"><Avatar initials={initialsOf(fullName(item.tutor))} tone={avatarTone(fullName(item.tutor))} size="sm"/><span className="truncate">{i+1}. {fullName(item.tutor)}</span></span><b>{item.hours.toFixed(1)}h</b></Link>)}</div>
         <div><h3 className="mb-2 font-bold">Students · recorded attendance</h3>{studentLeaderboard.slice(0,5).map((item,i)=><Link key={item.student!.id} to="/admin/students/$id" params={{id:item.student!.id}} className="flex justify-between gap-2 border-b py-2 text-sm"><span className="flex min-w-0 items-center gap-2"><Avatar initials={initialsOf(fullName(item.student))} tone={avatarTone(fullName(item.student))} size="sm"/><span className="truncate">{i+1}. {fullName(item.student)}</span></span><b>{item.attended}</b></Link>)}</div>
       </div>)}
+      {panel("sites","Locations & rooms",siteInsights.length,<div className="space-y-5">
+        <p className="text-xs text-muted-foreground">Enrolments are counted per class, not unique students. Room figures are nested within each location. Bars compare enrolments across locations and rooms.</p>
+        {siteInsights.map((site) => <div key={site.id} className="rounded-xl border border-border p-3">
+          <div className="flex flex-wrap items-center justify-between gap-2 text-sm"><strong>{site.name}</strong><span className="tabular-nums text-muted-foreground">{site.classes} classes · {site.enrolled} enrolments</span></div>
+          <div role="img" aria-label={`${site.name}: ${site.enrolled} enrolments`} className="mt-2 h-3 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary" style={{width:`${site.enrolled / maxSiteEnrolments * 100}%`}} /></div>
+          <div className="mt-3 space-y-2 border-l-2 border-border pl-3">
+            {site.rooms.length ? site.rooms.map((room) => <div key={room.id} className="text-xs">
+              <div className="flex items-center justify-between gap-2"><span className="min-w-0 truncate font-semibold">{room.name}</span><span className="shrink-0 tabular-nums">{room.classes} classes · {room.enrolled} enrolled{room.capacity ? ` · ${room.capacity} room seats` : ""}</span></div>
+              <div role="img" aria-label={`${room.name}: ${room.enrolled} enrolments`} className="mt-1 h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-emerald-500" style={{width:`${site.enrolled ? room.enrolled / site.enrolled * 100 : 0}%`}} /></div>
+            </div>) : <p className="text-xs text-muted-foreground">No rooms configured for this location.</p>}
+          </div>
+        </div>)}
+        {!siteInsights.length && <p className="text-sm text-muted-foreground">No locations configured.</p>}
+      </div>,<BarChart3 className="h-4 w-4 text-primary"/>)}
       {panel("reports","Insights & reports",null,<div className="space-y-3">
         <p className="text-sm text-muted-foreground">Attendance: {attendancePercent===null?"No saved marks":attendancePercent+"%"} · {reportingPeriod}</p>
         <Link to="/admin/reports" className="font-semibold text-primary hover:underline">Open detailed reports</Link>
