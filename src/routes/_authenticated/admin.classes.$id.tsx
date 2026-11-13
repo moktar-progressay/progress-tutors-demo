@@ -461,15 +461,6 @@ export function ClassWorkspace({
           )}
           <Button
             size="icon"
-            variant="ghost"
-            className="text-destructive hover:text-destructive"
-            onClick={() => setDeleteOpen(true)}
-            aria-label="Delete lesson"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-          <Button
-            size="icon"
             onClick={saveLesson}
             disabled={updateClass.isPending}
             aria-label="Save lesson" title="Save changes"
@@ -801,6 +792,9 @@ export function ClassWorkspace({
         <div className="mx-auto flex max-w-xl gap-2 sm:w-[28rem]">
           <Button className="flex-1" variant="secondary" onClick={onClone} disabled={!onClone}>
             <Copy className="h-4 w-4" /> Clone lesson
+          </Button>
+          <Button type="button" variant="outline" className="border-red-300 bg-red-50 font-semibold text-red-700 hover:bg-red-100 hover:text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200" onClick={() => setDeleteOpen(true)} aria-label="Delete lesson" title="Delete lesson">
+            <Trash2 className="h-4 w-4" /> <span>Delete</span>
           </Button>
           <Button className="flex-1" asChild>
             <Link to="/admin/classes/$id" params={{ id: c.id }} search={{ date: attendanceDate }}>
