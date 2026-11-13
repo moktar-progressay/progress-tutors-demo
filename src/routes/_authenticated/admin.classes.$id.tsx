@@ -304,14 +304,24 @@ export function ClassWorkspace({
           .includes(query))
     );
   });
+  // Count only students currently enrolled in this lesson. Historical marks for
+  // removed students and duplicate attendance rows must not inflate the scorecard.
+  const activeStudentIds = new Set(activeRoster.map((item) => item.student_id));
   const marksForDate = attendanceSession
-    ? classAttendance.filter((item) => item.session_id === attendanceSession.id)
+    ? classAttendance.filter(
+        (item) =>
+          item.session_id === attendanceSession.id &&
+          activeStudentIds.has(item.student_id),
+      )
     : [];
-  const presentForDate = marksForDate.filter((item) =>
-    ["present", "late"].includes(item.status),
-  ).length;
+  const presentStudentIds = new Set(
+    marksForDate
+      .filter((item) => ["present", "late"].includes(item.status))
+      .map((item) => item.student_id),
+  );
+  const presentForDate = presentStudentIds.size;
   const attendancePercentage =
-    marksForDate.length && activeRoster.length
+    activeRoster.length > 0 && marksForDate.length > 0
       ? Math.round((presentForDate / activeRoster.length) * 100)
       : null;
 
