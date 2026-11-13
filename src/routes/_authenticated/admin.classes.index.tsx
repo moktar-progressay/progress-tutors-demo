@@ -1212,20 +1212,21 @@ function SchedulePage() {
             <button type="button" onClick={() => setScheduleGrouping("tutor")} title="By tutor" aria-label="By tutor" className={cn("inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-bold", scheduleGrouping === "tutor" ? "bg-card text-primary shadow-sm" : "text-muted-foreground")}><Users className="h-3.5 w-3.5" /><span className="hidden sm:inline">By tutor</span></button>
             <button type="button" onClick={() => setScheduleGrouping("location")} title="By location" aria-label="By location" className={cn("inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-bold", scheduleGrouping === "location" ? "bg-card text-primary shadow-sm" : "text-muted-foreground")}><MapPin className="h-3.5 w-3.5" /><span className="hidden sm:inline">By location</span></button>
           </div>}
-          <div className="order-3 flex w-full min-w-0 justify-between rounded-xl bg-muted p-0.5 sm:order-none sm:w-auto sm:p-1">
-            {(["day", "week", "month", "list"] as CalendarView[]).map((item) => (
-              <button
-                key={item}
-                type="button"
-                onClick={() => setView(item)}
-                className={cn(
-                  "rounded-lg px-3 py-1.5 text-xs font-bold capitalize",
-                  view === item ? "bg-card text-primary shadow-sm" : "text-muted-foreground",
-                )}
-              >
-                {item}
-              </button>
-            ))}
+          <div className="order-3 sm:order-none">
+            <label className="sr-only" htmlFor="schedule-calendar-view">Calendar view</label>
+            <select
+              id="schedule-calendar-view"
+              value={view}
+              onChange={(event) => setView(event.target.value as CalendarView)}
+              aria-label="Calendar view"
+              title="Change calendar view"
+              className="h-8 min-w-[88px] cursor-pointer rounded-xl border border-border bg-card px-2 text-xs font-bold text-primary outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              <option value="day">Day</option>
+              <option value="week">Week</option>
+              <option value="month">Month</option>
+              <option value="list">List</option>
+            </select>
           </div>
           {(view === "day" || view === "week") && <button type="button" onClick={() => { setQuickFiltersOpen((open) => !open); }} aria-expanded={quickFiltersOpen} aria-controls="schedule-quick-filters" aria-label="Toggle timetable filters" title="Filters" className={cn("inline-flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-xs font-bold", quickFiltersOpen || activeFilterCount ? "bg-primary/10 text-primary" : "bg-card text-muted-foreground")}><Filter className="h-4 w-4" />{activeFilterCount ? <span className="text-[10px]">{activeFilterCount}</span> : null}</button>}
           {(view === "day" || view === "week") && quickFiltersOpen && <div id="schedule-quick-filters" className="flex flex-wrap items-center gap-1.5">
