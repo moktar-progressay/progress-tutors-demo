@@ -1392,15 +1392,6 @@ function SchedulePage() {
         )
       ) : null}
 
-      <Button
-        size="icon"
-        onClick={() => openNew()}
-        aria-label="Add lesson"
-        className="fixed right-4 bottom-24 z-30 h-14 w-14 rounded-2xl shadow-xl sm:hidden"
-      >
-        <Plus className="h-6 w-6" />
-      </Button>
-
       <Dialog open={filtersOpen} onOpenChange={setFiltersOpen}>
         <DialogContent className="max-h-[calc(100dvh-1rem)] overflow-y-auto overscroll-contain pb-[calc(env(safe-area-inset-bottom)+1rem)] sm:max-h-[90vh] sm:max-w-md sm:pb-6">
           <DialogHeader>
