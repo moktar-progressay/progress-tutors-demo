@@ -1028,6 +1028,7 @@ function SchedulePage() {
                 )}>{format(day, "d")}</span>
               </button>
             ))}
+            <div className="sticky right-0 z-40 border-l border-border bg-slate-100 dark:bg-slate-800" />
           </div>}
           <div className={cn("sticky z-30 grid border-b border-border bg-card", view === "day" ? "top-0" : "top-[57px]")} style={{ gridTemplateColumns }}>
             <div className="sticky left-0 z-40 bg-card p-2" />
@@ -1068,7 +1069,7 @@ function SchedulePage() {
                 </div>
               );
             })}
-            <div className="flex items-center justify-center border-l border-border bg-card px-1" title={scheduleGrouping === "tutor" ? "Add tutor column" : "Add room column"}>
+            <div className="sticky right-0 z-50 flex items-center justify-center border-l border-slate-200 bg-slate-100 px-1 shadow-[-3px_0_6px_-4px_rgba(0,0,0,0.25)] dark:border-slate-700 dark:bg-slate-800" title={scheduleGrouping === "tutor" ? "Add tutor column" : "Add room column"}>
               <Link to={scheduleGrouping === "tutor" ? "/admin/tutors" : "/admin/configuration"} aria-label={scheduleGrouping === "tutor" ? "Add tutor" : "Add room"} title={scheduleGrouping === "tutor" ? "Add tutor" : "Add room"} className="flex h-12 w-12 flex-col items-center justify-center gap-0.5 rounded-xl bg-[#e92e73] text-white shadow-sm transition-colors hover:bg-[#c9185d] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e92e73]">
                 <Plus className="h-5 w-5 stroke-[3]" /><span className="text-[9px] font-bold">{scheduleGrouping === "tutor" ? "Tutor" : "Room"}</span>
               </Link>
@@ -1139,7 +1140,7 @@ function SchedulePage() {
                 </div>
               );
             })}
-            <div aria-hidden="true" className="border-l border-dashed border-[#e92e73]/35 bg-[#e92e73]/[0.035]" style={{height:calendarHeight}} />
+            <div aria-hidden="true" className="sticky right-0 z-20 border-l border-slate-200 bg-slate-100 shadow-[-3px_0_6px_-4px_rgba(0,0,0,0.25)] dark:border-slate-700 dark:bg-slate-800" style={{height:calendarHeight}} />
           </div>
         </div>
       </div>
