@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Page } from "@/components/AppShell";
-import { Empty, PageHeader, Pill, Section, StatCard } from "@/components/kit";
+import { Empty, PageHeader, Section, StatCard } from "@/components/kit";
 import { fullName, money, num, useTable } from "@/lib/db";
 
 export const Route = createFileRoute("/_authenticated/admin/reports")({
@@ -17,9 +17,6 @@ export const Route = createFileRoute("/_authenticated/admin/reports")({
 });
 
 function Reports() {
-  const sites = useTable("sites", "name");
-  const classes = useTable("classes", "name");
-  const enrolments = useTable("class_enrolments");
   const sessions = useTable("sessions");
   const attendance = useTable("student_attendance");
   const payments = useTable("client_payments");
@@ -44,52 +41,6 @@ function Reports() {
         <StatCard label="Income received" value={money(income)} tone="purple" />
         <StatCard label="Tutor cost" value={money(cost)} tone="pink" />
       </div>
-
-      <Section id="rep-sites" title="By site">
-        {(sites.data ?? []).length === 0 ? (
-          <Empty>No sites configured.</Empty>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[560px] text-sm">
-              <thead>
-                <tr className="text-left text-xs text-muted-foreground">
-                  {["Site", "Classes", "Enrolled", "Sessions", "Attendance"].map((h) => (
-                    <th key={h} className="pb-2 font-semibold">
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {(sites.data ?? []).map((s) => {
-                  const cls = (classes.data ?? []).filter((c) => c.site_id === s.id);
-                  const enrolled = (enrolments.data ?? []).filter(
-                    (e) => e.status === "active" && cls.some((c) => c.id === e.class_id),
-                  ).length;
-                  const sess = (sessions.data ?? []).filter((x) => x.site_id === s.id);
-                  const siteMarks = marks.filter((m) => sess.some((x) => x.id === m.session_id));
-                  const sitePresent = siteMarks.filter((m) => m.status === "present" || m.status === "late").length;
-                  return (
-                    <tr key={s.id} className="border-t border-border">
-                      <td className="py-3 font-semibold">{s.name}</td>
-                      <td className="py-3">{cls.length}</td>
-                      <td className="py-3">{enrolled}</td>
-                      <td className="py-3">{sess.length}</td>
-                      <td className="py-3">
-                        {siteMarks.length === 0 ? (
-                          <span className="text-muted-foreground">—</span>
-                        ) : (
-                          <Pill tone="green">{Math.round((sitePresent / siteMarks.length) * 100)}%</Pill>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Section>
 
       <Section id="rep-tutors" title="Tutor cost">
         {(tutors.data ?? []).length === 0 ? (
