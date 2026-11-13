@@ -61,10 +61,10 @@ function AttendanceWorkspace() {
   };
   const quickCard = (item: typeof suggestions[number]) => <button type="button" key={item.row.id}
     onClick={() => {setClassId(item.row.class_id ?? ""); setSessionId(item.row.id); setDate(item.row.session_date); setFilter("all");}}
-    className="w-full rounded-lg border border-border p-3 text-left shadow-sm transition hover:brightness-95" style={{backgroundColor:colourFor(item),color: colourFor(item) === "#ffb900" ? "#242424" : "#fff"}}>
-    <span className="block truncate text-sm font-bold">{item.course?.name ?? "Lesson"}</span>
-    <span className="block text-xs opacity-90">{prettyDate(item.row.session_date)} · {(item.row.start_time || item.course?.start_time || "").slice(0,5)}</span>
-    <span className="block text-xs font-semibold">{item.marked}/{item.total} marked</span>
+    className="block w-full min-w-0 max-w-full overflow-hidden rounded-lg border border-border px-3 py-2.5 text-left shadow-sm transition hover:brightness-95" style={{backgroundColor:colourFor(item),color: colourFor(item) === "#ffb900" ? "#242424" : "#fff"}}>
+    <span className="block w-full min-w-0 truncate text-sm font-bold">{item.course?.name ?? "Lesson"}</span>
+    <span className="block min-w-0 truncate text-xs opacity-90">{prettyDate(item.row.session_date)} · {(item.row.start_time || item.course?.start_time || "").slice(0,5)}</span>
+    <span className="block min-w-0 truncate text-xs font-semibold">{item.marked}/{item.total} marked</span>
   </button>;
   const selectedClass = classRows.find((row) => row.id === classId);
   const classSessions = useMemo(() => sessionRows.filter((row) => row.class_id === classId).sort((a,b) => b.session_date.localeCompare(a.session_date)), [sessionRows, classId]);
@@ -126,16 +126,16 @@ function AttendanceWorkspace() {
       <button type="button" disabled={busy} aria-pressed={current === "absent" || current === "excused"} onClick={() => void markOne(targetSessionId,targetStudentId,"absent")} className={`inline-flex min-h-9 items-center justify-center gap-1 rounded-lg border px-3 text-xs font-semibold disabled:opacity-50 ${["absent","excused"].includes(current) ? "border-red-500 bg-red-500 text-white" : "border-border hover:bg-red-50 dark:hover:bg-red-950"}`}><X className="h-3.5 w-3.5"/>Absent</button>
     </div>
   );
-  return <Page className="space-y-4 pb-24">
+  return <Page className="min-w-0 max-w-full space-y-4 overflow-x-hidden pb-24">
     <PageHeader title="Take attendance" subtitle="Choose a lesson, mark the register and review attendance by student."/>
     <div className="grid grid-cols-2 overflow-hidden rounded-xl border border-border bg-card">
       <button type="button" onClick={() => setView("course")} className={`flex min-h-12 items-center justify-center gap-2 text-sm font-bold ${view === "course" ? "border-b-2 border-primary text-primary" : "text-muted-foreground"}`}><Users className="h-4 w-4"/>By course</button>
       <button type="button" onClick={() => setView("student")} className={`flex min-h-12 items-center justify-center gap-2 text-sm font-bold ${view === "student" ? "border-b-2 border-primary text-primary" : "text-muted-foreground"}`}><UserRound className="h-4 w-4"/>By student</button>
     </div>
-    {view === "course" ? <>      <section className="rounded-xl border border-border bg-card p-4">
-        <div className="grid gap-3 sm:grid-cols-2">
+    {view === "course" ? <>      <section className="min-w-0 max-w-full rounded-xl border border-border bg-card p-3 sm:p-4">
+        <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
           <label className="space-y-1 text-xs font-semibold">COURSE
-            <select className="h-11 w-full rounded-lg border border-border bg-background px-3 text-sm" value={classId} onChange={(e) => {setClassId(e.target.value);setSessionId("");setFilter("all");}}><option value="">Choose a course</option>{classRows.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}</select>
+            <select className="h-11 w-full min-w-0 max-w-full rounded-lg border border-border bg-background px-3 text-sm" value={classId} onChange={(e) => {setClassId(e.target.value);setSessionId("");setFilter("all");}}><option value="">Choose a course</option>{classRows.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}</select>
           </label>
           <label className="space-y-1 text-xs font-semibold">LESSON
             <select className="h-11 w-full rounded-lg border border-border bg-background px-3 text-sm" value={sessionId} disabled={!classId} onChange={(e) => {setSessionId(e.target.value);setFilter("all");}}><option value="">Choose a lesson</option>{classSessions.map((row) => <option key={row.id} value={row.id}>{prettyDate(row.session_date)} · {row.start_time?.slice(0,5) ?? ""}</option>)}</select>
@@ -145,9 +145,9 @@ function AttendanceWorkspace() {
       </section>
       <section className="space-y-2" aria-label="Suggested lesson registers">
         <h2 className="text-sm font-bold">Quick start attendance</h2>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="space-y-2"><h3 className="text-xs font-semibold text-muted-foreground">Upcoming lessons</h3>{upcoming.length ? upcoming.map(quickCard) : <p className="text-xs text-muted-foreground">No upcoming registers in the next 7 days.</p>}</div>
-          <div className="space-y-2"><h3 className="text-xs font-semibold text-muted-foreground">Recently passed</h3>{recent.length ? recent.map(quickCard) : <p className="text-xs text-muted-foreground">No recent registers in the last 7 days.</p>}</div>
+        <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="min-w-0 space-y-2"><h3 className="text-xs font-semibold text-muted-foreground">Upcoming lessons</h3>{upcoming.length ? upcoming.map(quickCard) : <p className="text-xs text-muted-foreground">No upcoming registers in the next 7 days.</p>}</div>
+          <div className="min-w-0 space-y-2"><h3 className="text-xs font-semibold text-muted-foreground">Recently passed</h3>{recent.length ? recent.map(quickCard) : <p className="text-xs text-muted-foreground">No recent registers in the last 7 days.</p>}</div>
         </div>
       </section>
 
