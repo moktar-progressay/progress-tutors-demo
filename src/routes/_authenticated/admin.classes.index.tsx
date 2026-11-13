@@ -226,6 +226,35 @@ function AttendanceBar({
   );
 }
 
+const SCHEDULE_PREFERENCES_KEY = "progress-tutors:schedule-preferences:v1";
+type SchedulePreferences = {
+  date?: string; view?: CalendarView; grouping?: "tutor" | "location";
+  zoom?: number; tutorId?: string; siteId?: string; room?: string;
+  format?: string; subject?: string; attendance?: string; quickFiltersOpen?: boolean;
+};
+function readSchedulePreferences(): SchedulePreferences {
+  try {
+    const raw = window.localStorage.getItem(SCHEDULE_PREFERENCES_KEY);
+    if (!raw) return {};
+    const data: unknown = JSON.parse(raw);
+    if (!data || typeof data !== "object" || Array.isArray(data)) return {};
+    const p = data as SchedulePreferences;
+    return {
+      date: typeof p.date === "string" && /^\\d{4}-\\d{2}-\\d{2}$/.test(p.date) && !Number.isNaN(Date.parse(p.date)) ? p.date : undefined,
+      view: ["day", "week", "month", "list"].includes(p.view ?? "") ? p.view : undefined,
+      grouping: p.grouping === "location" ? "location" : "tutor",
+      zoom: typeof p.zoom === "number" && Number.isFinite(p.zoom) && p.zoom >= CALENDAR_ZOOM_MIN && p.zoom <= CALENDAR_ZOOM_MAX ? p.zoom : 1,
+      tutorId: typeof p.tutorId === "string" ? p.tutorId : "all",
+      siteId: typeof p.siteId === "string" ? p.siteId : "all",
+      room: typeof p.room === "string" ? p.room : "all",
+      format: typeof p.format === "string" ? p.format : "all",
+      subject: typeof p.subject === "string" ? p.subject : "all",
+      attendance: typeof p.attendance === "string" ? p.attendance : "all",
+      quickFiltersOpen: p.quickFiltersOpen === true,
+    };
+  } catch { return {}; }
+}
+
 function SchedulePage() {
   const { add, date: requestedDate, view: requestedView } = Route.useSearch();
   const lessons = useTable("classes", "start_time");
@@ -243,20 +272,21 @@ function SchedulePage() {
   const addEnrolments = useUpsert("class_enrolments", ["classes"]);
   const updateEnrolment = useUpdateRow("class_enrolments", ["classes"]);
 
-  const [view, setView] = useState<CalendarView>(requestedView ?? "day");
-  const [calendarZoom, setCalendarZoom] = useState(1);
-  const [scheduleGrouping, setScheduleGrouping] = useState<"tutor" | "location">("tutor");
-  const [selectedDate, setSelectedDate] = useState(requestedDate ?? currentDateIso);
+  const [savedPreferences] = useState(readSchedulePreferences);
+  const [view, setView] = useState<CalendarView>(requestedView ?? savedPreferences.view ?? "day");
+  const [calendarZoom, setCalendarZoom] = useState(savedPreferences.zoom ?? 1);
+  const [scheduleGrouping, setScheduleGrouping] = useState<"tutor" | "location">(savedPreferences.grouping ?? "tutor");
+  const [selectedDate, setSelectedDate] = useState(requestedDate ?? savedPreferences.date ?? currentDateIso());
   const [search, setSearch] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
-  const [tutorId, setTutorId] = useState("all");
-  const [siteId, setSiteId] = useState("all");
-  const [roomFilter, setRoomFilter] = useState("all");
-  const [formatFilter, setFormatFilter] = useState("all");
-  const [subjectFilter, setSubjectFilter] = useState("all");
-  const [attendanceFilter, setAttendanceFilter] = useState("all");
+  const [tutorId, setTutorId] = useState(savedPreferences.tutorId ?? "all");
+  const [siteId, setSiteId] = useState(savedPreferences.siteId ?? "all");
+  const [roomFilter, setRoomFilter] = useState(savedPreferences.room ?? "all");
+  const [formatFilter, setFormatFilter] = useState(savedPreferences.format ?? "all");
+  const [subjectFilter, setSubjectFilter] = useState(savedPreferences.subject ?? "all");
+  const [attendanceFilter, setAttendanceFilter] = useState(savedPreferences.attendance ?? "all");
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [quickFiltersOpen, setQuickFiltersOpen] = useState(false);
+  const [quickFiltersOpen, setQuickFiltersOpen] = useState(savedPreferences.quickFiltersOpen ?? false);
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [cloningId, setCloningId] = useState<string | null>(null);
@@ -281,6 +311,15 @@ function SchedulePage() {
     if (requestedDate) setSelectedDate(requestedDate);
     if (requestedView) setView(requestedView);
   }, [requestedDate, requestedView]);
+  useEffect(() => {
+    const preferences: SchedulePreferences = {
+      date: selectedDate, view, grouping: scheduleGrouping, zoom: calendarZoom,
+      tutorId, siteId, room: roomFilter, format: formatFilter, subject: subjectFilter,
+      attendance: attendanceFilter, quickFiltersOpen,
+    };
+    try { window.localStorage.setItem(SCHEDULE_PREFERENCES_KEY, JSON.stringify(preferences)); }
+    catch { /* Private browsing or disabled storage: schedule still works in memory. */ }
+  }, [selectedDate, view, scheduleGrouping, calendarZoom, tutorId, siteId, roomFilter, formatFilter, subjectFilter, attendanceFilter, quickFiltersOpen]);
   const [showMore, setShowMore] = useState(false);
   const [studentSearch, setStudentSearch] = useState("");
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
