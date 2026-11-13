@@ -1006,7 +1006,7 @@ function SchedulePage() {
     const gridTemplateColumns = `4rem repeat(${columns.length}, minmax(${columnWidth}px, 1fr)) 68px`;
 
     return (
-      <div className="relative isolate z-0 h-[calc(100dvh-245px)] min-h-[360px] max-w-full overflow-auto overscroll-contain rounded-2xl border border-border bg-card" aria-label={scheduleGrouping === "tutor" ? "Teacher timetable" : "Room timetable"} tabIndex={0}>
+      <div className="relative isolate z-0 h-[calc(100dvh-285px)] min-h-[300px] max-w-full overflow-auto overscroll-contain rounded-2xl border border-border bg-card" aria-label={scheduleGrouping === "tutor" ? "Teacher timetable" : "Room timetable"} tabIndex={0}>
         <div style={{ minWidth: `${64 + columns.length * columnWidth + 68}px` }}>
           {view !== "day" && <div className="sticky top-0 z-30 grid border-b border-border bg-card" style={{ gridTemplateColumns }}>
             <div className="sticky left-0 z-50 bg-card p-2" />
@@ -1030,13 +1030,13 @@ function SchedulePage() {
             ))}
             <div className="sticky right-0 z-40 border-l border-border bg-slate-100 dark:bg-slate-800" />
           </div>}
-          <div className={cn("sticky z-30 grid border-b border-border bg-card", view === "day" ? "top-0" : "top-[57px]")} style={{ gridTemplateColumns }}>
-            <div className="sticky left-0 z-40 bg-card p-2" />
+          <div className={cn("sticky z-40 grid border-b border-border bg-slate-50 shadow-sm dark:bg-slate-900", view === "day" ? "top-0" : "top-[57px]")} style={{ gridTemplateColumns }}>
+            <div className="sticky left-0 z-50 bg-slate-50 p-2 dark:bg-slate-900" />
             {columns.map(({ day, id }) => {
               const tutor = scheduleGrouping === "tutor" ? (tutors.data ?? []).find((person) => person.id === id) : undefined;
               const roomName = id.split("::").slice(1).join("::");
               return (
-                <div key={`${format(day, "yyyy-MM-dd")}-${id}`} className="min-w-0 border-l border-border bg-card px-2 py-2">
+                <div key={`${format(day, "yyyy-MM-dd")}-${id}`} className="min-w-0 border-l border-border bg-slate-50 px-2 py-2 dark:bg-slate-900">
                   <div className="flex min-w-0 items-center gap-2">
                     {scheduleGrouping === "tutor" ? <Avatar size="md" initials={tutor ? initialsOf(fullName(tutor)) : "?"} tone={tutor ? avatarTone(fullName(tutor)) : "neutral"} /> : <MapPin className="h-4 w-4 text-primary" />}
                     <span className={cn("truncate text-xs font-bold", !tutor && "text-muted-foreground")}>{scheduleGrouping === "location" ? roomName : (tutor ? fullName(tutor) : "Not assigned")}</span>
@@ -1149,7 +1149,7 @@ function SchedulePage() {
 
   return (
     <Page className="space-y-4">
-      <div className="sticky top-[var(--app-header-height)] z-40 -mx-4 space-y-2 bg-background px-4 pb-2 pt-1 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+      <div className="sticky top-[var(--app-header-height)] z-50 -mx-4 space-y-2 bg-background px-4 pb-2 pt-1 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
       <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
         <div><h1 className="text-xl font-extrabold sm:text-2xl">Schedule</h1><p className="hidden text-xs text-muted-foreground sm:block">One calendar for every online and face-to-face lesson.</p></div>
         <div className="flex min-w-0 flex-wrap items-center gap-1.5">
