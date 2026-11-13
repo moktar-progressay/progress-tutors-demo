@@ -946,6 +946,15 @@ function SchedulePage() {
         lessonRunsOn(lesson, day) && (scheduleGrouping === "tutor" ? (lesson.tutor_id ?? "") === tutorId : `${lesson.site_id ?? lesson.venue_name ?? "unspecified"}::${lesson.room?.trim() || "Room not assigned"}` === tutorId),
       );
       const expected = tutorLessons.reduce((sum, lesson) => sum + countFor(lesson), 0);
+      const capacity = tutorLessons.reduce((peak, lesson) => {
+        const concurrent = tutorLessons.filter((other) => minutes(other.start_time) < minutes(lesson.end_time) && minutes(other.end_time) > minutes(lesson.start_time));
+        return Math.max(peak, concurrent.reduce((sum, item) => sum + (item.capacity ?? 0), 0));
+      }, 0);
+      const peakStudents = tutorLessons.reduce((peak, lesson) => {
+        const concurrent = tutorLessons.filter((other) => minutes(other.start_time) < minutes(lesson.end_time) && minutes(other.end_time) > minutes(lesson.start_time));
+        return Math.max(peak, concurrent.reduce((sum, item) => sum + countFor(item), 0));
+      }, 0);
+      if (scheduleGrouping === "location") return { present: peakStudents, expected: capacity, marked: true, percentage: capacity ? Math.round(peakStudents / capacity * 100) : null };
       const summaries = tutorLessons.map((lesson) => attendanceSummaryFor(lesson, iso));
       const present = summaries.reduce((sum, item) => sum + item.present, 0);
       const marked = summaries.reduce((sum, item) => sum + item.marked, 0);
@@ -987,12 +996,12 @@ function SchedulePage() {
                 <div key={`${format(day, "yyyy-MM-dd")}-${id}`} className="min-w-0 border-l border-border bg-card px-2 py-2">
                   <div className="flex min-w-0 items-center gap-2">
                     {scheduleGrouping === "tutor" ? <Avatar size="md" initials={tutor ? initialsOf(fullName(tutor)) : "?"} tone={tutor ? avatarTone(fullName(tutor)) : "neutral"} /> : <MapPin className="h-4 w-4 text-primary" />}
-                    <span className={cn("truncate text-xs font-bold", !tutor && "text-muted-foreground")}>{tutor ? fullName(tutor) : "Not assigned"}</span>
+                    <span className={cn("truncate text-xs font-bold", !tutor && "text-muted-foreground")}>{scheduleGrouping === "location" ? roomName : (tutor ? fullName(tutor) : "Not assigned")}</span>
                   </div>
                   {(() => {
                     const totals = tutorAttendanceFor(day, id);
                     return (
-                      <div className="mt-1.5" title={totals.marked ? `${totals.present} present out of ${totals.expected} expected; ${totals.marked} marked` : "Attendance not marked"}>
+                      <div className="mt-1.5" title={scheduleGrouping === "location" ? `${totals.present}/${totals.expected} peak room occupancy` : totals.marked ? `${totals.present} present out of ${totals.expected} expected; ${totals.marked} marked` : "Attendance not marked"}>
                         <div className="mb-1 flex flex-wrap items-center justify-between gap-1 text-[11px] font-bold tabular-nums">
                           <span className="text-muted-foreground">{scheduleGrouping === "tutor" ? "Attendance" : "Students"}</span>
                           <span>{totals.percentage === null ? "Not marked" : `${totals.percentage}% (${totals.present}/${totals.expected})`}</span>
