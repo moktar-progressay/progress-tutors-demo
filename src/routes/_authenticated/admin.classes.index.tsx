@@ -965,6 +965,31 @@ function SchedulePage() {
     );
   };
 
+  // Fit the timetable to the visible viewport so the page itself does not become
+  // a second vertical scroller. Column headers then stick inside the real scroll area.
+  const timetableRef = useRef<HTMLDivElement>(null);
+  const [timetableHeight, setTimetableHeight] = useState<number | null>(null);
+  useEffect(() => {
+    const update = () => {
+      const element = timetableRef.current;
+      if (!element) return;
+      const viewport = window.visualViewport?.height ?? window.innerHeight;
+      const viewportTop = window.visualViewport?.offsetTop ?? 0;
+      const bottomNavigation = window.matchMedia("(max-width: 639px)").matches ? 88 : 16;
+      setTimetableHeight(Math.max(220, Math.floor(viewport + viewportTop - element.getBoundingClientRect().top - bottomNavigation)));
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    if (timetableRef.current?.parentElement) observer.observe(timetableRef.current.parentElement);
+    window.addEventListener("resize", update);
+    window.visualViewport?.addEventListener("resize", update);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", update);
+      window.visualViewport?.removeEventListener("resize", update);
+    };
+  }, [view, quickFiltersOpen, filtersOpen, scheduleGrouping]);
+
   const timeline = (days: Date[]) => {
     // Each teaching resource gets its own time column. Unassigned lessons remain visible.
     const lanesByDay = days.map((day) => {
@@ -1006,7 +1031,7 @@ function SchedulePage() {
     const gridTemplateColumns = `4rem repeat(${columns.length}, minmax(${columnWidth}px, 1fr)) 68px`;
 
     return (
-      <div className="relative isolate z-0 h-[calc(100dvh-285px)] min-h-[300px] max-w-full overflow-auto overscroll-contain rounded-2xl border border-border bg-card" aria-label={scheduleGrouping === "tutor" ? "Teacher timetable" : "Room timetable"} tabIndex={0}>
+      <div ref={timetableRef} style={timetableHeight === null ? undefined : { height: `${timetableHeight}px` }} className="relative isolate z-0 h-[calc(100dvh-285px)] min-h-[220px] max-w-full overflow-auto overscroll-contain rounded-2xl border border-border bg-card" aria-label={scheduleGrouping === "tutor" ? "Teacher timetable" : "Room timetable"} tabIndex={0}>
         <div style={{ minWidth: `${64 + columns.length * columnWidth + 68}px` }}>
           {view !== "day" && <div className="sticky top-0 z-30 grid border-b border-border bg-card" style={{ gridTemplateColumns }}>
             <div className="sticky left-0 z-50 bg-card p-2" />
