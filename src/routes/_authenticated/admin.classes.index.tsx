@@ -25,6 +25,7 @@ import {
   Filter,
   GraduationCap,
   MapPin,
+  SearchCheck,
   Minus,
   Pencil,
   Plus,
@@ -1226,17 +1227,16 @@ function SchedulePage() {
               </button>
             ))}
           </div>
-          {(view === "day" || view === "week") && <button type="button" onClick={() => setQuickFiltersOpen((open) => !open)} aria-expanded={quickFiltersOpen} aria-controls="schedule-quick-filters" className={cn("inline-flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-xs font-bold", quickFiltersOpen || activeFilterCount ? "bg-primary/10 text-primary" : "bg-card text-muted-foreground")}><Filter className="h-3.5 w-3.5" /> Filters{activeFilterCount ? ` (${activeFilterCount})` : ""} {quickFiltersOpen ? "▴" : "▾"}</button>}
+          {(view === "day" || view === "week") && <button type="button" onClick={() => setQuickFiltersOpen((open) => !open)} aria-expanded={quickFiltersOpen} aria-controls="schedule-quick-filters" aria-label="Toggle timetable filters" title="Filters" className={cn("inline-flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-xs font-bold", quickFiltersOpen || activeFilterCount ? "bg-primary/10 text-primary" : "bg-card text-muted-foreground")}><Filter className="h-4 w-4" />{activeFilterCount ? <span className="text-[10px]">{activeFilterCount}</span> : null}</button>}
           {(view === "day" || view === "week") && quickFiltersOpen && <div id="schedule-quick-filters" className="flex flex-wrap items-center gap-1.5">
             <label className="inline-flex items-center gap-1 rounded-lg border border-border bg-card px-2 py-1 text-xs"><Users className="h-3.5 w-3.5" /><select aria-label="Filter tutor" className="max-w-28 bg-transparent outline-none" value={tutorId} onChange={(event) => setTutorId(event.target.value)}><option value="all">All tutors</option><option value="unassigned">Unassigned</option>{(tutors.data ?? []).map((tutor) => <option key={tutor.id} value={tutor.id}>{fullName(tutor)}</option>)}</select></label>
             <label className="inline-flex items-center gap-1 rounded-lg border border-border bg-card px-2 py-1 text-xs"><MapPin className="h-3.5 w-3.5" /><select aria-label="Filter location" className="max-w-28 bg-transparent outline-none" value={siteId} onChange={(event) => {setSiteId(event.target.value);setRoomFilter("all");}}><option value="all">All locations</option>{(sites.data ?? []).map((site) => <option key={site.id} value={site.id}>{site.name}</option>)}</select></label>
             <label className="inline-flex items-center gap-1 rounded-lg border border-border bg-card px-2 py-1 text-xs"><span aria-hidden="true">▣</span><select aria-label="Filter room" className="max-w-32 bg-transparent outline-none" value={roomFilter} onChange={(event) => setRoomFilter(event.target.value)}><option value="all">All rooms</option>{Array.from(new Set((lessons.data ?? []).filter((lesson) => siteId === "all" || lesson.site_id === siteId).map((lesson) => lesson.room?.trim() || "Room not assigned"))).sort().map((room) => <option key={room} value={room}>{room}</option>)}</select></label>
           </div>}
           {view === "day" || view === "week" ? (
-            <div
-              className="flex items-center rounded-xl border border-border bg-card p-0.5"
-              aria-label="Calendar zoom controls"
-            >
+            <details className="group relative">
+              <summary className="flex h-8 w-8 cursor-pointer list-none items-center justify-center rounded-lg border border-border bg-card text-muted-foreground hover:text-primary [&::-webkit-details-marker]:hidden" title="Zoom timetable" aria-label="Zoom timetable"><SearchCheck className="h-4 w-4" /></summary>
+              <div className="absolute right-0 top-full z-[70] mt-1 flex items-center rounded-xl border border-border bg-card p-0.5 shadow-lg" aria-label="Calendar zoom controls">
               <Button
                 type="button"
                 size="icon"
@@ -1278,7 +1278,8 @@ function SchedulePage() {
               >
                 <Plus className="h-4 w-4" />
               </Button>
-            </div>
+              </div>
+            </details>
           ) : null}
         </div>
       </section>
