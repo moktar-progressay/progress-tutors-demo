@@ -40,6 +40,24 @@ function AttendanceWorkspace() {
   const markRows = attendance.data ?? [];
   const enrolmentRows = enrolments.data ?? [];
   const studentRows = students.data ?? [];
+  const now = new Date();
+  const suggestions = sessionRows.filter(row => row.class_id && row.session_date).map(row => {
+    const course = classRows.find(c => c.id === row.class_id);
+    const start = new Date(row.session_date + "T" + (row.start_time || course?.start_time || "00:00").slice(0,5) + ":00");
+    const end = new Date(row.session_date + "T" + (row.end_time || course?.end_time || "23:59").slice(0,5) + ":00");
+    const marked = markRows.filter(m => m.session_id === row.id).length;
+    const total = enrolmentRows.filter(e => e.class_id === row.class_id && e.status === "active").length;
+    return {row, course, start, end, marked, total};
+  }).filter(item => Number.isFinite(item.start.getTime()) && Number.isFinite(item.end.getTime()));
+  const upcoming = suggestions.filter(x => x.end >= now && x.start.getTime() <= now.getTime() + 7*86400000).sort((a,b) => a.start.getTime()-b.start.getTime()).slice(0,5);
+  const recent = suggestions.filter(x => x.end < now && x.end.getTime() >= now.getTime()-7*86400000).sort((a,b) => b.end.getTime()-a.end.getTime()).slice(0,5);
+  const quickCard = (item: typeof suggestions[number]) => <button type="button" key={item.row.id}
+    onClick={() => {setClassId(item.row.class_id ?? ""); setSessionId(item.row.id); setDate(item.row.session_date); setFilter("all");}}
+    className="w-full rounded-lg border border-border bg-background p-3 text-left hover:border-primary hover:bg-primary/5">
+    <span className="block truncate text-sm font-bold">{item.course?.name ?? "Lesson"}</span>
+    <span className="block text-xs text-muted-foreground">{prettyDate(item.row.session_date)} · {(item.row.start_time || item.course?.start_time || "").slice(0,5)}</span>
+    <span className="block text-xs font-semibold text-primary">{item.marked}/{item.total} marked</span>
+  </button>;
   const selectedClass = classRows.find((row) => row.id === classId);
   const classSessions = useMemo(() => sessionRows.filter((row) => row.class_id === classId).sort((a,b) => b.session_date.localeCompare(a.session_date)), [sessionRows, classId]);
   const selectedSession = classSessions.find((row) => row.id === sessionId);
@@ -106,7 +124,14 @@ function AttendanceWorkspace() {
       <button type="button" onClick={() => setView("course")} className={`flex min-h-12 items-center justify-center gap-2 text-sm font-bold ${view === "course" ? "border-b-2 border-primary text-primary" : "text-muted-foreground"}`}><Users className="h-4 w-4"/>By course</button>
       <button type="button" onClick={() => setView("student")} className={`flex min-h-12 items-center justify-center gap-2 text-sm font-bold ${view === "student" ? "border-b-2 border-primary text-primary" : "text-muted-foreground"}`}><UserRound className="h-4 w-4"/>By student</button>
     </div>
-    {view === "course" ? <>
+    {view === "course" ? <>      <section className="space-y-2" aria-label="Suggested lesson registers">
+        <h2 className="text-sm font-bold">Quick start attendance</h2>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-2"><h3 className="text-xs font-semibold text-muted-foreground">Upcoming lessons</h3>{upcoming.length ? upcoming.map(quickCard) : <p className="text-xs text-muted-foreground">No upcoming registers in the next 7 days.</p>}</div>
+          <div className="space-y-2"><h3 className="text-xs font-semibold text-muted-foreground">Recently passed</h3>{recent.length ? recent.map(quickCard) : <p className="text-xs text-muted-foreground">No recent registers in the last 7 days.</p>}</div>
+        </div>
+      </section>
+
       <section className="rounded-xl border border-border bg-card p-4">
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="space-y-1 text-xs font-semibold">COURSE
