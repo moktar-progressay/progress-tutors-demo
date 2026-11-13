@@ -23,7 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LessonTimeRangePicker } from "@/components/lesson-time-range-picker";
 import { SiteRoomField } from "@/components/site-room-field";
-import { useCatalogue } from "@/lib/teaching-catalogue";
+import { useCatalogue, useCatalogueMutation } from "@/lib/teaching-catalogue";
 import {
   Dialog,
   DialogContent,
@@ -108,6 +108,12 @@ export function ClassWorkspace({
   const enrolments = useTable("class_enrolments");
   const sessions = useTable("sessions", "session_date");
   const attendance = useTable("student_attendance");
+  const createSite = useUpsert("sites");
+  const createRoom = useCatalogueMutation("site_rooms");
+  const [quickAdd, setQuickAdd] = useState<"site" | "room" | null>(null);
+  const [quickName, setQuickName] = useState("");
+  const [quickAddress, setQuickAddress] = useState("");
+  const [quickFloor, setQuickFloor] = useState("");
   const updateClass = useUpdateRow("classes");
   const deleteClass = useDeleteRow("classes");
   const addStudent = useUpsert("students");
@@ -219,6 +225,29 @@ export function ClassWorkspace({
       </Page>
     );
 
+  const saveQuickLocation = async () => {
+    const name = quickName.trim();
+    if (!name) { toast.error("Enter a name"); return; }
+    if (quickAdd === "room" && !edit.site_id) { toast.error("Choose a location before adding a room"); return; }
+    try {
+      if (quickAdd === "site") {
+        if ((sites.data ?? []).some((site) => site.name.toLowerCase() === name.toLowerCase())) {
+          toast.error("This location already exists"); return;
+        }
+        const created = await createSite.mutateAsync([{ name, address: quickAddress.trim() || null }]);
+        const newId = created?.[0]?.id;
+        if (!newId) throw new Error("Location created but could not be selected. Please reload.");
+        setEdit((previous) => ({ ...previous, site_id: newId, room: "" }));
+        toast.success("Location added. Remember to save the lesson.");
+      } else if (quickAdd === "room") {
+        const created = await createRoom.mutateAsync({ type: "create", values: { name, site_id: edit.site_id, floor: quickFloor.trim() || null } });
+        if (!created) throw new Error("Could not create room");
+        setEdit((previous) => ({ ...previous, room: name }));
+        toast.success("Room added. Remember to save the lesson.");
+      }
+      setQuickAdd(null); setQuickName(""); setQuickAddress(""); setQuickFloor("");
+    } catch (error) { toast.error(error instanceof Error ? error.message : "Could not add location or room"); }
+  };
   const tutor = (tutors.data ?? []).find((item) => item.id === edit.tutor_id);
   const roster = (enrolments.data ?? []).filter((item) => item.class_id === c.id);
   const activeRoster = roster.filter((item) => item.status === "active");
@@ -504,8 +533,8 @@ export function ClassWorkspace({
           </label>
         </div>
         {edit.delivery_mode === "online" ? <div className="lg:col-span-2 text-sm text-muted-foreground">Online lesson: no physical location or room required.</div> : <>
-          <SelectField label="Location / site" value={edit.site_id} onChange={(site_id) => setEdit({ ...edit, site_id, room: "" })} options={[{ value: "", label: "Venue to confirm" }, ...(sites.data ?? []).map((item) => ({ value: item.id, label: item.name }))]} />
-          <div className="min-w-0"><SiteRoomField siteId={edit.site_id} siteName={(sites.data ?? []).find((site) => site.id === edit.site_id)?.name ?? edit.venue_name} value={edit.room} onChange={(room) => setEdit({ ...edit, room })} /></div>
+          <div className="min-w-0 space-y-1"><SelectField label="Location / site" value={edit.site_id} onChange={(site_id) => setEdit({ ...edit, site_id, room: "" })} options={[{ value: "", label: "Venue to confirm" }, ...(sites.data ?? []).map((item) => ({ value: item.id, label: item.name }))]} /><button type="button" className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline" onClick={() => { setQuickName(""); setQuickAddress(""); setQuickAdd("site"); }}><Plus className="h-3.5 w-3.5" /> Add location</button></div>
+          <div className="min-w-0"><SiteRoomField siteId={edit.site_id} siteName={(sites.data ?? []).find((site) => site.id === edit.site_id)?.name ?? edit.venue_name} value={edit.room} onChange={(room) => setEdit({ ...edit, room })} /><button type="button" disabled={!edit.site_id} className="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline disabled:cursor-not-allowed disabled:opacity-50" onClick={() => { setQuickName(""); setQuickFloor(""); setQuickAdd("room"); }}><Plus className="h-3.5 w-3.5" /> Add room</button></div>
         </>}
       </section>
 
@@ -1088,6 +1117,16 @@ export function ClassWorkspace({
               {addEnrolment.isPending || updateEnrolment.isPending ? "Saving…" : "Save students"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={quickAdd !== null} onOpenChange={(open) => { if (!open && !createSite.isPending && !createRoom.isPending) setQuickAdd(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader><DialogTitle>{quickAdd === "site" ? "Add location" : "Add room"}</DialogTitle><DialogDescription>{quickAdd === "site" ? "Create a location and select it for this lesson." : `Create a room within ${(sites.data ?? []).find((site) => site.id === edit.site_id)?.name ?? "the selected location"}.`}</DialogDescription></DialogHeader>
+          <div className="space-y-3 py-2">
+            <label className="block text-sm font-semibold">{quickAdd === "site" ? "Location name" : "Room name"}<Input className="mt-1" autoFocus value={quickName} maxLength={120} onChange={(event) => setQuickName(event.target.value)} placeholder={quickAdd === "site" ? "e.g. Westway Sports Centre" : "e.g. Training Room"} /></label>
+            {quickAdd === "site" ? <label className="block text-sm font-semibold">Address (optional)<Input className="mt-1" value={quickAddress} onChange={(event) => setQuickAddress(event.target.value)} /></label> : <label className="block text-sm font-semibold">Floor (optional)<Input className="mt-1" value={quickFloor} onChange={(event) => setQuickFloor(event.target.value)} /></label>}
+          </div>
+          <DialogFooter><Button type="button" variant="outline" onClick={() => setQuickAdd(null)}>Cancel</Button><Button type="button" disabled={!quickName.trim() || createSite.isPending || createRoom.isPending} onClick={saveQuickLocation}><Plus className="h-4 w-4" /> {createSite.isPending || createRoom.isPending ? "Adding…" : quickAdd === "site" ? "Add location" : "Add room"}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
       <ConfirmDeleteDialog
