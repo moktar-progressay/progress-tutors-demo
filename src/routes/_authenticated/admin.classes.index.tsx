@@ -1003,11 +1003,11 @@ function SchedulePage() {
       return { present, expected, marked, percentage: marked && expected ? Math.round((present / expected) * 100) : null };
     };
     const columnWidth = 220;
-    const gridTemplateColumns = `4rem repeat(${columns.length}, minmax(${columnWidth}px, 1fr))`;
+    const gridTemplateColumns = `4rem repeat(${columns.length}, minmax(${columnWidth}px, 1fr)) 68px`;
 
     return (
       <div className="relative isolate z-0 h-[min(85dvh,900px)] min-h-[540px] max-w-full overflow-auto overscroll-contain rounded-2xl border border-border bg-card" aria-label={scheduleGrouping === "tutor" ? "Teacher timetable" : "Room timetable"} tabIndex={0}>
-        <div style={{ minWidth: `${64 + columns.length * columnWidth}px` }}>
+        <div style={{ minWidth: `${64 + columns.length * columnWidth + 68}px` }}>
           {view !== "day" && <div className="sticky top-0 z-30 grid border-b border-border bg-card" style={{ gridTemplateColumns }}>
             <div className="sticky left-0 z-50 bg-card p-2" />
             {lanesByDay.map(({ day, lanes }) => (
@@ -1068,6 +1068,11 @@ function SchedulePage() {
                 </div>
               );
             })}
+            <div className="flex items-center justify-center border-l border-border bg-card px-1" title={scheduleGrouping === "tutor" ? "Add tutor column" : "Add room column"}>
+              <Link to={scheduleGrouping === "tutor" ? "/admin/tutors" : "/admin/configuration"} aria-label={scheduleGrouping === "tutor" ? "Add tutor" : "Add room"} title={scheduleGrouping === "tutor" ? "Add tutor" : "Add room"} className="flex h-12 w-12 flex-col items-center justify-center gap-0.5 rounded-xl bg-[#e92e73] text-white shadow-sm transition-colors hover:bg-[#c9185d] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e92e73]">
+                <Plus className="h-5 w-5 stroke-[3]" /><span className="text-[9px] font-bold">{scheduleGrouping === "tutor" ? "Tutor" : "Room"}</span>
+              </Link>
+            </div>
           </div>
           <div className="grid" style={{ gridTemplateColumns }}>
             <div className="sticky left-0 z-40 border-r border-border bg-card" style={{ height: calendarHeight }}>
@@ -1134,6 +1139,7 @@ function SchedulePage() {
                 </div>
               );
             })}
+            <div aria-hidden="true" className="border-l border-dashed border-[#e92e73]/35 bg-[#e92e73]/[0.035]" style={{height:calendarHeight}} />
           </div>
         </div>
       </div>
@@ -1252,7 +1258,6 @@ function SchedulePage() {
       </section>
       </div>
 
-      {(view === "day" || view === "week") && <div className="flex justify-end">{scheduleGrouping === "location" ? <Button size="sm" variant="outline" onClick={() => { openNew(); toast.info("Select the location, then choose or manage its rooms."); }}><Plus className="mr-1 h-4 w-4" /> Room</Button> : <Button size="sm" variant="outline" asChild><Link to="/admin/tutors"><Plus className="mr-1 h-4 w-4" /> Tutor</Link></Button>}</div>}
       {view === "day" ? timeline([anchor]) : null}
       {view === "week" ? timeline(weekDays) : null}
       {view === "month" ? (
