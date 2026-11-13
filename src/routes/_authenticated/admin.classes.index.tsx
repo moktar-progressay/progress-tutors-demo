@@ -1182,7 +1182,7 @@ function SchedulePage() {
           {searchOpen || search ? <div className="relative w-40 sm:w-56"><Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" /><Input autoFocus aria-label="Search lessons" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search lessons" className="h-8 rounded-lg pl-8 pr-7 text-xs" /><button type="button" aria-label="Close search" className="absolute right-2 top-1/2 -translate-y-1/2" onClick={() => { setSearch(""); setSearchOpen(false); }}>×</button></div> : <Button size="icon" variant="ghost" className="h-8 w-8" aria-label="Search lessons" onClick={() => setSearchOpen(true)}><Search className="h-4 w-4" /></Button>}
           
           <Button size="sm" variant="ghost" className="h-8" onClick={downloadTeachingReport}><Download className="h-4 w-4" /><span className="hidden sm:inline">Report</span></Button>
-          <Button size="sm" className="h-8" onClick={() => openNew()}>Add lesson</Button>
+          <Button size="icon" className="h-8 w-8 shrink-0 rounded-full" onClick={() => openNew()} aria-label="Add lesson" title="Add lesson"><Plus className="h-4 w-4" /></Button>
         </div>
       </div>
 
