@@ -964,7 +964,7 @@ function SchedulePage() {
     const gridTemplateColumns = `4rem repeat(${columns.length}, minmax(${columnWidth}px, 1fr))`;
 
     return (
-      <div className="relative max-h-[min(65dvh,680px)] min-h-[320px] max-w-full overflow-auto overscroll-contain rounded-2xl border border-border bg-card" aria-label={scheduleGrouping === "tutor" ? "Teacher timetable" : "Room timetable"} tabIndex={0}>
+      <div className="relative isolate max-h-[min(65dvh,680px)] min-h-[320px] max-w-full overflow-auto overscroll-contain rounded-2xl border border-border bg-card" style={{ contain: "paint" }} aria-label={scheduleGrouping === "tutor" ? "Teacher timetable" : "Room timetable"} tabIndex={0}>
         <div style={{ minWidth: `${64 + columns.length * columnWidth}px` }}>
           {view !== "day" && <div className="sticky top-0 z-30 grid border-b border-border bg-card" style={{ gridTemplateColumns }}>
             <div className="sticky left-0 z-40 bg-card p-2" />
