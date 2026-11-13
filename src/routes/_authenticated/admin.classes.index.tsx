@@ -1036,7 +1036,7 @@ function SchedulePage() {
                 const active = filtered.filter((lesson) => days.some((day) => lessonRunsOn(lesson, day)) && minutes(lesson.start_time) < (hour + 1) * 60 && minutes(lesson.end_time) > hour * 60);
                 const occupied = active.reduce((sum, lesson) => sum + countFor(lesson), 0);
                 const capacity = active.reduce((sum, lesson) => sum + (lesson.capacity ?? 0), 0);
-                return <div key={hour} className="absolute inset-x-0 px-1 text-center" style={{ top: `${(hour - 8) * calendarHourHeight + 4}px` }}><span className="text-[10px] font-semibold">{hour}:00</span>{scheduleGrouping === "location" && <><span className="block text-[9px] tabular-nums">{occupied}/{capacity} students</span><div className="mt-1 h-1 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-[#e92e73]" style={{width:`${capacity ? Math.min(100, occupied / capacity * 100) : 0}%`}} /></div></>}</div>;
+                return <div key={hour} className="absolute inset-x-0 px-1 text-center" style={{ top: `${(hour - 8) * calendarHourHeight + 4}px` }}><span className="text-[10px] font-semibold">{hour}:00</span>{<><span className="block text-[9px] tabular-nums">{occupied}/{capacity} students</span><div className="mt-1 h-1 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-[#e92e73]" style={{width:`${capacity ? Math.min(100, occupied / capacity * 100) : 0}%`}} /></div></>}</div>;
               })}
             </div>
             {columns.map(({ day, id }) => {
