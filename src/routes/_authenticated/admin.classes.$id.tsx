@@ -472,7 +472,7 @@ export function ClassWorkspace({
             size="icon"
             onClick={saveLesson}
             disabled={updateClass.isPending}
-            aria-label="Save lesson"
+            aria-label="Save lesson" title="Save changes"
           >
             <Save className="h-4 w-4" />
           </Button>
@@ -504,6 +504,19 @@ export function ClassWorkspace({
         </button>
       </section>
       </div>
+
+      <section className="grid gap-3 rounded-2xl border border-border bg-card p-4 lg:grid-cols-3" aria-label="Tutor and location assignments">
+        <div className="flex min-w-0 items-end gap-2">
+          <Avatar initials={tutor ? initialsOf(fullName(tutor)) : "?"} tone={tutor ? avatarTone(fullName(tutor)) : "neutral"} size="lg" />
+          <label className="flex min-w-0 flex-1 flex-col gap-1 text-xs font-semibold text-muted-foreground">Assigned tutor
+            <select ref={tutorSelectRef} value={edit.tutor_id} onChange={(event) => setEdit({ ...edit, tutor_id: event.target.value })} className="h-10 w-full min-w-0 rounded-xl border border-border bg-card px-3 text-sm font-medium text-foreground"><option value="">Not assigned</option>{(tutors.data ?? []).map((item) => <option key={item.id} value={item.id}>{fullName(item)}</option>)}</select>
+          </label>
+        </div>
+        {edit.delivery_mode === "online" ? <div className="lg:col-span-2 text-sm text-muted-foreground">Online lesson: no physical location or room required.</div> : <>
+          <SelectField label="Location / site" value={edit.site_id} onChange={(site_id) => setEdit({ ...edit, site_id, room: "" })} options={[{ value: "", label: "Venue to confirm" }, ...(sites.data ?? []).map((item) => ({ value: item.id, label: item.name }))]} />
+          <div className="min-w-0"><SiteRoomField siteId={edit.site_id} siteName={(sites.data ?? []).find((site) => site.id === edit.site_id)?.name ?? edit.venue_name} value={edit.room} onChange={(room) => setEdit({ ...edit, room })} /></div>
+        </>}
+      </section>
 
       <div className="grid gap-3 lg:grid-cols-2">
         <section className="rounded-2xl border border-border bg-card p-4">
@@ -620,69 +633,11 @@ export function ClassWorkspace({
                 value={edit.online_url}
                 onChange={(online_url) => setEdit({ ...edit, online_url })}
               />
-            ) : (
-              <div className="min-w-0 space-y-2 sm:col-span-2">
-                <SelectField
-                  label="Location / site"
-                  value={edit.site_id}
-                  onChange={(site_id) => setEdit({ ...edit, site_id, room: "" })}
-                  options={[
-                    { value: "", label: "Venue to confirm" },
-                    ...(sites.data ?? []).map((item) => ({ value: item.id, label: item.name })),
-                  ]}
-                />
-                <div className="ml-3 border-l-2 border-primary/25 pl-3">
-                  <SiteRoomField
-                    siteId={edit.site_id}
-                    siteName={(sites.data ?? []).find((site) => site.id === edit.site_id)?.name ?? edit.venue_name}
-                    value={edit.room}
-                    onChange={(room) => setEdit({ ...edit, room })}
-                  />
-                </div>
-              </div>
-            )}
+            ) : null}
           </div>
         </section>
 
-        <section className="rounded-2xl border border-border bg-card p-4 lg:col-span-2">
-          <h2 className="mb-3 text-sm font-extrabold">Tutor</h2>
-          <div className="flex items-end gap-3">
-            <button
-              type="button"
-              className="group relative shrink-0 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              aria-label="Change assigned tutor"
-              onClick={() => {
-                tutorSelectRef.current?.focus();
-                tutorSelectRef.current?.showPicker?.();
-              }}
-            >
-              <Avatar
-                initials={tutor ? initialsOf(fullName(tutor)) : "?"}
-                tone={tutor ? avatarTone(fullName(tutor)) : "neutral"}
-                size="lg"
-              />
-              <span className="absolute -right-1 -bottom-1 grid h-6 w-6 place-items-center rounded-full bg-primary text-primary-foreground shadow-sm ring-2 ring-card">
-                <Pencil className="h-3 w-3" />
-              </span>
-            </button>
-            <label className="flex min-w-0 flex-1 flex-col gap-1 text-xs font-semibold text-muted-foreground">
-              Assigned tutor
-              <select
-                ref={tutorSelectRef}
-                value={edit.tutor_id}
-                onChange={(event) => setEdit({ ...edit, tutor_id: event.target.value })}
-                className="h-10 w-full min-w-0 rounded-xl border border-border bg-card px-3 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-              >
-                <option value="">Not assigned</option>
-                {(tutors.data ?? []).map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {fullName(item)}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-        </section>
+
       </div>
 
       <section id="lesson-attendance" className="scroll-mt-6 rounded-2xl border border-border bg-card p-4 sm:p-5">
