@@ -966,10 +966,10 @@ function SchedulePage() {
     const gridTemplateColumns = `4rem repeat(${columns.length}, minmax(${columnWidth}px, 1fr))`;
 
     return (
-      <div className="relative isolate z-0 h-[min(65dvh,680px)] min-h-[360px] max-w-full overflow-auto overscroll-contain rounded-2xl border border-border bg-card" aria-label={scheduleGrouping === "tutor" ? "Teacher timetable" : "Room timetable"} tabIndex={0}>
+      <div className="relative isolate z-0 h-[min(85dvh,900px)] min-h-[540px] max-w-full overflow-auto overscroll-contain rounded-2xl border border-border bg-card" aria-label={scheduleGrouping === "tutor" ? "Teacher timetable" : "Room timetable"} tabIndex={0}>
         <div style={{ minWidth: `${64 + columns.length * columnWidth}px` }}>
           {view !== "day" && <div className="sticky top-0 z-30 grid border-b border-border bg-card" style={{ gridTemplateColumns }}>
-            <div className="sticky left-0 z-40 bg-card p-2" />
+            <div className="sticky left-0 z-50 bg-card p-2" />
             {lanesByDay.map(({ day, lanes }) => (
               <button
                 key={format(day, "yyyy-MM-dd")}
@@ -1030,7 +1030,7 @@ function SchedulePage() {
             })}
           </div>
           <div className="grid" style={{ gridTemplateColumns }}>
-            <div className="sticky left-0 z-20 border-r border-border bg-card" style={{ height: calendarHeight }}>
+            <div className="sticky left-0 z-40 border-r border-border bg-card" style={{ height: calendarHeight }}>
               {HOURS.map((hour) => {
                 const active = filtered.filter((lesson) => days.some((day) => lessonRunsOn(lesson, day)) && minutes(lesson.start_time) < (hour + 1) * 60 && minutes(lesson.end_time) > hour * 60);
                 const occupied = active.reduce((sum, lesson) => sum + countFor(lesson), 0);
