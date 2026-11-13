@@ -51,12 +51,20 @@ function AttendanceWorkspace() {
   }).filter(item => Number.isFinite(item.start.getTime()) && Number.isFinite(item.end.getTime()));
   const upcoming = suggestions.filter(x => x.end >= now && x.start.getTime() <= now.getTime() + 7*86400000).sort((a,b) => a.start.getTime()-b.start.getTime()).slice(0,5);
   const recent = suggestions.filter(x => x.end < now && x.end.getTime() >= now.getTime()-7*86400000).sort((a,b) => b.end.getTime()-a.end.getTime()).slice(0,5);
+  const lessonColours = ["#ec2d70", "#155dfb", "#00a36c", "#ffb900", "#8424f5", "#009b91"];
+  const colourFor = (item: typeof suggestions[number]) => {
+    const source = item.course as Record<string, unknown> | undefined;
+    const saved = source?.colour ?? source?.color ?? source?.card_colour ?? source?.card_color;
+    if (typeof saved === "string" && /^#[0-9a-f]{6}$/i.test(saved)) return saved;
+    const key = String(item.row.class_id ?? "");
+    return lessonColours[Array.from(key).reduce((sum, char) => sum + char.charCodeAt(0), 0) % lessonColours.length];
+  };
   const quickCard = (item: typeof suggestions[number]) => <button type="button" key={item.row.id}
     onClick={() => {setClassId(item.row.class_id ?? ""); setSessionId(item.row.id); setDate(item.row.session_date); setFilter("all");}}
-    className="w-full rounded-lg border border-border bg-background p-3 text-left hover:border-primary hover:bg-primary/5">
+    className="w-full rounded-lg border border-border p-3 text-left shadow-sm transition hover:brightness-95" style={{backgroundColor:colourFor(item),color: colourFor(item) === "#ffb900" ? "#242424" : "#fff"}}>
     <span className="block truncate text-sm font-bold">{item.course?.name ?? "Lesson"}</span>
-    <span className="block text-xs text-muted-foreground">{prettyDate(item.row.session_date)} · {(item.row.start_time || item.course?.start_time || "").slice(0,5)}</span>
-    <span className="block text-xs font-semibold text-primary">{item.marked}/{item.total} marked</span>
+    <span className="block text-xs opacity-90">{prettyDate(item.row.session_date)} · {(item.row.start_time || item.course?.start_time || "").slice(0,5)}</span>
+    <span className="block text-xs font-semibold">{item.marked}/{item.total} marked</span>
   </button>;
   const selectedClass = classRows.find((row) => row.id === classId);
   const classSessions = useMemo(() => sessionRows.filter((row) => row.class_id === classId).sort((a,b) => b.session_date.localeCompare(a.session_date)), [sessionRows, classId]);
@@ -124,15 +132,7 @@ function AttendanceWorkspace() {
       <button type="button" onClick={() => setView("course")} className={`flex min-h-12 items-center justify-center gap-2 text-sm font-bold ${view === "course" ? "border-b-2 border-primary text-primary" : "text-muted-foreground"}`}><Users className="h-4 w-4"/>By course</button>
       <button type="button" onClick={() => setView("student")} className={`flex min-h-12 items-center justify-center gap-2 text-sm font-bold ${view === "student" ? "border-b-2 border-primary text-primary" : "text-muted-foreground"}`}><UserRound className="h-4 w-4"/>By student</button>
     </div>
-    {view === "course" ? <>      <section className="space-y-2" aria-label="Suggested lesson registers">
-        <h2 className="text-sm font-bold">Quick start attendance</h2>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="space-y-2"><h3 className="text-xs font-semibold text-muted-foreground">Upcoming lessons</h3>{upcoming.length ? upcoming.map(quickCard) : <p className="text-xs text-muted-foreground">No upcoming registers in the next 7 days.</p>}</div>
-          <div className="space-y-2"><h3 className="text-xs font-semibold text-muted-foreground">Recently passed</h3>{recent.length ? recent.map(quickCard) : <p className="text-xs text-muted-foreground">No recent registers in the last 7 days.</p>}</div>
-        </div>
-      </section>
-
-      <section className="rounded-xl border border-border bg-card p-4">
+    {view === "course" ? <>      <section className="rounded-xl border border-border bg-card p-4">
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="space-y-1 text-xs font-semibold">COURSE
             <select className="h-11 w-full rounded-lg border border-border bg-background px-3 text-sm" value={classId} onChange={(e) => {setClassId(e.target.value);setSessionId("");setFilter("all");}}><option value="">Choose a course</option>{classRows.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}</select>
@@ -143,6 +143,14 @@ function AttendanceWorkspace() {
         </div>
         {classId && <div className="mt-3 flex flex-wrap items-end gap-2"><label className="space-y-1 text-xs font-semibold">Create register for date<input type="date" value={date} onChange={(e)=>setDate(e.target.value)} className="block h-10 rounded-lg border border-border bg-background px-2"/></label><Button type="button" variant="outline" disabled={busy || !date} onClick={() => void createLessonRegister()}>Open or create register</Button></div>}
       </section>
+      <section className="space-y-2" aria-label="Suggested lesson registers">
+        <h2 className="text-sm font-bold">Quick start attendance</h2>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-2"><h3 className="text-xs font-semibold text-muted-foreground">Upcoming lessons</h3>{upcoming.length ? upcoming.map(quickCard) : <p className="text-xs text-muted-foreground">No upcoming registers in the next 7 days.</p>}</div>
+          <div className="space-y-2"><h3 className="text-xs font-semibold text-muted-foreground">Recently passed</h3>{recent.length ? recent.map(quickCard) : <p className="text-xs text-muted-foreground">No recent registers in the last 7 days.</p>}</div>
+        </div>
+      </section>
+
       {selectedSession ? <section className="rounded-xl border border-border bg-card p-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><div><h2 className="font-bold">{selectedClass?.name}</h2><p className="text-xs text-muted-foreground">{prettyDate(selectedSession.session_date)}</p></div><Link to="/admin/classes/$id" params={{id:classId}} className="text-xs font-semibold text-primary underline">Open class</Link></div>
         <div className="mb-3 grid grid-cols-4 gap-2">{([{label:"Total",value:totals.total},{label:"Present",value:totals.present},{label:"Absent",value:totals.absent},{label:"Unmarked",value:totals.unmarked}]).map((item) => <div key={item.label} className="rounded-lg border border-border p-2"><p className="text-[10px] uppercase text-muted-foreground">{item.label}</p><p className="text-lg font-bold">{item.value}</p></div>)}</div>
