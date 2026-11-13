@@ -1006,7 +1006,7 @@ function SchedulePage() {
     const gridTemplateColumns = `4rem repeat(${columns.length}, minmax(${columnWidth}px, 1fr)) 68px`;
 
     return (
-      <div className="relative isolate z-0 h-[min(85dvh,900px)] min-h-[540px] max-w-full overflow-auto overscroll-contain rounded-2xl border border-border bg-card" aria-label={scheduleGrouping === "tutor" ? "Teacher timetable" : "Room timetable"} tabIndex={0}>
+      <div className="relative isolate z-0 h-[calc(100dvh-245px)] min-h-[360px] max-w-full overflow-auto overscroll-contain rounded-2xl border border-border bg-card" aria-label={scheduleGrouping === "tutor" ? "Teacher timetable" : "Room timetable"} tabIndex={0}>
         <div style={{ minWidth: `${64 + columns.length * columnWidth + 68}px` }}>
           {view !== "day" && <div className="sticky top-0 z-30 grid border-b border-border bg-card" style={{ gridTemplateColumns }}>
             <div className="sticky left-0 z-50 bg-card p-2" />
@@ -1148,7 +1148,7 @@ function SchedulePage() {
 
   return (
     <Page className="space-y-4">
-      <div className="relative z-10 -mx-4 space-y-2 bg-background px-4 pb-2 pt-1 sm:sticky sm:top-[var(--app-header-height)] sm:z-30 sm:-mx-6 sm:bg-background/95 sm:px-6 sm:backdrop-blur-md lg:-mx-8 lg:px-8">
+      <div className="sticky top-[var(--app-header-height)] z-40 -mx-4 space-y-2 bg-background px-4 pb-2 pt-1 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
       <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
         <div><h1 className="text-xl font-extrabold sm:text-2xl">Schedule</h1><p className="hidden text-xs text-muted-foreground sm:block">One calendar for every online and face-to-face lesson.</p></div>
         <div className="flex min-w-0 flex-wrap items-center gap-1.5">
@@ -1181,7 +1181,7 @@ function SchedulePage() {
             <ChevronRight className="h-4 w-4" />
           </Button>
           <p className="min-w-40 flex-1 text-sm font-extrabold sm:text-base">{dateTitle}</p>
-          {(view === "day" || view === "week") && <div className="flex items-center gap-1 rounded-xl border border-border bg-muted p-1" aria-label="Schedule grouping">
+          {(view === "day" || view === "week") && <div className="mr-3 flex items-center gap-1 rounded-xl border border-primary/20 bg-primary/5 p-1 sm:mr-5" aria-label="Schedule grouping">
             <button type="button" onClick={() => setScheduleGrouping("tutor")} className={cn("inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-bold", scheduleGrouping === "tutor" ? "bg-card text-primary shadow-sm" : "text-muted-foreground")}><Users className="h-3.5 w-3.5" /> By tutor</button>
             <button type="button" onClick={() => setScheduleGrouping("location")} className={cn("inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-bold", scheduleGrouping === "location" ? "bg-card text-primary shadow-sm" : "text-muted-foreground")}><MapPin className="h-3.5 w-3.5" /> By location</button>
           </div>}
