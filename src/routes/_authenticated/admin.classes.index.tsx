@@ -245,6 +245,7 @@ function SchedulePage() {
 
   const [view, setView] = useState<CalendarView>(requestedView ?? "day");
   const [calendarZoom, setCalendarZoom] = useState(1);
+  const [scheduleGrouping, setScheduleGrouping] = useState<"tutor" | "location">("tutor");
   const [selectedDate, setSelectedDate] = useState(requestedDate ?? currentDateIso);
   const [search, setSearch] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
@@ -914,7 +915,7 @@ function SchedulePage() {
         </div>
         {!compact && !narrow && !dense ? (
           <div className="mt-auto flex min-w-0 items-center justify-between gap-1 pt-1 text-[9px] font-bold">
-            <span className="truncate">{tutor ? fullName(tutor) : "Not assigned"}</span>
+            <span className="truncate">{scheduleGrouping === "tutor" ? (tutor ? fullName(tutor) : "Not assigned") : roomName}</span>
             <span className="shrink-0">{enrolled}/{lesson.capacity} seats</span>
           </div>
         ) : null}
@@ -926,11 +927,11 @@ function SchedulePage() {
     // Each teaching resource gets its own time column. Unassigned lessons remain visible.
     const lanesByDay = days.map((day) => {
       const dayLessons = filtered.filter((lesson) => lessonRunsOn(lesson, day));
-      const ids = Array.from(new Set(dayLessons.map((lesson) => lesson.tutor_id ?? "")));
+      const ids = Array.from(new Set(dayLessons.map((lesson) => scheduleGrouping === "tutor" ? (lesson.tutor_id ?? "") : `${lesson.site_id ?? lesson.venue_name ?? "unspecified"}::${lesson.room?.trim() || "Room not assigned"}`)));
       if (!ids.length) ids.push("");
       return {
         day,
-        lanes: ids.sort((a, b) =>
+        lanes: ids.sort((a, b) => scheduleGrouping === "location" ? a.localeCompare(b, "en-GB") :
           a === "" ? 1 : b === "" ? -1 : fullName((tutors.data ?? []).find((tutor) => tutor.id === a)).localeCompare(
             fullName((tutors.data ?? []).find((tutor) => tutor.id === b)),
             "en-GB",
@@ -942,7 +943,7 @@ function SchedulePage() {
     const tutorAttendanceFor = (day: Date, tutorId: string) => {
       const iso = format(day, "yyyy-MM-dd");
       const tutorLessons = filtered.filter((lesson) =>
-        lessonRunsOn(lesson, day) && (lesson.tutor_id ?? "") === tutorId,
+        lessonRunsOn(lesson, day) && (scheduleGrouping === "tutor" ? (lesson.tutor_id ?? "") === tutorId : `${lesson.site_id ?? lesson.venue_name ?? "unspecified"}::${lesson.room?.trim() || "Room not assigned"}` === tutorId),
       );
       const expected = tutorLessons.reduce((sum, lesson) => sum + countFor(lesson), 0);
       const summaries = tutorLessons.map((lesson) => attendanceSummaryFor(lesson, iso));
@@ -954,7 +955,7 @@ function SchedulePage() {
     const gridTemplateColumns = `4rem repeat(${columns.length}, minmax(${columnWidth}px, 1fr))`;
 
     return (
-      <div className="relative max-h-[min(65dvh,680px)] min-h-[320px] max-w-full overflow-auto overscroll-contain rounded-2xl border border-border bg-card" aria-label="Teacher timetable" tabIndex={0}>
+      <div className="relative max-h-[min(65dvh,680px)] min-h-[320px] max-w-full overflow-auto overscroll-contain rounded-2xl border border-border bg-card" aria-label={scheduleGrouping === "tutor" ? "Teacher timetable" : "Room timetable"} tabIndex={0}>
         <div style={{ minWidth: `${64 + columns.length * columnWidth}px` }}>
           {view !== "day" && <div className="sticky top-0 z-30 grid border-b border-border bg-card" style={{ gridTemplateColumns }}>
             <div className="sticky left-0 z-40 bg-card p-2" />
@@ -980,11 +981,12 @@ function SchedulePage() {
           <div className={cn("sticky z-30 grid border-b border-border bg-card", view === "day" ? "top-0" : "top-[57px]")} style={{ gridTemplateColumns }}>
             <div className="sticky left-0 z-40 bg-card p-2" />
             {columns.map(({ day, id }) => {
-              const tutor = (tutors.data ?? []).find((person) => person.id === id);
+              const tutor = scheduleGrouping === "tutor" ? (tutors.data ?? []).find((person) => person.id === id) : undefined;
+              const roomName = id.split("::").slice(1).join("::");
               return (
                 <div key={`${format(day, "yyyy-MM-dd")}-${id}`} className="min-w-0 border-l border-border bg-card px-2 py-2">
                   <div className="flex min-w-0 items-center gap-2">
-                    <Avatar size="md" initials={tutor ? initialsOf(fullName(tutor)) : "?"} tone={tutor ? avatarTone(fullName(tutor)) : "neutral"} />
+                    {scheduleGrouping === "tutor" ? <Avatar size="md" initials={tutor ? initialsOf(fullName(tutor)) : "?"} tone={tutor ? avatarTone(fullName(tutor)) : "neutral"} /> : <MapPin className="h-4 w-4 text-primary" />}
                     <span className={cn("truncate text-xs font-bold", !tutor && "text-muted-foreground")}>{tutor ? fullName(tutor) : "Not assigned"}</span>
                   </div>
                   {(() => {
@@ -992,7 +994,7 @@ function SchedulePage() {
                     return (
                       <div className="mt-1.5" title={totals.marked ? `${totals.present} present out of ${totals.expected} expected; ${totals.marked} marked` : "Attendance not marked"}>
                         <div className="mb-1 flex flex-wrap items-center justify-between gap-1 text-[11px] font-bold tabular-nums">
-                          <span className="text-muted-foreground">Attendance</span>
+                          <span className="text-muted-foreground">{scheduleGrouping === "tutor" ? "Attendance" : "Students"}</span>
                           <span>{totals.percentage === null ? "Not marked" : `${totals.percentage}% (${totals.present}/${totals.expected})`}</span>
                         </div>
                         <div
@@ -1018,15 +1020,16 @@ function SchedulePage() {
           </div>
           <div className="grid" style={{ gridTemplateColumns }}>
             <div className="sticky left-0 z-20 border-r border-border bg-card" style={{ height: calendarHeight }}>
-              {HOURS.map((hour) => (
-                <span key={hour} className="absolute right-2 -translate-y-2 text-[10px] text-muted-foreground" style={{ top: `${(hour - 8) * calendarHourHeight}px` }}>
-                  {hour}:00
-                </span>
-              ))}
+              {HOURS.map((hour) => {
+                const active = filtered.filter((lesson) => days.some((day) => lessonRunsOn(lesson, day)) && minutes(lesson.start_time) < (hour + 1) * 60 && minutes(lesson.end_time) > hour * 60);
+                const occupied = active.reduce((sum, lesson) => sum + countFor(lesson), 0);
+                const capacity = active.reduce((sum, lesson) => sum + (lesson.capacity ?? 0), 0);
+                return <div key={hour} className="absolute inset-x-0 px-1 text-center" style={{ top: `${(hour - 8) * calendarHourHeight + 4}px` }}><span className="text-[10px] font-semibold">{hour}:00</span>{scheduleGrouping === "location" && <><span className="block text-[9px] tabular-nums">{occupied}/{capacity} students</span><div className="mt-1 h-1 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-[#e92e73]" style={{width:`${capacity ? Math.min(100, occupied / capacity * 100) : 0}%`}} /></div></>}</div>;
+              })}
             </div>
             {columns.map(({ day, id }) => {
               const laneLessons = filtered.filter((lesson) =>
-                lessonRunsOn(lesson, day) && (lesson.tutor_id ?? "") === id,
+                lessonRunsOn(lesson, day) && (scheduleGrouping === "tutor" ? (lesson.tutor_id ?? "") === id : `${lesson.site_id ?? lesson.venue_name ?? "unspecified"}::${lesson.room?.trim() || "Room not assigned"}` === id),
               );
               return (
                 <div
@@ -1039,7 +1042,8 @@ function SchedulePage() {
                   }}
                   onDoubleClick={() => {
                     openNew(format(day, "yyyy-MM-dd"));
-                    setForm((current) => ({ ...current, tutor_id: id }));
+                    if (scheduleGrouping === "tutor") setForm((current) => ({ ...current, tutor_id: id }));
+                    else setForm((current) => ({ ...current, site_id: id.split("::")[0] === "unspecified" ? "" : id.split("::")[0], room: id.split("::").slice(1).join("::") }));
                   }}
                 >
                   {laneLessons.map((lesson) => {
@@ -1187,6 +1191,7 @@ function SchedulePage() {
       </section>
       </div>
 
+      {(view === "day" || view === "week") && <div className="flex items-center justify-between gap-2"><div className="inline-flex rounded-xl border border-border bg-muted p-1"><button type="button" onClick={() => setScheduleGrouping("tutor")} className={cn("rounded-lg px-4 py-2 text-xs font-bold",scheduleGrouping === "tutor" ? "bg-card text-primary shadow-sm" : "text-muted-foreground")}>By tutor</button><button type="button" onClick={() => setScheduleGrouping("location")} className={cn("rounded-lg px-4 py-2 text-xs font-bold",scheduleGrouping === "location" ? "bg-card text-primary shadow-sm" : "text-muted-foreground")}>By location</button></div>{scheduleGrouping === "location" ? <Button size="sm" variant="outline" onClick={() => { openNew(); toast.info("Enter the new room name and venue in the lesson form."); }}><Plus className="mr-1 h-4 w-4" /> Room</Button> : <Button size="sm" variant="outline" asChild><Link to="/admin/tutors"><Plus className="mr-1 h-4 w-4" /> Tutor</Link></Button>}</div>}
       {view === "day" ? timeline([anchor]) : null}
       {view === "week" ? timeline(weekDays) : null}
       {view === "month" ? (
