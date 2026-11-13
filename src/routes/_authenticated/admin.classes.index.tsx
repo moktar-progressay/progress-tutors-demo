@@ -251,6 +251,7 @@ function SchedulePage() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [tutorId, setTutorId] = useState("all");
   const [siteId, setSiteId] = useState("all");
+  const [roomFilter, setRoomFilter] = useState("all");
   const [formatFilter, setFormatFilter] = useState("all");
   const [subjectFilter, setSubjectFilter] = useState("all");
   const [attendanceFilter, setAttendanceFilter] = useState("all");
@@ -321,17 +322,18 @@ function SchedulePage() {
           (tutorId === "all" ||
             (tutorId === "unassigned" ? !lesson.tutor_id : lesson.tutor_id === tutorId)) &&
           (siteId === "all" || lesson.site_id === siteId) &&
+          (roomFilter === "all" || (lesson.room?.trim() || "Room not assigned") === roomFilter) &&
           (formatFilter === "all" || lesson.delivery_mode === formatFilter) &&
           (subjectFilter === "all" || subjectLabel(lesson.subject) === subjectFilter)
         );
       })
       .sort(compareLessons);
-  }, [attendance.data, attendanceFilter, formatFilter, lessons.data, search, selectedDate, sessions.data, siteId, subjectFilter, tutorId, tutors.data, view]);
+  }, [attendance.data, attendanceFilter, formatFilter, lessons.data, search, selectedDate, sessions.data, siteId, roomFilter, subjectFilter, tutorId, tutors.data, view]);
 
   const subjects = Array.from(
     new Set((lessons.data ?? []).map((item) => subjectLabel(item.subject)).filter(Boolean)),
   ).sort();
-  const activeFilterCount = [tutorId, siteId, formatFilter, subjectFilter, attendanceFilter].filter(
+  const activeFilterCount = [tutorId, siteId, roomFilter, formatFilter, subjectFilter, attendanceFilter].filter(
     (value) => value !== "all",
   ).length;
   const visibleStudents = (students.data ?? []).filter((student) => {
@@ -1133,6 +1135,10 @@ function SchedulePage() {
             <ChevronRight className="h-4 w-4" />
           </Button>
           <p className="min-w-40 flex-1 text-sm font-extrabold sm:text-base">{dateTitle}</p>
+          {(view === "day" || view === "week") && <div className="flex items-center gap-1 rounded-xl border border-border bg-muted p-1" aria-label="Schedule grouping">
+            <button type="button" onClick={() => setScheduleGrouping("tutor")} className={cn("inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-bold", scheduleGrouping === "tutor" ? "bg-card text-primary shadow-sm" : "text-muted-foreground")}><Users className="h-3.5 w-3.5" /> By tutor</button>
+            <button type="button" onClick={() => setScheduleGrouping("location")} className={cn("inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-bold", scheduleGrouping === "location" ? "bg-card text-primary shadow-sm" : "text-muted-foreground")}><MapPin className="h-3.5 w-3.5" /> By location</button>
+          </div>}
           <div className="order-3 flex w-full min-w-0 justify-between rounded-xl bg-muted p-1 sm:order-none sm:w-auto">
             {(["day", "week", "month", "list"] as CalendarView[]).map((item) => (
               <button
@@ -1148,6 +1154,11 @@ function SchedulePage() {
               </button>
             ))}
           </div>
+          {(view === "day" || view === "week") && <div className="flex flex-wrap items-center gap-1.5">
+            <label className="inline-flex items-center gap-1 rounded-lg border border-border bg-card px-2 py-1 text-xs"><Users className="h-3.5 w-3.5" /><select aria-label="Filter tutor" className="max-w-28 bg-transparent outline-none" value={tutorId} onChange={(event) => setTutorId(event.target.value)}><option value="all">All tutors</option><option value="unassigned">Unassigned</option>{(tutors.data ?? []).map((tutor) => <option key={tutor.id} value={tutor.id}>{fullName(tutor)}</option>)}</select></label>
+            <label className="inline-flex items-center gap-1 rounded-lg border border-border bg-card px-2 py-1 text-xs"><MapPin className="h-3.5 w-3.5" /><select aria-label="Filter location" className="max-w-28 bg-transparent outline-none" value={siteId} onChange={(event) => {setSiteId(event.target.value);setRoomFilter("all");}}><option value="all">All locations</option>{(sites.data ?? []).map((site) => <option key={site.id} value={site.id}>{site.name}</option>)}</select></label>
+            <label className="inline-flex items-center gap-1 rounded-lg border border-border bg-card px-2 py-1 text-xs"><span aria-hidden="true">▣</span><select aria-label="Filter room" className="max-w-32 bg-transparent outline-none" value={roomFilter} onChange={(event) => setRoomFilter(event.target.value)}><option value="all">All rooms</option>{Array.from(new Set((lessons.data ?? []).filter((lesson) => siteId === "all" || lesson.site_id === siteId).map((lesson) => lesson.room?.trim() || "Room not assigned"))).sort().map((room) => <option key={room} value={room}>{room}</option>)}</select></label>
+          </div>}
           {view === "day" || view === "week" ? (
             <div
               className="flex items-center rounded-xl border border-border bg-card p-0.5"
@@ -1200,7 +1211,7 @@ function SchedulePage() {
       </section>
       </div>
 
-      {(view === "day" || view === "week") && <div className="flex items-center justify-between gap-2"><div className="inline-flex rounded-xl border border-border bg-muted p-1"><button type="button" onClick={() => setScheduleGrouping("tutor")} className={cn("rounded-lg px-4 py-2 text-xs font-bold",scheduleGrouping === "tutor" ? "bg-card text-primary shadow-sm" : "text-muted-foreground")}>By tutor</button><button type="button" onClick={() => setScheduleGrouping("location")} className={cn("rounded-lg px-4 py-2 text-xs font-bold",scheduleGrouping === "location" ? "bg-card text-primary shadow-sm" : "text-muted-foreground")}>By location</button></div>{scheduleGrouping === "location" ? <Button size="sm" variant="outline" onClick={() => { openNew(); toast.info("Enter the new room name and venue in the lesson form."); }}><Plus className="mr-1 h-4 w-4" /> Room</Button> : <Button size="sm" variant="outline" asChild><Link to="/admin/tutors"><Plus className="mr-1 h-4 w-4" /> Tutor</Link></Button>}</div>}
+      {(view === "day" || view === "week") && <div className="flex justify-end">{scheduleGrouping === "location" ? <Button size="sm" variant="outline" onClick={() => { openNew(); toast.info("Select the location, then choose or manage its rooms."); }}><Plus className="mr-1 h-4 w-4" /> Room</Button> : <Button size="sm" variant="outline" asChild><Link to="/admin/tutors"><Plus className="mr-1 h-4 w-4" /> Tutor</Link></Button>}</div>}
       {view === "day" ? timeline([anchor]) : null}
       {view === "week" ? timeline(weekDays) : null}
       {view === "month" ? (
