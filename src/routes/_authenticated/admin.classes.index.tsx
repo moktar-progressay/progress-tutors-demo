@@ -975,7 +975,7 @@ function SchedulePage() {
       if (!element) return;
       const viewport = window.visualViewport?.height ?? window.innerHeight;
       const viewportTop = window.visualViewport?.offsetTop ?? 0;
-      const bottomNavigation = window.matchMedia("(max-width: 639px)").matches ? 88 : 16;
+      const bottomNavigation = window.matchMedia("(max-width: 639px)").matches ? 76 : 16;
       setTimetableHeight(Math.max(220, Math.floor(viewport + viewportTop - element.getBoundingClientRect().top - bottomNavigation)));
     };
     update();
@@ -1165,7 +1165,7 @@ function SchedulePage() {
                 </div>
               );
             })}
-            <div aria-hidden="true" className="sticky right-0 z-20 border-l border-slate-200 bg-slate-100 shadow-[-3px_0_6px_-4px_rgba(0,0,0,0.25)] dark:border-slate-700 dark:bg-slate-800" style={{height:calendarHeight}} />
+            <div aria-hidden="true" className="sticky right-0 z-20 border-l border-slate-200 bg-slate-100 dark:border-slate-700 dark:bg-slate-800" style={{height:calendarHeight}} />
           </div>
         </div>
       </div>
@@ -1173,8 +1173,8 @@ function SchedulePage() {
   };
 
   return (
-    <Page className="space-y-4">
-      <div className="sticky top-[var(--app-header-height)] z-50 -mx-4 space-y-2 bg-background px-4 pb-2 pt-1 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+    <Page className="space-y-1.5 sm:space-y-4">
+      <div className="sticky top-[var(--app-header-height)] z-50 -mx-4 space-y-1 bg-background px-4 pb-1 pt-0.5 sm:space-y-2 sm:pb-2 sm:pt-1 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
       <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
         <div><h1 className="text-xl font-extrabold sm:text-2xl">Schedule</h1><p className="hidden text-xs text-muted-foreground sm:block">One calendar for every online and face-to-face lesson.</p></div>
         <div className="flex min-w-0 flex-wrap items-center gap-1.5">
@@ -1185,17 +1185,17 @@ function SchedulePage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4" aria-label="Schedule overview">
-        <div className="flex items-center justify-between rounded-lg bg-pink-50 px-3 py-1.5 text-pink-800 dark:bg-pink-950/40 dark:text-pink-200"><span className="text-xs font-semibold">Lessons</span><strong className="text-sm tabular-nums">{summaryOccurrences}</strong></div>
-        <div className="flex items-center justify-between rounded-lg bg-emerald-50 px-3 py-1.5 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200"><span className="text-xs font-semibold">Students</span><strong className="text-sm tabular-nums">{summaryStudents}</strong></div>
-        <div className="flex items-center justify-between rounded-lg bg-violet-50 px-3 py-1.5 text-violet-800 dark:bg-violet-950/40 dark:text-violet-200"><span className="text-xs font-semibold">Teachers</span><strong className="text-sm tabular-nums">{summaryTutors}</strong></div>
-        <button type="button" onClick={() => setFiltersOpen(true)} className="flex min-w-0 items-center justify-between gap-2 rounded-lg bg-sky-50 px-3 py-1.5 text-left text-sky-800 hover:ring-2 hover:ring-sky-400 focus-visible:outline focus-visible:outline-2 dark:bg-sky-950/40 dark:text-sky-200" aria-label="Filter lessons by attendance">
-          <span className="min-w-0"><span className="block text-xs font-semibold">Total attendance <Filter className="inline h-3 w-3" /></span><span className="block truncate text-[10px]">{summaryAttendanceMarks.length ? `${summaryPresentMarks}/${summaryExpectedStudents} present` : "Not marked"}</span></span>
-          <strong className="shrink-0 text-base tabular-nums">{summaryAttendancePercentage === null ? "—" : `${summaryAttendancePercentage}%`}</strong>
+      <div className="grid grid-cols-4 gap-1 sm:gap-1.5" aria-label="Schedule overview">
+        <div className="flex items-center justify-between rounded-lg bg-pink-50 px-1.5 py-1 sm:px-3 sm:py-1.5 text-pink-800 dark:bg-pink-950/40 dark:text-pink-200"><span className="text-[9px] font-semibold sm:text-xs">Lessons</span><strong className="text-xs tabular-nums sm:text-sm">{summaryOccurrences}</strong></div>
+        <div className="flex items-center justify-between rounded-lg bg-emerald-50 px-1.5 py-1 sm:px-3 sm:py-1.5 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200"><span className="text-[9px] font-semibold sm:text-xs">Students</span><strong className="text-xs tabular-nums sm:text-sm">{summaryStudents}</strong></div>
+        <div className="flex items-center justify-between rounded-lg bg-violet-50 px-1.5 py-1 sm:px-3 sm:py-1.5 text-violet-800 dark:bg-violet-950/40 dark:text-violet-200"><span className="text-[9px] font-semibold sm:text-xs">Teachers</span><strong className="text-xs tabular-nums sm:text-sm">{summaryTutors}</strong></div>
+        <button type="button" onClick={() => setFiltersOpen(true)} className="flex min-w-0 items-center justify-between gap-2 rounded-lg bg-sky-50 px-1.5 py-1 sm:px-3 sm:py-1.5 text-left text-sky-800 hover:ring-2 hover:ring-sky-400 focus-visible:outline focus-visible:outline-2 dark:bg-sky-950/40 dark:text-sky-200" aria-label="Filter lessons by attendance">
+          <span className="min-w-0"><span className="block truncate text-[9px] font-semibold sm:text-xs">Attendance <Filter className="inline h-3 w-3" /></span><span className="hidden truncate text-[10px] sm:block">{summaryAttendanceMarks.length ? `${summaryPresentMarks}/${summaryExpectedStudents} present` : "Not marked"}</span></span>
+          <strong className="shrink-0 text-xs tabular-nums sm:text-base">{summaryAttendancePercentage === null ? "—" : `${summaryAttendancePercentage}%`}</strong>
         </button>
       </div>
 
-      <section className="rounded-xl border border-border bg-card px-2 py-1.5 sm:px-3">
+      <section className="rounded-xl border border-border bg-card px-2 py-1 sm:px-3 sm:py-1.5">
         <div className="flex flex-wrap items-center gap-2">
           <Button size="sm" variant="secondary" onClick={() => setSelectedDate(currentDateIso())}>
             Today
@@ -1207,11 +1207,11 @@ function SchedulePage() {
             <ChevronRight className="h-4 w-4" />
           </Button>
           <p className="min-w-40 flex-1 text-sm font-extrabold sm:text-base">{dateTitle}</p>
-          {(view === "day" || view === "week") && <div className="mr-3 flex items-center gap-1 rounded-xl border border-primary/20 bg-primary/5 p-1 sm:mr-5" aria-label="Schedule grouping">
-            <button type="button" onClick={() => setScheduleGrouping("tutor")} className={cn("inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-bold", scheduleGrouping === "tutor" ? "bg-card text-primary shadow-sm" : "text-muted-foreground")}><Users className="h-3.5 w-3.5" /> By tutor</button>
-            <button type="button" onClick={() => setScheduleGrouping("location")} className={cn("inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-bold", scheduleGrouping === "location" ? "bg-card text-primary shadow-sm" : "text-muted-foreground")}><MapPin className="h-3.5 w-3.5" /> By location</button>
+          {(view === "day" || view === "week") && <div className="mr-1 flex items-center gap-1 rounded-xl border border-primary/20 bg-primary/5 p-0.5 sm:mr-5 sm:p-1" aria-label="Schedule grouping">
+            <button type="button" onClick={() => setScheduleGrouping("tutor")} title="By tutor" aria-label="By tutor" className={cn("inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-bold", scheduleGrouping === "tutor" ? "bg-card text-primary shadow-sm" : "text-muted-foreground")}><Users className="h-3.5 w-3.5" /><span className="hidden sm:inline">By tutor</span></button>
+            <button type="button" onClick={() => setScheduleGrouping("location")} title="By location" aria-label="By location" className={cn("inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-bold", scheduleGrouping === "location" ? "bg-card text-primary shadow-sm" : "text-muted-foreground")}><MapPin className="h-3.5 w-3.5" /><span className="hidden sm:inline">By location</span></button>
           </div>}
-          <div className="order-3 flex w-full min-w-0 justify-between rounded-xl bg-muted p-1 sm:order-none sm:w-auto">
+          <div className="order-3 flex w-full min-w-0 justify-between rounded-xl bg-muted p-0.5 sm:order-none sm:w-auto sm:p-1">
             {(["day", "week", "month", "list"] as CalendarView[]).map((item) => (
               <button
                 key={item}
