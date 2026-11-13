@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
 import { Check, ClipboardCheck, Search, Users, UserRound, X } from "lucide-react";
 import { toast } from "sonner";
@@ -28,6 +28,9 @@ function AttendanceWorkspace() {
   const createMark = useUpsert("student_attendance");
   const updateMark = useUpdateRow("student_attendance");
   const [view, setView] = useState<View>("course");
+  const registerRef = useRef<HTMLElement | null>(null);
+  const studentRegisterRef = useRef<HTMLElement | null>(null);
+  const [jumpToRegister, setJumpToRegister] = useState(false);
   const [classId, setClassId] = useState("");
   const [sessionId, setSessionId] = useState("");
   const [studentId, setStudentId] = useState("");
@@ -60,7 +63,7 @@ function AttendanceWorkspace() {
     return lessonColours[Array.from(key).reduce((sum, char) => sum + char.charCodeAt(0), 0) % lessonColours.length];
   };
   const quickCard = (item: typeof suggestions[number]) => <button type="button" key={item.row.id}
-    onClick={() => {setClassId(item.row.class_id ?? ""); setSessionId(item.row.id); setDate(item.row.session_date); setFilter("all");}}
+    onClick={() => {setView("course");setClassId(item.row.class_id ?? ""); setSessionId(item.row.id); setDate(item.row.session_date); setFilter("all");setJumpToRegister(true);}}
     className="block w-full min-w-0 max-w-full overflow-hidden rounded-lg border border-border px-3 py-2.5 text-left shadow-sm transition hover:brightness-95" style={{backgroundColor:colourFor(item),color: colourFor(item) === "#ffb900" ? "#242424" : "#fff"}}>
     <span className="block w-full min-w-0 truncate text-sm font-bold">{item.course?.name ?? "Lesson"}</span>
     <span className="block min-w-0 truncate text-xs opacity-90">{prettyDate(item.row.session_date)} · {(item.row.start_time || item.course?.start_time || "").slice(0,5)}</span>
@@ -83,6 +86,23 @@ function AttendanceWorkspace() {
   const studentClassIds = new Set(studentClasses.map((row) => row.class_id));
   const studentSessions = sessionRows.filter((row) => row.class_id && studentClassIds.has(row.class_id)).sort((a,b) => b.session_date.localeCompare(a.session_date));
   const studentMarkFor = (id: string) => markRows.find((row) => row.session_id === id && row.student_id === studentId);
+  const suggestedStudents = studentRows.map(student => {
+    const enrolled = enrolmentRows.filter(e => e.student_id === student.id && e.status === "active");
+    const ids = new Set(enrolled.map(e => e.class_id));
+    const lessons = suggestions.filter(item => item.row.class_id && ids.has(item.row.class_id));
+    const recentLessons = lessons.filter(item => item.end.getTime() <= now.getTime() && item.end.getTime() >= now.getTime() - 7 * 86400000);
+    const outstanding = recentLessons.filter(item => !markRows.some(m => m.session_id === item.row.id && m.student_id === student.id)).length;
+    return {student, recentCount:recentLessons.length, outstanding, lastLesson:recentLessons.reduce((max,item)=>Math.max(max,item.end.getTime()),0)};
+  }).filter(item => item.recentCount > 0).sort((a,b)=>b.outstanding-a.outstanding || b.lastLesson-a.lastLesson).slice(0,8);
+  useEffect(() => {
+    if (!jumpToRegister) return;
+    const target = view === "course" ? (selectedSession ? registerRef.current : null) : (studentId ? studentRegisterRef.current : null);
+    if (target) {
+      target.scrollIntoView({behavior:"smooth",block:"start"});
+      setJumpToRegister(false);
+    }
+  }, [jumpToRegister,view,selectedSession,studentId]);
+
 
   async function saveMark(targetSessionId: string, targetStudentId: string, status: Mark) {
     const existing = markRows.find((row) => row.session_id === targetSessionId && row.student_id === targetStudentId);
@@ -128,9 +148,9 @@ function AttendanceWorkspace() {
   );
   return <Page className="min-w-0 max-w-full space-y-4 overflow-x-hidden pb-24">
     <PageHeader title="Take attendance" subtitle="Choose a lesson, mark the register and review attendance by student."/>
-    <div className="grid grid-cols-2 overflow-hidden rounded-xl border border-border bg-card">
-      <button type="button" onClick={() => setView("course")} className={`flex min-h-12 items-center justify-center gap-2 text-sm font-bold ${view === "course" ? "border-b-2 border-primary text-primary" : "text-muted-foreground"}`}><Users className="h-4 w-4"/>By course</button>
-      <button type="button" onClick={() => setView("student")} className={`flex min-h-12 items-center justify-center gap-2 text-sm font-bold ${view === "student" ? "border-b-2 border-primary text-primary" : "text-muted-foreground"}`}><UserRound className="h-4 w-4"/>By student</button>
+    <div role="tablist" aria-label="Attendance view" className="grid w-full min-w-0 grid-cols-2 overflow-hidden rounded-xl border border-border bg-card">
+      <button type="button" role="tab" aria-selected={view === "course"} onClick={() => setView("course") } className={`flex min-h-12 items-center justify-center gap-2 text-sm font-bold ${view === "course" ? "border-b-2 border-primary text-primary" : "text-muted-foreground"}`}><Users className="h-4 w-4"/>By course</button>
+      <button type="button" role="tab" aria-selected={view === "student"} onClick={() => setView("student") } className={`flex min-h-12 items-center justify-center gap-2 text-sm font-bold ${view === "student" ? "border-b-2 border-primary text-primary" : "text-muted-foreground"}`}><UserRound className="h-4 w-4"/>By student</button>
     </div>
     {view === "course" ? <>      <section className="min-w-0 max-w-full rounded-xl border border-border bg-card p-3 sm:p-4">
         <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
