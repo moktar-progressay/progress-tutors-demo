@@ -847,6 +847,8 @@ function SchedulePage() {
             where: scheduleGrouping === "location"
               ? `${venue} | Tutor: ${tutorFor(lesson) ? fullName(tutorFor(lesson)) : "Not assigned"}`
               : `${venue}${lesson.room ? ` | ${lesson.room}` : ""}`,
+            room: lesson.room?.trim() || "Room not assigned",
+            tutorName: tutorFor(lesson) ? fullName(tutorFor(lesson)) : "Tutor not assigned",
             delivery: lesson.delivery_mode === "in_person"
               ? "Face-to-face"
               : lesson.delivery_mode === "hybrid" ? "Hybrid" : "Online",
@@ -2094,6 +2096,8 @@ type TeachingReportGroup = {
     subject: string;
     when: string;
     where: string;
+    room: string;
+    tutorName: string;
     delivery: string;
     capacity: number;
     enrolled: number;
@@ -2119,186 +2123,79 @@ function truncatePdfText(value: string, maxLength: number) {
 }
 
 function createTeachingReportPdf(groups: TeachingReportGroup[], scope: string, grouping: "tutor" | "location") {
-  const lessonCount = groups.reduce((total, group) => total + group.lessons.length, 0);
-  const groupCount = groups.length;
-  const generated = new Date().toLocaleString("en-GB", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-
+  const lessonCount = groups.reduce((sum, group) => sum + group.lessons.length, 0);
   const pages: string[][] = [[]];
   let pageIndex = 0;
-  let y = 724;
-
+  let y = 698;
+  const ink: [number, number, number] = [0.12, 0.13, 0.19];
+  const muted: [number, number, number] = [0.42, 0.44, 0.50];
+  const pink: [number, number, number] = [0.91, 0.18, 0.43];
   const palette: Record<CardColour, [number, number, number]> = {
-    pink: [0.91, 0.18, 0.43],
-    blue: [0.15, 0.39, 0.92],
-    green: [0.04, 0.64, 0.43],
-    amber: [0.96, 0.62, 0.04],
-    violet: [0.49, 0.23, 0.93],
-    teal: [0.02, 0.58, 0.58],
+    pink, blue: [0.15, 0.39, 0.92], green: [0.04, 0.64, 0.43],
+    amber: [0.96, 0.62, 0.04], violet: [0.49, 0.23, 0.93], teal: [0.02, 0.58, 0.58],
   };
-
   const command = (value: string) => pages[pageIndex]?.push(value);
-  const textAt = (
-    value: string,
-    x: number,
-    textY: number,
-    size: number,
-    options?: { bold?: boolean; colour?: [number, number, number] },
-  ) => {
-    const [red, green, blue] = options?.colour ?? [0.08, 0.09, 0.12];
-    command(
-      `BT /${options?.bold ? "F2" : "F1"} ${size} Tf ${red} ${green} ${blue} rg ${x} ${textY} Td (${pdfText(value)}) Tj ET`,
-    );
+  const textAt = (value: string, x: number, posY: number, size: number, options?: { bold?: boolean; colour?: [number, number, number] }) => {
+    const colour = options?.colour ?? ink;
+    command(`BT /${options?.bold ? "F2" : "F1"} ${size} Tf ${colour.join(" ")} rg ${x} ${posY} Td (${pdfText(value)}) Tj ET`);
   };
-  const roundedRect = (
-    x: number,
-    rectY: number,
-    width: number,
-    height: number,
-    radius: number,
-    fill: [number, number, number],
-    stroke?: [number, number, number],
-  ) => {
-    const right = x + width;
-    const top = rectY + height;
-    const curve = radius * 0.5523;
-    const path = [
-      `${x + radius} ${rectY} m`,
-      `${right - radius} ${rectY} l`,
-      `${right - radius + curve} ${rectY} ${right} ${rectY + radius - curve} ${right} ${rectY + radius} c`,
-      `${right} ${top - radius} l`,
-      `${right} ${top - radius + curve} ${right - radius + curve} ${top} ${right - radius} ${top} c`,
-      `${x + radius} ${top} l`,
-      `${x + radius - curve} ${top} ${x} ${top - radius + curve} ${x} ${top - radius} c`,
-      `${x} ${rectY + radius} l`,
-      `${x} ${rectY + radius - curve} ${x + radius - curve} ${rectY} ${x + radius} ${rectY} c h`,
-    ].join(" ");
-    command(
-      `${fill.join(" ")} rg ${stroke ? `${stroke.join(" ")} RG 0.8 w ` : ""}${path} ${stroke ? "B" : "f"}`,
-    );
-  };
-  const circle = (x: number, centreY: number, radius: number, fill: [number, number, number]) => {
-    const curve = radius * 0.5523;
-    command(
-      `${fill.join(" ")} rg ${x + radius} ${centreY} m ${x + radius} ${centreY + curve} ${x + curve} ${centreY + radius} ${x} ${centreY + radius} c ${x - curve} ${centreY + radius} ${x - radius} ${centreY + curve} ${x - radius} ${centreY} c ${x - radius} ${centreY - curve} ${x - curve} ${centreY - radius} ${x} ${centreY - radius} c ${x + curve} ${centreY - radius} ${x + radius} ${centreY - curve} ${x + radius} ${centreY} c f`,
-    );
-  };
-
+  const rect = (x: number, bottom: number, width: number, height: number, colour: [number, number, number]) =>
+    command(`${colour.join(" ")} rg ${x} ${bottom} ${width} ${height} re f`);
   const startPage = () => {
-    command("0.97 0.98 1 rg 0 0 595 842 re f");
-    command("0.91 0.18 0.43 rg 0 766 595 76 re f");
-    textAt("ProgressTutors", 42, 811, 20, { bold: true, colour: [1, 1, 1] });
-    textAt(grouping === "tutor" ? "Teaching schedule by tutor" : "Teaching schedule by location and room", 42, 787, 12, { bold: true, colour: [1, 1, 1] });
-    roundedRect(42, 735, 511, 21, 10, [1, 1, 1]);
-    textAt(truncatePdfText(scope, 82), 52, 742, 9, {
-      bold: true,
-      colour: [0.35, 0.12, 0.23],
-    });
-    textAt(
-      `${lessonCount} lesson${lessonCount === 1 ? "" : "s"} | ${groupCount} ${grouping === "tutor" ? "tutor group" : "room group"}${groupCount === 1 ? "" : "s"} | Prepared ${generated}`,
-      42,
-      716,
-      8,
-      { colour: [0.38, 0.4, 0.46] },
-    );
-    y = 694;
+    rect(0, 766, 595, 76, pink);
+    textAt("ProgressTutors", 42, 810, 20, {bold:true,colour:[1,1,1]});
+    textAt(grouping === "tutor" ? "Teaching timetable by tutor" : "Teaching timetable by location and room", 42, 788, 12, {bold:true,colour:[1,1,1]});
+    rect(42, 735, 511, 22, [1,0.95,0.97]);
+    textAt(truncatePdfText(scope,90), 51, 742, 8, {bold:true,colour:pink});
+    textAt(`${lessonCount} lessons | ${groups.length} ${grouping === "tutor" ? "tutor" : "room"} groups`, 42, 716, 8, {colour:muted});
+    y = 695;
   };
-
-  const ensureSpace = (height: number) => {
-    if (y - height >= 54) return false;
-    pageIndex += 1;
-    pages.push([]);
-    startPage();
-    return true;
-  };
-
-  const tutorHeader = (group: TeachingReportGroup) => {
-    ensureSpace(42);
-    roundedRect(42, y - 34, 511, 34, 13, [1, 0.93, 0.96]);
-    circle(62, y - 17, 11, [0.91, 0.18, 0.43]);
-    textAt(truncatePdfText(group.tutorInitials, 3), 54, y - 21, 8, {
-      bold: true,
-      colour: [1, 1, 1],
-    });
-    textAt(truncatePdfText(group.tutor, 52), 82, y - 21, 13, {
-      bold: true,
-      colour: [0.35, 0.12, 0.23],
-    });
-    y -= 44;
-  };
-
+  const ensure = (needed: number) => { if (y-needed < 55) {pageIndex++;pages.push([]);startPage();} };
   startPage();
-
-  groups.forEach((group) => {
-    tutorHeader(group);
-    group.lessons.forEach((lesson) => {
-      const studentRows = Math.max(1, Math.ceil(lesson.students.length / 2));
-      const cardHeight = 114 + studentRows * 22;
-      if (ensureSpace(cardHeight + 10)) tutorHeader(group);
-      const cardBottom = y - cardHeight;
-      const colour = palette[lesson.colour] ?? palette.pink;
-      roundedRect(42, cardBottom, 511, cardHeight, 14, [1, 1, 1], [0.86, 0.88, 0.92]);
-      roundedRect(42, cardBottom, 7, cardHeight, 3, colour);
-      textAt(truncatePdfText(lesson.name, 58), 62, y - 23, 12, { bold: true });
-
-      const subjectWidth = Math.min(145, 18 + lesson.subject.length * 5.2);
-      roundedRect(62, y - 50, subjectWidth, 19, 9, [0.93, 0.95, 1]);
-      textAt(truncatePdfText(lesson.subject, 24), 71, y - 44, 8, {
-        bold: true,
-        colour,
-      });
-      textAt(truncatePdfText(lesson.when, 52), 62, y - 69, 9, { bold: true });
-      textAt(`${lesson.delivery} | ${truncatePdfText(lesson.where, 49)}`, 62, y - 86, 8, {
-        colour: [0.38, 0.4, 0.46],
-      });
-
-      const filled = lesson.capacity > 0 ? Math.min(1, lesson.enrolled / lesson.capacity) : 0;
-      textAt(`${lesson.enrolled}/${lesson.capacity} seats`, 431, y - 44, 9, {
-        bold: true,
-        colour,
-      });
-      roundedRect(431, y - 60, 96, 6, 3, [0.9, 0.91, 0.94]);
-      if (filled > 0) roundedRect(431, y - 60, Math.max(6, 96 * filled), 6, 3, colour);
-
-      textAt("Students", 62, y - 108, 8, {
-        bold: true,
-        colour: [0.38, 0.4, 0.46],
-      });
-      if (lesson.students.length === 0) {
-        textAt("No students assigned", 62, y - 127, 9, { colour: [0.5, 0.52, 0.58] });
-      } else {
-        lesson.students.forEach((student, index) => {
-          const column = index % 2;
-          const row = Math.floor(index / 2);
-          const itemX = 69 + column * 238;
-          const itemY = y - 126 - row * 22;
-          const avatarColours: [number, number, number][] = [
-            [0.91, 0.18, 0.43],
-            [0.15, 0.39, 0.92],
-            [0.04, 0.64, 0.43],
-            [0.49, 0.23, 0.93],
-          ];
-          circle(itemX, itemY + 3, 8, avatarColours[stableHash(student.name) % 4] ?? colour);
-          textAt(truncatePdfText(student.initials, 3), itemX - 5, itemY, 6, {
-            bold: true,
-            colour: [1, 1, 1],
-          });
-          textAt(truncatePdfText(student.name, 29), itemX + 14, itemY, 8, { bold: true });
-        });
+  for (const group of groups) {
+    ensure(70);
+    rect(42,y-29,511,29,[0.95,0.96,0.98]);
+    textAt(truncatePdfText(group.tutor,75),52,y-19,11,{bold:true});
+    y-=38;
+    let previousDate = "";
+    for(const lesson of group.lessons) {
+      // The time always comes first. Day/date remains visible inside each row.
+      const parts=lesson.when.split(", ");
+      const dateLabel=parts.length>1?parts[0]:lesson.when.startsWith("Every ")?lesson.when.split(",")[0]:"";
+      if (dateLabel && dateLabel !== previousDate) {
+        ensure(38);
+        rect(42,y-18,511,18,[0.98,0.98,0.99]);
+        textAt(truncatePdfText(dateLabel,75),52,y-13,9,{bold:true,colour:muted});
+        y-=23;
+        previousDate=dateLabel;
       }
-      y -= cardHeight + 10;
-    });
-  });
-
-  pages.forEach((page, index) => {
-    page.push("0.78 0.79 0.82 RG 48 38 m 547 38 l S");
-    page.push(`BT /F1 8 Tf 0.38 0.4 0.46 rg 48 24 Td (${grouping === "tutor" ? "Tutor" : "Location and room"} timetable) Tj ET`);
-    page.push(`BT /F1 8 Tf 0.38 0.4 0.46 rg 510 24 Td (Page ${index + 1}/${pages.length}) Tj ET`);
+      const lines=Math.ceil(lesson.students.length / 3);
+      const height=65+(lines ? lines*13+6 : 0);
+      ensure(height+12);
+      const base=y-height;
+      rect(42,base,511,height,[1,1,1]);
+      rect(42,base,5,height,palette[lesson.colour] ?? pink);
+      rect(46,base,507,0.6,[0.85,0.87,0.90]);
+      const timeMatch=lesson.when.match(/\b\d{1,2}:\d{2}-\d{1,2}:\d{2}\b/);
+      textAt(timeMatch?.[0] ?? truncatePdfText(lesson.when,16),56,y-17,9.5,{bold:true,colour:pink});
+      textAt(truncatePdfText(lesson.name,58),166,y-17,10,{bold:true});
+      textAt(`${lesson.enrolled}/${lesson.capacity} seats`,462,y-32,8,{bold:true,colour:lesson.enrolled>=lesson.capacity?pink:muted});
+      textAt(truncatePdfText(`${lesson.subject} | ${lesson.delivery}`,55),56,y-32,8,{colour:muted});
+      textAt(truncatePdfText(`Tutor: ${lesson.tutorName} | Room: ${lesson.room}`,89),56,y-45,8,{colour:muted});
+      textAt(truncatePdfText(`Site: ${lesson.where}`,90),56,y-58,8,{colour:muted});
+      lesson.students.forEach((student,index)=>{
+        const column=index%3;
+        const row=Math.floor(index/3);
+        textAt(truncatePdfText(student.name,25),56+column*165,y-74-row*13,7.4);
+      });
+      y-=height+7;
+    }
+    y-=8;
+  }
+  pages.forEach((page,index)=>{
+    page.push("0.82 0.83 0.86 RG 42 39 m 553 39 l S");
+    page.push(`BT /F1 8 Tf 0.4 0.42 0.47 rg 42 25 Td (Private teaching timetable) Tj ET`);
+    page.push(`BT /F1 8 Tf 0.4 0.42 0.47 rg 510 25 Td (Page ${index+1}/${pages.length}) Tj ET`);
   });
 
   const objects: string[] = [];
