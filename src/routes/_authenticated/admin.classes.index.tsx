@@ -798,63 +798,65 @@ function SchedulePage() {
       return;
     }
 
-    const groups = new Map<string, typeof visibleLessons>();
-    [...visibleLessons]
-      .sort(
-        (a, b) =>
-          fullName(tutorFor(a.lesson)).localeCompare(fullName(tutorFor(b.lesson)), "en-GB") ||
-          (a.date?.getTime() ?? 0) - (b.date?.getTime() ?? 0) ||
-          compareLessons(a.lesson, b.lesson),
-      )
-      .forEach((occurrence) => {
-        const lesson = occurrence.lesson;
-        const tutorName = tutorFor(lesson) ? fullName(tutorFor(lesson)) : "Tutor not assigned";
-        groups.set(tutorName, [...(groups.get(tutorName) ?? []), occurrence]);
-      });
-
-    const report: TeachingReportGroup[] = Array.from(groups, ([tutor, tutorLessons]) => ({
-      tutor,
-      tutorInitials: initialsOf(tutor),
-      lessons: tutorLessons.map(({ lesson, date: occurrenceDate }) => {
-        const enrolledStudents = studentsFor(lesson)
-          .map((student) => ({
-            name: fullName(student),
-            initials: initialsOf(fullName(student)),
-          }))
-          .sort((a, b) => a.name.localeCompare(b.name, "en-GB"));
-        const venue =
-          lesson.delivery_mode === "online"
-            ? lesson.online_url
-              ? `Online - ${lesson.online_url}`
-              : "Online"
+    // Export the exact tutor or location grouping selected in the Schedule.
+    // Within each group, order by occurrence date, start time and lesson name.
+    const groupKeyFor = (lesson: ClassRow) => {
+      if (scheduleGrouping === "tutor") {
+        const assigned = tutorFor(lesson);
+        return assigned ? fullName(assigned) : "Tutor not assigned";
+      }
+      const site = siteFor(lesson)?.name ?? lesson.venue_name ?? "Location not assigned";
+      const room = lesson.room?.trim() || "Room not assigned";
+      return `${site} > ${room}`;
+    };
+    const occurrences = [...visibleLessons].sort((a, b) =>
+      (a.date?.getTime() ?? 0) - (b.date?.getTime() ?? 0) ||
+      minutes(a.lesson.start_time) - minutes(b.lesson.start_time) ||
+      minutes(a.lesson.end_time) - minutes(b.lesson.end_time) ||
+      a.lesson.name.localeCompare(b.lesson.name, "en-GB"),
+    );
+    const grouped = new Map<string, typeof visibleLessons>();
+    occurrences.forEach((occurrence) => {
+      const key = groupKeyFor(occurrence.lesson);
+      grouped.set(key, [...(grouped.get(key) ?? []), occurrence]);
+    });
+    const report: TeachingReportGroup[] = Array.from(grouped.entries())
+      .sort(([a], [b]) => a.localeCompare(b, "en-GB"))
+      .map(([groupName, groupLessons]) => ({
+        tutor: groupName,
+        tutorInitials: initialsOf(groupName),
+        lessons: groupLessons.map(({ lesson, date: occurrenceDate }) => {
+          const enrolledStudents = studentsFor(lesson)
+            .map((student) => ({ name: fullName(student), initials: initialsOf(fullName(student)) }))
+            .sort((a, b) => a.name.localeCompare(b.name, "en-GB"));
+          const venue = lesson.delivery_mode === "online"
+            ? (lesson.online_url ? `Online - ${lesson.online_url}` : "Online")
             : (siteFor(lesson)?.name ?? lesson.venue_name ?? "Venue to be confirmed");
-        const firstDate = lesson.start_date
-          ? format(parseISO(lesson.start_date), "d MMM yyyy")
-          : "Date to be confirmed";
-        const when = occurrenceDate
-          ? `${format(occurrenceDate, "EEE d MMM yyyy")}, ${hhmm(lesson.start_time)}-${hhmm(lesson.end_time)}`
-          : lesson.recurrence === "once"
-            ? `${firstDate}, ${hhmm(lesson.start_time)}-${hhmm(lesson.end_time)}`
-            : `Every ${lesson.weekday}, ${hhmm(lesson.start_time)}-${hhmm(lesson.end_time)} from ${firstDate}`;
-        return {
-          name: lesson.name,
-          subject: subjectLabel(lesson.subject) || "Subject not set",
-          when,
-          where: venue,
-          delivery:
-            lesson.delivery_mode === "in_person"
+          const firstDate = lesson.start_date
+            ? format(parseISO(lesson.start_date), "d MMM yyyy")
+            : "Date to be confirmed";
+          const when = occurrenceDate
+            ? `${format(occurrenceDate, "EEE d MMM yyyy")}, ${hhmm(lesson.start_time)}-${hhmm(lesson.end_time)}`
+            : lesson.recurrence === "once"
+              ? `${firstDate}, ${hhmm(lesson.start_time)}-${hhmm(lesson.end_time)}`
+              : `Every ${lesson.weekday}, ${hhmm(lesson.start_time)}-${hhmm(lesson.end_time)} from ${firstDate}`;
+          return {
+            name: lesson.name,
+            subject: subjectLabel(lesson.subject) || "Subject not set",
+            when,
+            where: scheduleGrouping === "location"
+              ? `${venue} | Tutor: ${tutorFor(lesson) ? fullName(tutorFor(lesson)) : "Not assigned"}`
+              : `${venue}${lesson.room ? ` | ${lesson.room}` : ""}`,
+            delivery: lesson.delivery_mode === "in_person"
               ? "Face-to-face"
-              : lesson.delivery_mode === "hybrid"
-                ? "Hybrid"
-                : "Online",
-          capacity: lesson.capacity,
-          enrolled: enrolledStudents.length,
-          students: enrolledStudents,
-          colour: (lesson.card_colour as CardColour | null) ?? "pink",
-        };
-      }),
-    }));
-
+              : lesson.delivery_mode === "hybrid" ? "Hybrid" : "Online",
+            capacity: lesson.capacity,
+            enrolled: enrolledStudents.length,
+            students: enrolledStudents,
+            colour: (lesson.card_colour as CardColour | null) ?? "pink",
+          };
+        }),
+      }));
     const filterLabels = [
       tutorId !== "all"
         ? tutorId === "unassigned"
@@ -870,12 +872,12 @@ function SchedulePage() {
       subjectFilter !== "all" ? subjectFilter : null,
       search.trim() ? `Search: ${search.trim()}` : null,
     ].filter(Boolean) as string[];
-    const scope = `${dateTitle}${filterLabels.length ? ` | ${filterLabels.join(" | ")}` : ""}`;
-    const pdf = createTeachingReportPdf(report, scope);
+    const scope = `${scheduleGrouping === "tutor" ? "By tutor" : "By location and room"} | ${dateTitle}${filterLabels.length ? ` | ${filterLabels.join(" | ")}` : ""}`;
+    const pdf = createTeachingReportPdf(report, scope, scheduleGrouping);
     const url = URL.createObjectURL(pdf);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `ProgressTutors-teaching-report-${selectedDate}.pdf`;
+    link.download = `ProgressTutors-${scheduleGrouping}-schedule-${selectedDate}.pdf`;
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -2116,9 +2118,9 @@ function truncatePdfText(value: string, maxLength: number) {
   return clean.length > maxLength ? `${clean.slice(0, Math.max(1, maxLength - 3))}...` : clean;
 }
 
-function createTeachingReportPdf(groups: TeachingReportGroup[], scope: string) {
+function createTeachingReportPdf(groups: TeachingReportGroup[], scope: string, grouping: "tutor" | "location") {
   const lessonCount = groups.reduce((total, group) => total + group.lessons.length, 0);
-  const tutorCount = groups.filter((group) => group.tutor !== "Tutor not assigned").length;
+  const groupCount = groups.length;
   const generated = new Date().toLocaleString("en-GB", {
     day: "numeric",
     month: "long",
@@ -2191,14 +2193,14 @@ function createTeachingReportPdf(groups: TeachingReportGroup[], scope: string) {
     command("0.97 0.98 1 rg 0 0 595 842 re f");
     command("0.91 0.18 0.43 rg 0 766 595 76 re f");
     textAt("ProgressTutors", 42, 811, 20, { bold: true, colour: [1, 1, 1] });
-    textAt("Teaching schedule", 42, 787, 12, { bold: true, colour: [1, 1, 1] });
+    textAt(grouping === "tutor" ? "Teaching schedule by tutor" : "Teaching schedule by location and room", 42, 787, 12, { bold: true, colour: [1, 1, 1] });
     roundedRect(42, 735, 511, 21, 10, [1, 1, 1]);
     textAt(truncatePdfText(scope, 82), 52, 742, 9, {
       bold: true,
       colour: [0.35, 0.12, 0.23],
     });
     textAt(
-      `${lessonCount} lesson${lessonCount === 1 ? "" : "s"} | ${tutorCount} tutor${tutorCount === 1 ? "" : "s"} | Prepared ${generated}`,
+      `${lessonCount} lesson${lessonCount === 1 ? "" : "s"} | ${groupCount} ${grouping === "tutor" ? "tutor group" : "room group"}${groupCount === 1 ? "" : "s"} | Prepared ${generated}`,
       42,
       716,
       8,
@@ -2295,7 +2297,7 @@ function createTeachingReportPdf(groups: TeachingReportGroup[], scope: string) {
 
   pages.forEach((page, index) => {
     page.push("0.78 0.79 0.82 RG 48 38 m 547 38 l S");
-    page.push(`BT /F1 8 Tf 0.38 0.4 0.46 rg 48 24 Td (Private team timetable) Tj ET`);
+    page.push(`BT /F1 8 Tf 0.38 0.4 0.46 rg 48 24 Td (${grouping === "tutor" ? "Tutor" : "Location and room"} timetable) Tj ET`);
     page.push(`BT /F1 8 Tf 0.38 0.4 0.46 rg 510 24 Td (Page ${index + 1}/${pages.length}) Tj ET`);
   });
 
