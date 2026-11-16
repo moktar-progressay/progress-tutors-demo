@@ -111,9 +111,12 @@ function AttendanceWorkspace() {
   </button>;
   const selectedClass = classRows.find((row) => row.id === classId);
   const classSessions = useMemo(() => sessionRows.filter((row) => row.class_id === classId).sort((a,b) => b.session_date.localeCompare(a.session_date)), [sessionRows, classId]);
-  const selectedSession = classSessions.find((row) => row.id === sessionId);
+  // Selecting a course immediately opens its latest register; no second selection needed.
+  const selectedSession = classSessions.find((row) => row.id === sessionId) ?? (sessionId ? undefined : classSessions[0]);
+  const activeSessionId = selectedSession?.id ?? "";
+
   const roster = useMemo(() => enrolmentRows.filter((row) => row.class_id === classId && row.status === "active").map((row) => studentRows.find((student) => student.id === row.student_id)).filter((student): student is typeof studentRows[number] => Boolean(student)), [enrolmentRows, studentRows, classId]);
-  const marks = markRows.filter((row) => row.session_id === sessionId);
+  const marks = markRows.filter((row) => row.session_id === activeSessionId);
   const markFor = (id: string) => marks.find((row) => row.student_id === id);
   const shown = roster.filter((student) => {
     const mark = markFor(student.id);
@@ -228,17 +231,10 @@ function AttendanceWorkspace() {
             <select className="h-11 w-full min-w-0 max-w-full rounded-lg border border-border bg-background px-3 text-sm" value={classId} onChange={(e) => {setClassId(e.target.value);setSessionId("");setFilter("all");}}><option value="">Choose a course</option>{classRows.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}</select>
           </label>
           <label className="space-y-1 text-xs font-semibold">LESSON
-            <select className="h-11 w-full rounded-lg border border-border bg-background px-3 text-sm" value={sessionId} disabled={!classId} onChange={(e) => {setSessionId(e.target.value);setFilter("all");}}><option value="">Choose a lesson</option>{classSessions.map((row) => <option key={row.id} value={row.id}>{prettyDate(row.session_date)} · {row.start_time?.slice(0,5) ?? ""}</option>)}</select>
+            <select className="h-11 w-full rounded-lg border border-border bg-background px-3 text-sm" value={activeSessionId} disabled={!classId} onChange={(e) => {setSessionId(e.target.value);setFilter("all");}}><option value="">Choose a lesson</option>{classSessions.map((row) => <option key={row.id} value={row.id}>{prettyDate(row.session_date)} · {row.start_time?.slice(0,5) ?? ""}</option>)}</select>
           </label>
         </div>
         {classId && <div className="mt-3 flex flex-wrap items-end gap-2"><label className="space-y-1 text-xs font-semibold">Create register for date<input type="date" value={date} onChange={(e)=>setDate(e.target.value)} className="block h-10 rounded-lg border border-border bg-background px-2"/></label><Button type="button" variant="outline" disabled={busy || !date} onClick={() => void createLessonRegister()}>Open or create register</Button></div>}
-      </section>
-      <section className="space-y-2" aria-label="Suggested lesson registers">
-        <h2 className="text-sm font-bold">Quick start attendance</h2>
-        <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
-          <div className="min-w-0 space-y-2"><h3 className="text-xs font-semibold text-muted-foreground">Upcoming lessons</h3>{upcoming.length ? upcoming.map(upcomingCard) : <p className="text-xs text-muted-foreground">No upcoming registers in the next 7 days.</p>}</div>
-          <div className="min-w-0 space-y-2"><h3 className="text-xs font-semibold text-muted-foreground">Recently passed</h3>{recent.length ? recent.map(quickCard) : <p className="text-xs text-muted-foreground">No recent registers in the last 7 days.</p>}</div>
-        </div>
       </section>
 
       {selectedSession ? <section ref={registerRef} className="min-w-0 scroll-mt-20 rounded-xl border border-border bg-card p-3 sm:p-4">
@@ -264,7 +260,15 @@ function AttendanceWorkspace() {
           <table className="w-full min-w-[530px] border-collapse text-left text-sm"><thead className="sticky top-0 z-10 bg-muted text-xs uppercase"><tr><th scope="col" className="border-b border-border p-3">Student</th><th scope="col" className="border-b border-border p-3">Status</th><th scope="col" className="border-b border-border p-3">Attendance</th></tr></thead><tbody>{shown.map((student) => {const mark=markFor(student.id);return <tr key={student.id} className="border-b border-border last:border-0"><td className="p-3"><Link to="/admin/students/$id" params={{id:student.id}} className="flex items-center gap-2 font-semibold hover:text-primary"><Avatar initials={initialsOf(fullName(student))} tone={avatarTone(fullName(student))}/><span>{fullName(student)}</span></Link></td><td className="p-3 text-xs capitalize">{mark?.status ?? "Unmarked"}</td><td className="p-3">{markButtons(selectedSession.id,student.id,mark?.status ?? "")}</td></tr>})}</tbody></table>
           {!shown.length && <p className="p-4 text-sm text-muted-foreground">No students match this filter.</p>}
         </div>
-      </section> : <section className="rounded-xl border border-dashed border-border p-10 text-center text-sm text-muted-foreground">Choose a course and lesson to start taking attendance.</section>}
+      </section> : <section className="rounded-xl border border-dashed border-border p-10 text-center text-sm text-muted-foreground">Choose a course to see its students.</section>}
+      <section className="space-y-2" aria-label="Suggested lesson registers">
+        <h2 className="text-sm font-bold">Quick start attendance</h2>
+        <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="min-w-0 space-y-2"><h3 className="text-xs font-semibold text-muted-foreground">Upcoming lessons</h3>{upcoming.length ? upcoming.map(upcomingCard) : <p className="text-xs text-muted-foreground">No upcoming registers in the next 7 days.</p>}</div>
+          <div className="min-w-0 space-y-2"><h3 className="text-xs font-semibold text-muted-foreground">Recently passed</h3>{recent.length ? recent.map(quickCard) : <p className="text-xs text-muted-foreground">No recent registers in the last 7 days.</p>}</div>
+        </div>
+      </section>
+
     </> : <>
       <section className="min-w-0 space-y-2" aria-label="Suggested students">
         <h2 className="text-sm font-bold">Suggested students</h2>
