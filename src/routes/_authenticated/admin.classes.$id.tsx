@@ -176,6 +176,7 @@ export function ClassWorkspace({
     () => requestedDate ?? format(new Date(), "yyyy-MM-dd"),
   );
   const [attendanceSearch, setAttendanceSearch] = useState("");
+  const attendanceDateInitialisedFor = useRef<string | null>(null);
   // Keep confirmed marks visible immediately, even while query caches refresh.
   const [attendanceSort, setAttendanceSort] = useState<"student" | "gender" | "age" | "present" | "absent">("student");
   const [attendanceSortDirection, setAttendanceSortDirection] = useState<"asc" | "desc">("asc");
@@ -253,6 +254,25 @@ export function ClassWorkspace({
   useEffect(() => {
     if (requestedDate) setAttendanceDate(requestedDate);
   }, [requestedDate]);
+
+  // Default to the most recent scheduled lesson date, not an unrelated weekday.
+  // Do this only once per class so users can still select a different date.
+  useEffect(() => {
+    if (!c || requestedDate || attendanceDateInitialisedFor.current === c.id) return;
+    const scheduledDay = c.weekday?.trim().toLowerCase();
+    if (!scheduledDay) return;
+    const today = new Date();
+    const candidate = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 12);
+    for (let daysBack = 0; daysBack < 7; daysBack++) {
+      const day = candidate.toLocaleDateString("en-GB", { weekday: "long" }).toLowerCase();
+      if (day === scheduledDay) {
+        setAttendanceDate(format(candidate, "yyyy-MM-dd"));
+        attendanceDateInitialisedFor.current = c.id;
+        break;
+      }
+      candidate.setDate(candidate.getDate() - 1);
+    }
+  }, [c, requestedDate]);
 
   if (classes.isLoading)
     return (
