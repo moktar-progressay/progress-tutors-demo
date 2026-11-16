@@ -375,14 +375,26 @@ export function ClassWorkspace({
       if (!session) throw new Error("Could not create the lesson date");
       // Upsert by the database's unique (session_id, student_id) key.
       // The cached attendance list can be stale, so insert-then-update causes 409 conflicts.
-      const { error: attendanceError } = await supabase
+      const { data: savedAttendance, error: attendanceError } = await supabase
         .from("student_attendance")
         .upsert(
           { session_id: session.id, student_id: studentIdValue, status },
           { onConflict: "session_id,student_id" },
-        );
+        )
+        .select("id,session_id,student_id,status")
+        .single();
       if (attendanceError) throw attendanceError;
-      await invalidateAttendance("student_attendance");
+      if (
+        !savedAttendance ||
+        savedAttendance.session_id !== session.id ||
+        savedAttendance.student_id !== studentIdValue ||
+        savedAttendance.status !== status
+      ) {
+        throw new Error("Attendance could not be verified. Please try again.");
+      }
+      // A newly created session must be visible to the roster before its marks
+      // can be displayed. Refresh both datasets, not just attendance.
+      await invalidateAttendance("sessions", "student_attendance");
       toast.success(`Marked ${status} for ${prettyDate(session.session_date)}`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not save attendance");
