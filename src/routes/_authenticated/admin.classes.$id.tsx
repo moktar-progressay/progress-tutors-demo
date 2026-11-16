@@ -16,6 +16,8 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { useInvalidate } from "@/lib/db";
 import { Page } from "@/components/AppShell";
 import { Avatar, avatarTone, Empty, PageHeader } from "@/components/kit";
 import { ConfirmDeleteDialog, SelectField, TextField } from "@/components/form-kit";
@@ -120,8 +122,7 @@ export function ClassWorkspace({
   const addEnrolment = useUpsert("class_enrolments");
   const updateEnrolment = useUpdateRow("class_enrolments");
   const addSession = useUpsert("sessions", ["student_attendance"]);
-  const addAttendance = useUpsert("student_attendance");
-  const updateAttendance = useUpdateRow("student_attendance");
+  const invalidateAttendance = useInvalidate();
 
   const [lessonPickerOpen, setLessonPickerOpen] = useState(false);
   const [editingTitle, setEditingTitle] = useState(false);
@@ -372,18 +373,16 @@ export function ClassWorkspace({
         session = created[0];
       }
       if (!session) throw new Error("Could not create the lesson date");
-      const existing = classAttendance.find(
-        (item) => item.session_id === session.id && item.student_id === studentIdValue,
-      );
-      if (existing) {
-        await updateAttendance.mutateAsync({ id: existing.id, values: { status } });
-      } else {
-        await addAttendance.mutateAsync({
-          session_id: session.id,
-          student_id: studentIdValue,
-          status,
-        });
-      }
+      // Upsert by the database's unique (session_id, student_id) key.
+      // The cached attendance list can be stale, so insert-then-update causes 409 conflicts.
+      const { error: attendanceError } = await supabase
+        .from("student_attendance")
+        .upsert(
+          { session_id: session.id, student_id: studentIdValue, status },
+          { onConflict: "session_id,student_id" },
+        );
+      if (attendanceError) throw attendanceError;
+      await invalidateAttendance("student_attendance");
       toast.success(`Marked ${status} for ${prettyDate(session.session_date)}`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not save attendance");
