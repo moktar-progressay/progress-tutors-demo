@@ -52,7 +52,29 @@ function AttendanceWorkspace() {
     const total = enrolmentRows.filter(e => e.class_id === row.class_id && e.status === "active").length;
     return {row, course, start, end, marked, total};
   }).filter(item => Number.isFinite(item.start.getTime()) && Number.isFinite(item.end.getTime()));
-  const upcoming = suggestions.filter(x => x.end >= now && x.start.getTime() <= now.getTime() + 7*86400000).sort((a,b) => a.start.getTime()-b.start.getTime()).slice(0,5);
+  // Upcoming attendance must be driven by the timetable, not only existing registers.
+  // A future lesson may be scheduled without a sessions row yet.
+  const scheduledUpcoming = classRows.flatMap(course => {
+    if (!course.active || !course.start_time || !course.start_date) return [];
+    const startDate = new Date(course.start_date + "T00:00:00");
+    const weekday = startDate.getDay();
+    const occurrences: Array<{row: typeof sessionRows[number] | null; course: typeof course; start: Date; end: Date; marked: number; total: number; date: string}> = [];
+    for (let offset = 0; offset <= 7; offset++) {
+      const day = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset);
+      const dateString = format(day, "yyyy-MM-dd");
+      if (dateString < course.start_date || (course.end_date && dateString > course.end_date)) continue;
+      if (course.recurrence === "once" ? dateString !== course.start_date : day.getDay() !== weekday) continue;
+      const start = new Date(dateString + "T" + course.start_time.slice(0,5) + ":00");
+      const end = new Date(dateString + "T" + (course.end_time || course.start_time).slice(0,5) + ":00");
+      if (end < now || start.getTime() > now.getTime() + 7 * 86400000) continue;
+      const row = sessionRows.find(item => item.class_id === course.id && item.session_date === dateString) ?? null;
+      const marked = row ? markRows.filter(mark => mark.session_id === row.id).length : 0;
+      const total = enrolmentRows.filter(item => item.class_id === course.id && item.status === "active").length;
+      occurrences.push({row, course, start, end, marked, total, date: dateString});
+    }
+    return occurrences;
+  });
+  const upcoming = scheduledUpcoming.sort((a,b) => a.start.getTime()-b.start.getTime()).slice(0,8);
   const recent = suggestions.filter(x => x.end < now && x.end.getTime() >= now.getTime()-7*86400000).sort((a,b) => b.end.getTime()-a.end.getTime()).slice(0,5);
   const lessonColours = ["#ec2d70", "#155dfb", "#00a36c", "#ffb900", "#8424f5", "#009b91"];
   const colourFor = (item: typeof suggestions[number]) => {
@@ -62,6 +84,22 @@ function AttendanceWorkspace() {
     const key = String(item.row.class_id ?? "");
     return lessonColours[Array.from(key).reduce((sum, char) => sum + char.charCodeAt(0), 0) % lessonColours.length];
   };
+  const upcomingCard = (item: typeof upcoming[number]) => <button type="button" key={item.course.id + item.date}
+    onClick={() => {
+      if (!item.row) {
+        // The class page can create the missing register on first attendance mark.
+        window.location.assign(`/admin/classes/${item.course.id}?date=${item.date}`);
+        return;
+      }
+      setView("course"); setClassId(item.course.id); setSessionId(item.row.id);
+      setDate(item.date); setFilter("all"); setJumpToRegister(true);
+    }}
+    className="block w-full min-w-0 max-w-full overflow-hidden rounded-lg border border-border px-3 py-2.5 text-left shadow-sm transition hover:brightness-95"
+    style={{backgroundColor: colourFor({row: item.row ?? {class_id:item.course.id} as typeof sessionRows[number],course:item.course,start:item.start,end:item.end,marked:item.marked,total:item.total}), color:"#fff"}}>
+    <span className="block w-full min-w-0 truncate text-sm font-bold">{item.course.name}</span>
+    <span className="block min-w-0 truncate text-xs opacity-90">{prettyDate(item.date)} · {item.course.start_time?.slice(0,5)}</span>
+    <span className="block min-w-0 truncate text-xs font-semibold">{item.row ? `${item.marked}/${item.total} marked` : `Register not started · ${item.total} students`}</span>
+  </button>;
   const quickCard = (item: typeof suggestions[number]) => <button type="button" key={item.row.id}
     onClick={() => {setView("course");setClassId(item.row.class_id ?? ""); setSessionId(item.row.id); setDate(item.row.session_date); setFilter("all");setJumpToRegister(true);}}
     className="block w-full min-w-0 max-w-full overflow-hidden rounded-lg border border-border px-3 py-2.5 text-left shadow-sm transition hover:brightness-95" style={{backgroundColor:colourFor(item),color: colourFor(item) === "#ffb900" ? "#242424" : "#fff"}}>
@@ -166,7 +204,7 @@ function AttendanceWorkspace() {
       <section className="space-y-2" aria-label="Suggested lesson registers">
         <h2 className="text-sm font-bold">Quick start attendance</h2>
         <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
-          <div className="min-w-0 space-y-2"><h3 className="text-xs font-semibold text-muted-foreground">Upcoming lessons</h3>{upcoming.length ? upcoming.map(quickCard) : <p className="text-xs text-muted-foreground">No upcoming registers in the next 7 days.</p>}</div>
+          <div className="min-w-0 space-y-2"><h3 className="text-xs font-semibold text-muted-foreground">Upcoming lessons</h3>{upcoming.length ? upcoming.map(upcomingCard) : <p className="text-xs text-muted-foreground">No upcoming registers in the next 7 days.</p>}</div>
           <div className="min-w-0 space-y-2"><h3 className="text-xs font-semibold text-muted-foreground">Recently passed</h3>{recent.length ? recent.map(quickCard) : <p className="text-xs text-muted-foreground">No recent registers in the last 7 days.</p>}</div>
         </div>
       </section>
