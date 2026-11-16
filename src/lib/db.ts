@@ -32,10 +32,22 @@ export type ProgressRow = Row<"progress_records">;
 const sb = supabase as any;
 
 async function selectAll<T extends keyof Tables>(table: T, order?: string): Promise<Row<T>[]> {
-  const query = sb.from(table as string).select("*");
-  const { data, error } = await (order ? query.order(order) : query);
-  if (error) throw error;
-  return (data ?? []) as Row<T>[];
+  // PostgREST commonly caps responses at 1,000 rows. Fetch every page so
+  // newly saved attendance is not omitted from schedules and dashboards.
+  const pageSize = 500;
+  const rows: Row<T>[] = [];
+  for (let offset = 0; ; offset += pageSize) {
+    const query = sb.from(table as string).select("*");
+    // Stable ordering prevents rows being skipped or duplicated across pages.
+    const { data, error } = await (order
+      ? query.order(order).order("id").range(offset, offset + pageSize - 1)
+      : query.order("id").range(offset, offset + pageSize - 1));
+    if (error) throw error;
+    const page = (data ?? []) as Row<T>[];
+    rows.push(...page);
+    if (page.length < pageSize) break;
+  }
+  return rows;
 }
 
 /** Generic list hook for any operational table. */
