@@ -203,6 +203,12 @@ function AttendanceWorkspace() {
   }
   async function createLessonRegister() {
     if (!selectedClass || busy || !date) return;
+    const scheduledDay = selectedClass.weekday?.trim().toLowerCase();
+    const chosenDay = new Date(date + "T12:00:00").toLocaleDateString("en-GB", {weekday:"long"}).toLowerCase();
+    if (scheduledDay && scheduledDay !== chosenDay) {
+      toast.error(`This class runs on ${selectedClass.weekday}. Choose a matching date to avoid incorrect attendance reports.`);
+      return;
+    }
     const existing = classSessions.find((row) => row.session_date === date);
     if (existing) { setSessionId(existing.id); return; }
     setBusy(true);
