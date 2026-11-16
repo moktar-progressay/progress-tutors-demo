@@ -407,6 +407,11 @@ export function ClassWorkspace({
     try {
       let session = attendanceSession;
       if (!session) {
+        const scheduledDay = c.weekday?.trim().toLowerCase();
+        const chosenDay = new Date(attendanceDate + "T12:00:00").toLocaleDateString("en-GB", {weekday:"long"}).toLowerCase();
+        if (scheduledDay && scheduledDay !== chosenDay) {
+          throw new Error(`This class runs on ${c.weekday}. Select the correct attendance date before marking students.`);
+        }
         const created = await addSession.mutateAsync({
           class_id: c.id,
           schedule_block_id: c.schedule_block_id,
