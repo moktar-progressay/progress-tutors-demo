@@ -763,7 +763,7 @@ export function ClassWorkspace({
                   );
                   const currentAttendance = currentAttendanceFor(item.student_id);
                   const saving =
-                    addSession.isPending || addAttendance.isPending || updateAttendance.isPending;
+                    addSession.isPending;
                   return (
                     <tr key={item.id}>
                       <td className="px-2 py-2.5 sm:px-3">
