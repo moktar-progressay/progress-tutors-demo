@@ -148,6 +148,8 @@ export function ClassWorkspace({
   const [attendanceSearch, setAttendanceSearch] = useState("");
   // Keep confirmed marks visible immediately, even while query caches refresh.
   const [confirmedMarks, setConfirmedMarks] = useState<Record<string, "present" | "absent">>({});
+  const attendanceSaveLock = useRef<Set<string>>(new Set());
+  const [savingStudentIds, setSavingStudentIds] = useState<string[]>([]);
   useEffect(() => {
     setConfirmedMarks({});
   }, [id, attendanceDate]);
@@ -361,6 +363,10 @@ export function ClassWorkspace({
       : null;
 
   const markAttendance = async (studentIdValue: string, status: "present" | "absent") => {
+    // A double tap must never start competing writes for the same student.
+    if (attendanceSaveLock.current.has(studentIdValue)) return;
+    attendanceSaveLock.current.add(studentIdValue);
+    setSavingStudentIds((previous) => [...previous, studentIdValue]);
     try {
       let session = attendanceSession;
       if (!session) {
@@ -378,42 +384,40 @@ export function ClassWorkspace({
         session = created[0];
       }
       if (!session) throw new Error("Could not create the lesson date");
-      // Do not rely on an unverified composite UNIQUE constraint for upsert.
-      // Update by the attendance row's primary key when one already exists.
-      const { data: existingRows, error: lookupError } = await supabase
+      // Confirmed in the live database: UNIQUE (session_id, student_id).
+      // A single atomic upsert handles both first marks and corrections.
+      const { data: saved, error: writeError } = await supabase
         .from("student_attendance")
-        .select("id")
-        .eq("session_id", session.id)
-        .eq("student_id", studentIdValue)
-        .limit(1);
-      if (lookupError) throw new Error(lookupError.message);
-      const existingId = existingRows?.[0]?.id;
-      const write = existingId
-        ? supabase.from("student_attendance").update({ status }).eq("id", existingId)
-        : supabase.from("student_attendance").insert({
-            session_id: session.id,
-            student_id: studentIdValue,
-            status,
-          });
-      const { error: writeError } = await write;
+        .upsert(
+          { session_id: session.id, student_id: studentIdValue, status },
+          { onConflict: "session_id,student_id" },
+        )
+        .select("id,session_id,student_id,status")
+        .single();
       if (writeError) throw new Error(writeError.message);
-      const { data: verified, error: verifyError } = await supabase
-        .from("student_attendance")
-        .select("status")
-        .eq("session_id", session.id)
-        .eq("student_id", studentIdValue)
-        .limit(1);
-      if (verifyError) throw new Error(verifyError.message);
-      if (verified?.[0]?.status !== status) {
-        throw new Error("Attendance was not confirmed by the database. Please retry.");
-      }
-      // A newly created session must be visible to the roster before its marks
-      // can be displayed. Refresh both datasets, not just attendance.
+      if (
+        !saved ||
+        saved.session_id !== session.id ||
+        saved.student_id !== studentIdValue ||
+        saved.status !== status
+      ) throw new Error("The database did not confirm the attendance change.");
       setConfirmedMarks((previous) => ({ ...previous, [studentIdValue]: status }));
-      await invalidateAttendance("sessions", "student_attendance");
+      try {
+        await invalidateAttendance("sessions", "student_attendance");
+      } catch {
+        // A cache refresh failure must not report a confirmed database write as failed.
+        toast.warning("Attendance saved, but the register could not refresh. Please reload.");
+        return;
+      }
       toast.success(`Marked ${status} for ${prettyDate(session.session_date)}`);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : (error && typeof error === "object" && "message" in error ? String(error.message) : "Could not save attendance"));
+      const message = error instanceof Error ? error.message :
+        error && typeof error === "object" && "message" in error
+          ? String(error.message) : "Could not save attendance";
+      toast.error(message);
+    } finally {
+      attendanceSaveLock.current.delete(studentIdValue);
+      setSavingStudentIds((previous) => previous.filter((id) => id !== studentIdValue));
     }
   };
   const saveLesson = async () => {
