@@ -121,6 +121,7 @@ export function ClassWorkspace({
   const addStudent = useUpsert("students");
   const addEnrolment = useUpsert("class_enrolments");
   const updateEnrolment = useUpdateRow("class_enrolments");
+  const updateStudent = useUpdateRow("students");
   const addSession = useUpsert("sessions", ["student_attendance"]);
   const invalidateAttendance = useInvalidate();
 
@@ -129,6 +130,35 @@ export function ClassWorkspace({
   const [lessonSearch, setLessonSearch] = useState("");
   const [enrolOpen, setEnrolOpen] = useState(false);
   const [studentToRemove, setStudentToRemove] = useState<{ enrolmentId: string; name: string } | null>(null);
+  const [quickEditStudent, setQuickEditStudent] = useState<{id:string;first_name:string;last_name:string;gender:string;date_of_birth:string} | null>(null);
+  const openQuickEdit = (student: NonNullable<typeof students.data>[number]) => {
+    setQuickEditStudent({
+      id:student.id, first_name:student.first_name ?? "", last_name:student.last_name ?? "",
+      gender:student.gender ?? "", date_of_birth:student.date_of_birth ?? "",
+    });
+  };
+  const saveQuickEdit = async () => {
+    if (!quickEditStudent) return;
+    if (!quickEditStudent.first_name.trim() || !quickEditStudent.last_name.trim()) {
+      toast.error("Enter the student's first and last name"); return;
+    }
+    try {
+      await updateStudent.mutateAsync({
+        id:quickEditStudent.id,
+        values:{
+          first_name:quickEditStudent.first_name.trim(),
+          last_name:quickEditStudent.last_name.trim(),
+          gender:quickEditStudent.gender.trim() || null,
+          date_of_birth:quickEditStudent.date_of_birth || null,
+        },
+      });
+      toast.success("Student details updated");
+      setQuickEditStudent(null);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not update student");
+    }
+  };
+
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
   const [studentSearch, setStudentSearch] = useState("");
   const [studentSchool, setStudentSchool] = useState("all");
@@ -862,9 +892,22 @@ export function ClassWorkspace({
                           />
                           <span className="min-w-0 truncate">{fullName(student)}</span>
                         </Link>
+                        {student && <button type="button" title="Edit student name" aria-label={`Edit ${fullName(student)}`}
+                          className="ml-1 inline-flex rounded p-1 text-muted-foreground hover:bg-muted hover:text-primary"
+                          onClick={() => openQuickEdit(student)}><Pencil className="h-3.5 w-3.5" /></button>}
                       </td>
-                      <td className="px-1 py-2.5 text-center text-xs">{student?.gender || "Not recorded"}</td>
-                      <td className="px-1 py-2.5 text-center text-xs">{ageAtAttendance(student?.date_of_birth) ?? "—"}</td>
+                      <td className="px-1 py-2.5 text-center text-xs">
+                        <span>{student?.gender || "Not recorded"}</span>
+                        {student && <button type="button" title="Edit gender" aria-label={`Edit gender for ${fullName(student)}`}
+                          className="ml-1 inline-flex rounded p-1 text-muted-foreground hover:bg-muted hover:text-primary"
+                          onClick={() => openQuickEdit(student)}><Pencil className="h-3 w-3" /></button>}
+                      </td>
+                      <td className="px-1 py-2.5 text-center text-xs">
+                        <span>{ageAtAttendance(student?.date_of_birth) ?? "—"}</span>
+                        {student && <button type="button" title="Edit date of birth" aria-label={`Edit age for ${fullName(student)}`}
+                          className="ml-1 inline-flex rounded p-1 text-muted-foreground hover:bg-muted hover:text-primary"
+                          onClick={() => openQuickEdit(student)}><Pencil className="h-3 w-3" /></button>}
+                      </td>
                       <td className="px-1 py-2.5 text-center">
                         <AttendanceChoiceButton
                           type="present"
@@ -917,6 +960,38 @@ export function ClassWorkspace({
         </div>
       </footer>
 
+      <Dialog open={quickEditStudent !== null} onOpenChange={(open) => {if (!open && !updateStudent.isPending) setQuickEditStudent(null);}}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Quick edit student</DialogTitle>
+            <DialogDescription>Changes update the student's profile across ProgressTutors. Age is calculated from date of birth.</DialogDescription>
+          </DialogHeader>
+          {quickEditStudent && <div className="space-y-3">
+            <label className="block text-sm font-medium">First name
+              <Input value={quickEditStudent.first_name} onChange={(e) => setQuickEditStudent(v => v && {...v,first_name:e.target.value})} className="mt-1" />
+            </label>
+            <label className="block text-sm font-medium">Last name
+              <Input value={quickEditStudent.last_name} onChange={(e) => setQuickEditStudent(v => v && {...v,last_name:e.target.value})} className="mt-1" />
+            </label>
+            <label className="block text-sm font-medium">Gender
+              <select className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3" value={quickEditStudent.gender}
+                onChange={(e) => setQuickEditStudent(v => v && {...v,gender:e.target.value})}>
+                <option value="">Not recorded</option><option value="Male">Male</option><option value="Female">Female</option><option value="Other">Other</option><option value="Prefer not to say">Prefer not to say</option>
+              </select>
+            </label>
+            <label className="block text-sm font-medium">Date of birth
+              <Input type="date" max={format(new Date(),"yyyy-MM-dd")} value={quickEditStudent.date_of_birth}
+                onChange={(e) => setQuickEditStudent(v => v && {...v,date_of_birth:e.target.value})} className="mt-1" />
+            </label>
+          </div>}
+          <DialogFooter>
+            <Button type="button" variant="outline" disabled={updateStudent.isPending} onClick={() => setQuickEditStudent(null)}>Cancel</Button>
+            <Button type="button" disabled={updateStudent.isPending} onClick={saveQuickEdit}>
+              <Save className="h-4 w-4" />{updateStudent.isPending ? "Saving…" : "Save changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <Dialog open={lessonPickerOpen} onOpenChange={setLessonPickerOpen}>
         <DialogContent className="flex max-h-[82vh] flex-col p-0 sm:max-w-xl">
           <DialogHeader className="px-5 pt-5 text-left">
