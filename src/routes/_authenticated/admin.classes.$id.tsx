@@ -147,6 +147,12 @@ export function ClassWorkspace({
   );
   const [attendanceSearch, setAttendanceSearch] = useState("");
   // Keep confirmed marks visible immediately, even while query caches refresh.
+  const [attendanceSort, setAttendanceSort] = useState<"student" | "gender" | "age" | "present" | "absent">("student");
+  const [attendanceSortDirection, setAttendanceSortDirection] = useState<"asc" | "desc">("asc");
+  const sortAttendanceBy = (column: "student" | "gender" | "age" | "present" | "absent") => {
+    if (attendanceSort === column) setAttendanceSortDirection((direction) => direction === "asc" ? "desc" : "asc");
+    else { setAttendanceSort(column); setAttendanceSortDirection("asc"); }
+  };
   const [confirmedMarks, setConfirmedMarks] = useState<Record<string, "present" | "absent">>({});
   const attendanceSaveLock = useRef<Set<string>>(new Set());
   const [savingStudentIds, setSavingStudentIds] = useState<string[]>([]);
@@ -325,6 +331,16 @@ export function ClassWorkspace({
     const confirmed = confirmedMarks[studentIdValue];
     return confirmed ? { ...stored, status: confirmed } : stored;
   };
+  const studentForAttendance = (studentId: string) =>
+    (students.data ?? []).find((student) => student.id === studentId);
+  const ageAtAttendance = (dateOfBirth: string | null | undefined): number | null => {
+    if (!dateOfBirth || !/^\\d{4}-\\d{2}-\\d{2}$/.test(dateOfBirth)) return null;
+    const [year, month, day] = dateOfBirth.split("-").map(Number);
+    const [asOfYear, asOfMonth, asOfDay] = attendanceDate.split("-").map(Number);
+    if (!year || !month || !day || !asOfYear || !asOfMonth || !asOfDay) return null;
+    const years = asOfYear - year - (asOfMonth < month || (asOfMonth === month && asOfDay < day) ? 1 : 0);
+    return years >= 0 && years <= 120 ? years : null;
+  };
   const attendanceRoster = activeRoster.filter((item) => {
     const student = (students.data ?? []).find((value) => value.id === item.student_id);
     const parent = parentFor(item.student_id);
@@ -344,6 +360,27 @@ export function ClassWorkspace({
           .toLowerCase()
           .includes(query))
     );
+  });
+  attendanceRoster.sort((left, right) => {
+    const leftStudent = studentForAttendance(left.student_id);
+    const rightStudent = studentForAttendance(right.student_id);
+    const status = (id: string) => currentAttendanceFor(id)?.status ?? "";
+    const value = (item: typeof left, student: typeof leftStudent): string | number | null => {
+      if (attendanceSort === "student") return fullName(student);
+      if (attendanceSort === "gender") return student?.gender ?? null;
+      if (attendanceSort === "age") return ageAtAttendance(student?.date_of_birth);
+      if (attendanceSort === "present") return status(item.student_id) === "present" ? 1 : 0;
+      return status(item.student_id) === "absent" ? 1 : 0;
+    };
+    const a = value(left, leftStudent);
+    const b = value(right, rightStudent);
+    if (a == null && b == null) return fullName(leftStudent).localeCompare(fullName(rightStudent));
+    if (a == null) return 1;
+    if (b == null) return -1;
+    const comparison = typeof a === "number" && typeof b === "number"
+      ? a - b : String(a).localeCompare(String(b), "en-GB", { numeric: true });
+    return (attendanceSortDirection === "asc" ? comparison : -comparison)
+      || fullName(leftStudent).localeCompare(fullName(rightStudent), "en-GB");
   });
   // Count only students currently enrolled in this lesson. Historical marks for
   // removed students and duplicate attendance rows must not inflate the scorecard.
@@ -779,13 +816,23 @@ export function ClassWorkspace({
           </div>
         ) : (
           <div className="mt-3 overflow-x-auto rounded-xl border border-border">
-            <table className="w-full min-w-[320px] table-fixed text-left text-sm">
+            <table className="w-full min-w-[700px] text-left text-sm">
               <thead className="border-b border-border bg-muted/50 text-xs text-muted-foreground">
                 <tr>
-                  <th className="w-[46%] px-2 py-2.5 sm:px-3">Student</th>
-                  <th className="w-[22%] px-1 py-2.5 text-center">Present</th>
-                  <th className="w-[22%] px-1 py-2.5 text-center">Absent</th>
-                  <th className="w-[10%] px-1 py-2.5 text-center">Remove</th>
+                  {(["student", "gender", "age", "present", "absent"] as const).map((column) => (
+                    <th key={column} scope="col" className={column === "student" ? "min-w-[170px] px-2 py-2.5 text-left sm:px-3" : "px-1 py-2.5 text-center"}>
+                      <button type="button" onClick={() => sortAttendanceBy(column)}
+                        aria-label={`Sort by ${column}`}
+                        aria-pressed={attendanceSort === column}
+                        className="inline-flex items-center gap-1 font-semibold hover:text-foreground">
+                        {column.charAt(0).toUpperCase() + column.slice(1)}
+                        <span aria-hidden="true" className={attendanceSort === column ? "text-primary" : "opacity-40"}>
+                          {attendanceSort === column ? (attendanceSortDirection === "asc" ? "↑" : "↓") : "↕"}
+                        </span>
+                      </button>
+                    </th>
+                  ))}
+                  <th className="px-1 py-2.5 text-center">Remove</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -811,6 +858,8 @@ export function ClassWorkspace({
                           <span className="min-w-0 truncate">{fullName(student)}</span>
                         </Link>
                       </td>
+                      <td className="px-1 py-2.5 text-center text-xs">{student?.gender || "Not recorded"}</td>
+                      <td className="px-1 py-2.5 text-center text-xs">{ageAtAttendance(student?.date_of_birth) ?? "—"}</td>
                       <td className="px-1 py-2.5 text-center">
                         <AttendanceChoiceButton
                           type="present"
