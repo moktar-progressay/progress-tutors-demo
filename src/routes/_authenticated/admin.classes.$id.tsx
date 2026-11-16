@@ -146,6 +146,12 @@ export function ClassWorkspace({
     () => requestedDate ?? format(new Date(), "yyyy-MM-dd"),
   );
   const [attendanceSearch, setAttendanceSearch] = useState("");
+  // Keep confirmed marks visible immediately, even while query caches refresh.
+  const [confirmedMarks, setConfirmedMarks] = useState<Record<string, "present" | "absent">>({});
+  useEffect(() => {
+    setConfirmedMarks({});
+  }, [id, attendanceDate]);
+
   const [attendanceFilter, setAttendanceFilter] = useState<
     "all" | "present" | "absent" | "unmarked"
   >("all");
@@ -308,12 +314,15 @@ export function ClassWorkspace({
     const link = links.find((item) => item.is_primary) ?? links[0];
     return (parents.data ?? []).find((item) => item.id === link?.parent_id);
   };
-  const currentAttendanceFor = (studentIdValue: string) =>
-    attendanceSession
+  const currentAttendanceFor = (studentIdValue: string) => {
+    const stored = attendanceSession
       ? classAttendance.find(
           (item) => item.session_id === attendanceSession.id && item.student_id === studentIdValue,
         )
       : undefined;
+    const confirmed = confirmedMarks[studentIdValue];
+    return confirmed ? { ...stored, status: confirmed } : stored;
+  };
   const attendanceRoster = activeRoster.filter((item) => {
     const student = (students.data ?? []).find((value) => value.id === item.student_id);
     const parent = parentFor(item.student_id);
@@ -337,13 +346,9 @@ export function ClassWorkspace({
   // Count only students currently enrolled in this lesson. Historical marks for
   // removed students and duplicate attendance rows must not inflate the scorecard.
   const activeStudentIds = new Set(activeRoster.map((item) => item.student_id));
-  const marksForDate = attendanceSession
-    ? classAttendance.filter(
-        (item) =>
-          item.session_id === attendanceSession.id &&
-          activeStudentIds.has(item.student_id),
-      )
-    : [];
+  const marksForDate = activeRoster
+    .map((item) => ({ student_id: item.student_id, status: currentAttendanceFor(item.student_id)?.status }))
+    .filter((item) => Boolean(item.status));
   const presentStudentIds = new Set(
     marksForDate
       .filter((item) => ["present", "late"].includes(item.status))
@@ -394,6 +399,7 @@ export function ClassWorkspace({
       }
       // A newly created session must be visible to the roster before its marks
       // can be displayed. Refresh both datasets, not just attendance.
+      setConfirmedMarks((previous) => ({ ...previous, [studentIdValue]: status }));
       await invalidateAttendance("sessions", "student_attendance");
       toast.success(`Marked ${status} for ${prettyDate(session.session_date)}`);
     } catch (error) {
