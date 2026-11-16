@@ -4,10 +4,11 @@ import { format } from "date-fns";
 import { Check, ClipboardCheck, Search, Users, UserRound, X } from "lucide-react";
 import { toast } from "sonner";
 import { Page } from "@/components/AppShell";
+import { supabase } from "@/integrations/supabase/client";
 import { Avatar, avatarTone, PageHeader } from "@/components/kit";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { fullName, initialsOf, prettyDate, useTable, useUpsert, useUpdateRow } from "@/lib/db";
+import { fullName, initialsOf, prettyDate, useInvalidate, useTable, useUpsert } from "@/lib/db";
 
 export const Route = createFileRoute("/_authenticated/admin/attendance")({
   head: () => ({ meta: [{ title: "Attendance | ProgressTutors" }, { name: "robots", content: "noindex" }] }),
@@ -26,8 +27,8 @@ function AttendanceWorkspace() {
   const sessions = useTable("sessions", "session_date");
   const attendance = useTable("student_attendance");
   const createSession = useUpsert("sessions", ["student_attendance"]);
-  const createMark = useUpsert("student_attendance");
-  const updateMark = useUpdateRow("student_attendance");
+  const invalidateAttendance = useInvalidate();
+  const saveLock = useRef(false);
   const [view, setView] = useState<View>("course");
   const registerRef = useRef<HTMLElement | null>(null);
   const studentRegisterRef = useRef<HTMLElement | null>(null);
@@ -144,28 +145,58 @@ function AttendanceWorkspace() {
 
 
   async function saveMark(targetSessionId: string, targetStudentId: string, status: Mark) {
-    const existing = markRows.find((row) => row.session_id === targetSessionId && row.student_id === targetStudentId);
-    if (existing) await updateMark.mutateAsync({id: existing.id, values:{status}});
-    else await createMark.mutateAsync({session_id:targetSessionId,student_id:targetStudentId,status});
+    const { data, error } = await supabase.from("student_attendance")
+      .upsert({ session_id: targetSessionId, student_id: targetStudentId, status },
+        { onConflict: "session_id,student_id" })
+      .select("session_id,student_id,status").single();
+    if (error) throw new Error(error.message);
+    if (data?.session_id !== targetSessionId || data?.student_id !== targetStudentId || data?.status !== status) {
+      throw new Error("The database did not confirm this attendance mark.");
+    }
   }
   async function markOne(targetSessionId: string, targetStudentId: string, status: Mark) {
-    if (busy) return;
-    setBusy(true);
-    try { await saveMark(targetSessionId,targetStudentId,status); toast.success("Attendance saved"); }
-    catch (error) { toast.error(error instanceof Error ? error.message : "Could not save attendance"); }
-    finally { setBusy(false); }
-  }
-  async function markAllPresent() {
-    if (!selectedSession || busy) return;
+    if (saveLock.current) return;
+    saveLock.current = true;
     setBusy(true);
     try {
-      // Preserve existing absent/excused/late marks. Only fill missing marks.
+      await saveMark(targetSessionId, targetStudentId, status);
+      toast.success("Attendance saved");
+      try { await invalidateAttendance("student_attendance"); }
+      catch { toast.warning("Saved successfully, but refresh failed. Please reload."); }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not save attendance");
+    } finally {
+      saveLock.current = false;
+      setBusy(false);
+    }
+  }
+  async function markAllPresent() {
+    if (!selectedSession || saveLock.current) return;
+    saveLock.current = true;
+    setBusy(true);
+    try {
       const missing = roster.filter((student) => !markFor(student.id));
       if (!missing.length) { toast.info("All students are already marked"); return; }
-      await createMark.mutateAsync(missing.map((student) => ({session_id:selectedSession.id,student_id:student.id,status:"present"})));
+      const values = missing.map((student) => ({
+        session_id: selectedSession.id, student_id: student.id, status: "present" as const,
+      }));
+      const { data, error } = await supabase.from("student_attendance")
+        .upsert(values, { onConflict: "session_id,student_id" })
+        .select("student_id,status");
+      if (error) throw new Error(error.message);
+      const confirmed = new Set((data ?? []).filter(row => row.status === "present").map(row => row.student_id));
+      if (missing.some(student => !confirmed.has(student.id))) {
+        throw new Error("Some attendance marks were not confirmed. Please refresh and check.");
+      }
       toast.success(`Marked ${missing.length} unmarked students present`);
-    } catch (error) { toast.error(error instanceof Error ? error.message : "Could not save the register"); }
-    finally { setBusy(false); }
+      try { await invalidateAttendance("student_attendance"); }
+      catch { toast.warning("Saved successfully, but refresh failed. Please reload."); }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not save the register");
+    } finally {
+      saveLock.current = false;
+      setBusy(false);
+    }
   }
   async function createLessonRegister() {
     if (!selectedClass || busy || !date) return;
