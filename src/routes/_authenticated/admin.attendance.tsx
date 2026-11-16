@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
 import { Check, ClipboardCheck, Search, Users, UserRound, X } from "lucide-react";
@@ -19,6 +19,7 @@ type View = "course" | "student";
 type Filter = "all" | "present" | "absent" | "unmarked";
 
 function AttendanceWorkspace() {
+  const navigate = useNavigate();
   const classes = useTable("classes", "name");
   const students = useTable("students", "first_name");
   const enrolments = useTable("class_enrolments");
@@ -88,7 +89,7 @@ function AttendanceWorkspace() {
     onClick={() => {
       if (!item.row) {
         // The class page can create the missing register on first attendance mark.
-        window.location.assign(`/admin/classes/${item.course.id}?date=${item.date}`);
+        void navigate({to:"/admin/classes/$id",params:{id:item.course.id},search:{date:item.date}});
         return;
       }
       setView("course"); setClassId(item.course.id); setSessionId(item.row.id);
