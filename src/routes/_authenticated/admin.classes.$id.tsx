@@ -378,24 +378,34 @@ export function ClassWorkspace({
         session = created[0];
       }
       if (!session) throw new Error("Could not create the lesson date");
-      // Upsert by the database's unique (session_id, student_id) key.
-      // The cached attendance list can be stale, so insert-then-update causes 409 conflicts.
-      const { data: savedAttendance, error: attendanceError } = await supabase
+      // Do not rely on an unverified composite UNIQUE constraint for upsert.
+      // Update by the attendance row's primary key when one already exists.
+      const { data: existingRows, error: lookupError } = await supabase
         .from("student_attendance")
-        .upsert(
-          { session_id: session.id, student_id: studentIdValue, status },
-          { onConflict: "session_id,student_id" },
-        )
-        .select("id,session_id,student_id,status")
-        .single();
-      if (attendanceError) throw attendanceError;
-      if (
-        !savedAttendance ||
-        savedAttendance.session_id !== session.id ||
-        savedAttendance.student_id !== studentIdValue ||
-        savedAttendance.status !== status
-      ) {
-        throw new Error("Attendance could not be verified. Please try again.");
+        .select("id")
+        .eq("session_id", session.id)
+        .eq("student_id", studentIdValue)
+        .limit(1);
+      if (lookupError) throw new Error(lookupError.message);
+      const existingId = existingRows?.[0]?.id;
+      const write = existingId
+        ? supabase.from("student_attendance").update({ status }).eq("id", existingId)
+        : supabase.from("student_attendance").insert({
+            session_id: session.id,
+            student_id: studentIdValue,
+            status,
+          });
+      const { error: writeError } = await write;
+      if (writeError) throw new Error(writeError.message);
+      const { data: verified, error: verifyError } = await supabase
+        .from("student_attendance")
+        .select("status")
+        .eq("session_id", session.id)
+        .eq("student_id", studentIdValue)
+        .limit(1);
+      if (verifyError) throw new Error(verifyError.message);
+      if (verified?.[0]?.status !== status) {
+        throw new Error("Attendance was not confirmed by the database. Please retry.");
       }
       // A newly created session must be visible to the roster before its marks
       // can be displayed. Refresh both datasets, not just attendance.
@@ -403,7 +413,7 @@ export function ClassWorkspace({
       await invalidateAttendance("sessions", "student_attendance");
       toast.success(`Marked ${status} for ${prettyDate(session.session_date)}`);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not save attendance");
+      toast.error(error instanceof Error ? error.message : (error && typeof error === "object" && "message" in error ? String(error.message) : "Could not save attendance"));
     }
   };
   const saveLesson = async () => {
