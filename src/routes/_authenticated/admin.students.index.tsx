@@ -19,7 +19,6 @@ import {
   fullName,
   initialsOf,
   useTable,
-  useDeleteRow,
   useUpdateRow,
   useUpsert,
   type Insert,
@@ -79,7 +78,6 @@ function StudentsPage() {
 
   const createStudent = useUpsert("students");
   const updateStudent = useUpdateRow("students");
-  const deleteStudent = useDeleteRow("students");
   const linkParent = useUpsert("parent_students", ["students"]);
 
   const [q, setQ] = useState("");
@@ -434,8 +432,8 @@ function StudentsPage() {
         description="Only first name is required. Sensitive details stay on the student record."
         onSubmit={save}
         busy={createStudent.isPending || updateStudent.isPending}
-        dangerLabel={editing ? "Delete" : undefined}
-        dangerBusy={deleteStudent.isPending}
+        dangerLabel={editing && editing.status !== "archived" ? "Archive" : undefined}
+        dangerBusy={updateStudent.isPending}
         onDanger={editing ? () => setStudentPendingDelete(editing) : undefined}
       >
         <TextField
@@ -549,24 +547,24 @@ function StudentsPage() {
       <ConfirmDeleteDialog
         open={Boolean(studentPendingDelete)}
         onOpenChange={(nextOpen) => {
-          if (!nextOpen && !deleteStudent.isPending) setStudentPendingDelete(null);
+          if (!nextOpen && !updateStudent.isPending) setStudentPendingDelete(null);
         }}
-        title="Are you sure you want to delete this student?"
-        description="This cannot be undone. Their enrolments, attendance, progress and other linked student records will also be removed."
-        confirmLabel="Delete student"
-        busy={deleteStudent.isPending}
+        title="Archive this student?"
+        description="The student will be hidden from the active roster. Their historical attendance, enrolments and progress records will be retained. You can restore them later."
+        confirmLabel="Archive student"
+        busy={updateStudent.isPending}
         onConfirm={async () => {
           if (!studentPendingDelete) return;
           try {
-            await deleteStudent.mutateAsync(studentPendingDelete.id);
-            toast.success("Student deleted");
+            await updateStudent.mutateAsync({ id: studentPendingDelete.id, values: { status: "archived" } });
+            toast.success("Student archived. Historical records retained.");
             setStudentPendingDelete(null);
             if (editing?.id === studentPendingDelete.id) {
               setEditing(null);
               setOpen(false);
             }
           } catch (error) {
-            toast.error(error instanceof Error ? error.message : "Could not delete the student");
+            toast.error(error instanceof Error ? error.message : "Could not archive the student");
           }
         }}
       />
