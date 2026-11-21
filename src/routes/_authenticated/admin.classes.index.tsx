@@ -479,7 +479,7 @@ function SchedulePage() {
       : summaryDates.reduce(
           (total, date) =>
             total +
-            exportLessons
+            filtered
               .filter((lesson) => lessonRunsOn(lesson, date))
               .reduce((dateTotal, lesson) => dateTotal + countFor(lesson), 0),
           0,
@@ -790,7 +790,7 @@ function SchedulePage() {
           : view === "month"
             ? eachDayOfInterval({ start: startOfMonth(anchor), end: endOfMonth(anchor) })
             : [];
-    const exportLessons = exportCurrentFilters ? filtered : (classRows ?? []);
+    const exportLessons: ClassRow[] = exportCurrentFilters ? filtered : (lessons.data ?? []);
     const visibleLessons =
       view === "list"
         ? exportLessons.map((lesson) => ({ lesson, date: null as Date | null }))
