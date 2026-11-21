@@ -81,7 +81,7 @@ function AttendanceWorkspace() {
   const lessonColours = ["#ec2d70", "#155dfb", "#00a36c", "#ffb900", "#8424f5", "#009b91"];
   const colourFor = (item: typeof suggestions[number]) => {
     const source = item.course as Record<string, unknown> | undefined;
-    const saved = source?.colour ?? source?.color ?? source?.card_colour ?? source?.card_color;
+    const saved = source?.["colour"] ?? source?.["color"] ?? source?.["card_colour"] ?? source?.["card_color"];
     if (typeof saved === "string" && /^#[0-9a-f]{6}$/i.test(saved)) return saved;
     const key = String(item.row.class_id ?? "");
     return lessonColours[Array.from(key).reduce((sum, char) => sum + char.charCodeAt(0), 0) % lessonColours.length];
