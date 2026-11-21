@@ -405,9 +405,9 @@ function StudentsPage() {
                           <Button
                             size="sm"
                             variant="destructive"
-                            onClick={() => setStudentPendingDelete(s)}
+                            onClick={() => setStudentPendingDelete(s)} disabled={s.status === "archived"}
                           >
-                            Delete
+                            Archive
                           </Button>
                         </td>
                       </tr>
