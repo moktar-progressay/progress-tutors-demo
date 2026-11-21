@@ -306,7 +306,7 @@ export function ClassWorkspace({
         toast.success("Location added. Remember to save the lesson.");
       } else if (quickAdd === "room") {
         const created = await createRoom.mutateAsync({ type: "create", values: { name, site_id: edit.site_id, floor: quickFloor.trim() || null } });
-        if (!created) throw new Error("Could not create room");
+        // The mutation returns void on success and throws on failure.
         setEdit((previous) => ({ ...previous, room: name }));
         toast.success("Room added. Remember to save the lesson.");
       }
@@ -440,7 +440,7 @@ export function ClassWorkspace({
     .filter((item) => Boolean(item.status));
   const presentStudentIds = new Set(
     marksForDate
-      .filter((item) => ["present", "late"].includes(item.status))
+      .filter((item) => ["present", "late"].includes(item.status ?? ""))
       .map((item) => item.student_id),
   );
   const presentForDate = presentStudentIds.size;
