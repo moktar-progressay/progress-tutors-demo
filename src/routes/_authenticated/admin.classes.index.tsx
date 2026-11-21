@@ -241,8 +241,8 @@ function readSchedulePreferences(): SchedulePreferences {
     if (!data || typeof data !== "object" || Array.isArray(data)) return {};
     const p = data as SchedulePreferences;
     return {
-      date: typeof p.date === "string" && /^\\d{4}-\\d{2}-\\d{2}$/.test(p.date) && !Number.isNaN(Date.parse(p.date)) ? p.date : undefined,
-      view: ["day", "week", "month", "list"].includes(p.view ?? "") ? p.view : undefined,
+      ...(typeof p.date === "string" && /^\\d{4}-\\d{2}-\\d{2}$/.test(p.date) && !Number.isNaN(Date.parse(p.date)) ? { date: p.date } : {}),
+      ...(["day", "week", "month", "list"].includes(p.view ?? "") ? { view: p.view } : {}),
       grouping: p.grouping === "location" ? "location" : "tutor",
       zoom: typeof p.zoom === "number" && Number.isFinite(p.zoom) && p.zoom >= CALENDAR_ZOOM_MIN && p.zoom <= CALENDAR_ZOOM_MAX ? p.zoom : 1,
       tutorId: typeof p.tutorId === "string" ? p.tutorId : "all",
@@ -790,12 +790,12 @@ function SchedulePage() {
           : view === "month"
             ? eachDayOfInterval({ start: startOfMonth(anchor), end: endOfMonth(anchor) })
             : [];
-    const exportLessons = exportCurrentFilters ? filtered : (classes.data ?? []);
+    const exportLessons = exportCurrentFilters ? filtered : (classRows ?? []);
     const visibleLessons =
       view === "list"
         ? exportLessons.map((lesson) => ({ lesson, date: null as Date | null }))
         : reportDates.flatMap((date) =>
-            filtered
+            exportLessons
               .filter((lesson) => lessonRunsOn(lesson, date))
               .map((lesson) => ({ lesson, date })),
           );
@@ -980,7 +980,7 @@ function SchedulePage() {
         </div>
         {!compact && !narrow && !dense ? (
           <div className="mt-auto flex min-w-0 items-center justify-between gap-1 pt-1 text-[9px] font-bold">
-            <span className="truncate">{scheduleGrouping === "tutor" ? (tutor ? fullName(tutor) : "Not assigned") : roomName}</span>
+            <span className="truncate">{scheduleGrouping === "tutor" ? (tutor ? fullName(tutor) : "Not assigned") : (lesson.room || "Room not assigned")}</span>
             <span className="shrink-0">{enrolled}/{lesson.capacity} seats</span>
           </div>
         ) : null}
@@ -1148,7 +1148,7 @@ function SchedulePage() {
                   onDoubleClick={() => {
                     openNew(format(day, "yyyy-MM-dd"));
                     if (scheduleGrouping === "tutor") setForm((current) => ({ ...current, tutor_id: id }));
-                    else setForm((current) => ({ ...current, site_id: id.split("::")[0] === "unspecified" ? "" : id.split("::")[0], room: id.split("::").slice(1).join("::") }));
+                    else setForm((current) => ({ ...current, site_id: id.split("::")[0] === "unspecified" ? "" : (id.split("::")[0] ?? ""), room: id.split("::").slice(1).join("::") }));
                   }}
                 >
                   {laneLessons.map((lesson) => {
