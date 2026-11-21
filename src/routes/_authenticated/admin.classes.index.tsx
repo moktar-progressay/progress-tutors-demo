@@ -278,6 +278,11 @@ function SchedulePage() {
   const [view, setView] = useState<CalendarView>(requestedView ?? savedPreferences.view ?? "day");
   const [calendarZoom, setCalendarZoom] = useState(savedPreferences.zoom ?? 1);
   const [scheduleGrouping, setScheduleGrouping] = useState<"tutor" | "location">(savedPreferences.grouping ?? "tutor");
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exportGrouping, setExportGrouping] = useState<"current" | "tutor" | "location">("current");
+  const [exportOrientation, setExportOrientation] = useState<"landscape" | "portrait">("landscape");
+  const [exportIncludeStudents, setExportIncludeStudents] = useState(true);
+  const [exportCurrentFilters, setExportCurrentFilters] = useState(true);
   const [selectedDate, setSelectedDate] = useState(requestedDate ?? savedPreferences.date ?? currentDateIso());
   const [search, setSearch] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
@@ -474,7 +479,7 @@ function SchedulePage() {
       : summaryDates.reduce(
           (total, date) =>
             total +
-            filtered
+            exportLessons
               .filter((lesson) => lessonRunsOn(lesson, date))
               .reduce((dateTotal, lesson) => dateTotal + countFor(lesson), 0),
           0,
@@ -776,6 +781,7 @@ function SchedulePage() {
   }
 
   function downloadTeachingReport() {
+    const reportGrouping = exportGrouping === "current" ? scheduleGrouping : exportGrouping;
     const reportDates =
       view === "day"
         ? [anchor]
@@ -784,9 +790,10 @@ function SchedulePage() {
           : view === "month"
             ? eachDayOfInterval({ start: startOfMonth(anchor), end: endOfMonth(anchor) })
             : [];
+    const exportLessons = exportCurrentFilters ? filtered : (classes.data ?? []);
     const visibleLessons =
       view === "list"
-        ? filtered.map((lesson) => ({ lesson, date: null as Date | null }))
+        ? exportLessons.map((lesson) => ({ lesson, date: null as Date | null }))
         : reportDates.flatMap((date) =>
             filtered
               .filter((lesson) => lessonRunsOn(lesson, date))
@@ -801,7 +808,7 @@ function SchedulePage() {
     // Export the exact tutor or location grouping selected in the Schedule.
     // Within each group, order by occurrence date, start time and lesson name.
     const groupKeyFor = (lesson: ClassRow) => {
-      if (scheduleGrouping === "tutor") {
+      if (reportGrouping === "tutor") {
         const assigned = tutorFor(lesson);
         return assigned ? fullName(assigned) : "Tutor not assigned";
       }
@@ -826,7 +833,7 @@ function SchedulePage() {
         tutor: groupName,
         tutorInitials: initialsOf(groupName),
         lessons: groupLessons.map(({ lesson, date: occurrenceDate }) => {
-          const enrolledStudents = studentsFor(lesson)
+          const enrolledStudents = (exportIncludeStudents ? studentsFor(lesson) : [])
             .map((student) => ({ name: fullName(student), initials: initialsOf(fullName(student)) }))
             .sort((a, b) => a.name.localeCompare(b.name, "en-GB"));
           const venue = lesson.delivery_mode === "online"
@@ -844,7 +851,7 @@ function SchedulePage() {
             name: lesson.name,
             subject: subjectLabel(lesson.subject) || "Subject not set",
             when,
-            where: scheduleGrouping === "location"
+            where: reportGrouping === "location"
               ? `${venue} | Tutor: ${tutorFor(lesson) ? fullName(tutorFor(lesson)) : "Not assigned"}`
               : `${venue}${lesson.room ? ` | ${lesson.room}` : ""}`,
             room: lesson.room?.trim() || "Room not assigned",
@@ -853,7 +860,7 @@ function SchedulePage() {
               ? "Face-to-face"
               : lesson.delivery_mode === "hybrid" ? "Hybrid" : "Online",
             capacity: lesson.capacity,
-            enrolled: enrolledStudents.length,
+            enrolled: countFor(lesson),
             students: enrolledStudents,
             colour: (lesson.card_colour as CardColour | null) ?? "pink",
           };
@@ -874,16 +881,17 @@ function SchedulePage() {
       subjectFilter !== "all" ? subjectFilter : null,
       search.trim() ? `Search: ${search.trim()}` : null,
     ].filter(Boolean) as string[];
-    const scope = `${scheduleGrouping === "tutor" ? "By tutor" : "By location and room"} | ${dateTitle}${filterLabels.length ? ` | ${filterLabels.join(" | ")}` : ""}`;
-    const pdf = createTeachingReportPdf(report, scope, scheduleGrouping);
+    const scope = `${reportGrouping === "tutor" ? "By tutor" : "By location and room"} | ${dateTitle}${filterLabels.length ? ` | ${filterLabels.join(" | ")}` : ""}`;
+    const pdf = createTeachingReportPdf(report, scope, reportGrouping, exportOrientation);
     const url = URL.createObjectURL(pdf);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `ProgressTutors-${scheduleGrouping}-schedule-${selectedDate}.pdf`;
+    link.download = `ProgressTutors-${reportGrouping}-${exportOrientation}-${selectedDate}.pdf`;
     document.body.appendChild(link);
     link.click();
     link.remove();
     window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
+    setExportOpen(false);
     toast.success("Teaching report downloaded");
   }
 
@@ -1248,7 +1256,7 @@ function SchedulePage() {
               </div>
             </details>
           ) : null}
-          <Button size="sm" variant="ghost" className="h-8" onClick={downloadTeachingReport}><Download className="h-4 w-4" /><span className="hidden sm:inline">Report</span></Button>
+          <Button size="sm" variant="ghost" className="h-8" onClick={() => setExportOpen(true)}><Download className="h-4 w-4" /><span className="hidden sm:inline">Report</span></Button>
           <Button size="icon" className="h-8 w-8 shrink-0 rounded-full" onClick={() => openNew()} aria-label="Add lesson" title="Add lesson"><Plus className="h-4 w-4" /></Button>
         </div>
       </div>
@@ -1761,6 +1769,21 @@ function SchedulePage() {
           }
         }}
       />
+      <Dialog open={exportOpen} onOpenChange={setExportOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Download timetable</DialogTitle>
+            <DialogDescription>Choose what to include in your printable A4 PDF.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <SelectField label="Group lessons by" value={exportGrouping} onChange={(value) => setExportGrouping(value as typeof exportGrouping)} options={[{value:"current",label:"Match current schedule view"},{value:"tutor",label:"Tutor / person"},{value:"location",label:"Location and room"}]} />
+            <SelectField label="Paper layout" value={exportOrientation} onChange={(value) => setExportOrientation(value as typeof exportOrientation)} options={[{value:"landscape",label:"A4 landscape (recommended)"},{value:"portrait",label:"A4 portrait"}]} />
+            <label className="flex items-center gap-3 text-sm"><input type="checkbox" checked={exportCurrentFilters} onChange={(event) => setExportCurrentFilters(event.target.checked)} /> Match current filters and search</label>
+            <label className="flex items-center gap-3 text-sm"><input type="checkbox" checked={exportIncludeStudents} onChange={(event) => setExportIncludeStudents(event.target.checked)} /> Include student names (private)</label>
+            <Button className="w-full" onClick={downloadTeachingReport}><Download className="mr-2 h-4 w-4" />Download PDF</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Page>
   );
 }
@@ -2122,11 +2145,17 @@ function truncatePdfText(value: string, maxLength: number) {
   return clean.length > maxLength ? `${clean.slice(0, Math.max(1, maxLength - 3))}...` : clean;
 }
 
-function createTeachingReportPdf(groups: TeachingReportGroup[], scope: string, grouping: "tutor" | "location") {
+function createTeachingReportPdf(groups: TeachingReportGroup[], scope: string, grouping: "tutor" | "location", orientation: "landscape" | "portrait" = "landscape") {
+  const landscape = orientation === "landscape";
+  const pageWidth = landscape ? 842 : 595;
+  const pageHeight = landscape ? 595 : 842;
+  const rightEdge = pageWidth - 42;
+  const contentWidth = pageWidth - 84;
+  const studentColumns = landscape ? 4 : 3;
   const lessonCount = groups.reduce((sum, group) => sum + group.lessons.length, 0);
   const pages: string[][] = [[]];
   let pageIndex = 0;
-  let y = 698;
+  let y = pageHeight - 144;
   const ink: [number, number, number] = [0.12, 0.13, 0.19];
   const muted: [number, number, number] = [0.42, 0.44, 0.50];
   const pink: [number, number, number] = [0.91, 0.18, 0.43];
@@ -2142,19 +2171,19 @@ function createTeachingReportPdf(groups: TeachingReportGroup[], scope: string, g
   const rect = (x: number, bottom: number, width: number, height: number, colour: [number, number, number]) =>
     command(`${colour.join(" ")} rg ${x} ${bottom} ${width} ${height} re f`);
   const startPage = () => {
-    rect(0, 766, 595, 76, pink);
-    textAt("ProgressTutors", 42, 810, 20, {bold:true,colour:[1,1,1]});
-    textAt(grouping === "tutor" ? "Teaching timetable by tutor" : "Teaching timetable by location and room", 42, 788, 12, {bold:true,colour:[1,1,1]});
-    rect(42, 735, 511, 22, [1,0.95,0.97]);
-    textAt(truncatePdfText(scope,90), 51, 742, 8, {bold:true,colour:pink});
-    textAt(`${lessonCount} lessons | ${groups.length} ${grouping === "tutor" ? "tutor" : "room"} groups`, 42, 716, 8, {colour:muted});
-    y = 695;
+    rect(0, pageHeight - 76, pageWidth, 76, pink);
+    textAt("ProgressTutors", 42, pageHeight - 32, 20, {bold:true,colour:[1,1,1]});
+    textAt(grouping === "tutor" ? "Teaching timetable by tutor" : "Teaching timetable by location and room", 42, pageHeight - 54, 12, {bold:true,colour:[1,1,1]});
+    rect(42, pageHeight - 107, contentWidth, 22, [1,0.95,0.97]);
+    textAt(truncatePdfText(scope,90), 51, pageHeight - 100, 8, {bold:true,colour:pink});
+    textAt(`${lessonCount} lessons | ${groups.length} ${grouping === "tutor" ? "tutor" : "room"} groups`, 42, pageHeight - 126, 8, {colour:muted});
+    y = pageHeight - 147;
   };
   const ensure = (needed: number) => { if (y-needed < 55) {pageIndex++;pages.push([]);startPage();} };
   startPage();
   for (const group of groups) {
     ensure(70);
-    rect(42,y-29,511,29,[0.95,0.96,0.98]);
+    rect(42,y-29,contentWidth,29,[0.95,0.96,0.98]);
     textAt(truncatePdfText(group.tutor,75),52,y-19,11,{bold:true});
     y-=38;
     let previousDate = "";
@@ -2164,38 +2193,38 @@ function createTeachingReportPdf(groups: TeachingReportGroup[], scope: string, g
       const dateLabel=parts.length>1?parts[0]:lesson.when.startsWith("Every ")?lesson.when.split(",")[0]:"";
       if (dateLabel && dateLabel !== previousDate) {
         ensure(38);
-        rect(42,y-18,511,18,[0.98,0.98,0.99]);
+        rect(42,y-18,contentWidth,18,[0.98,0.98,0.99]);
         textAt(truncatePdfText(dateLabel,75),52,y-13,9,{bold:true,colour:muted});
         y-=23;
         previousDate=dateLabel;
       }
-      const lines=Math.ceil(lesson.students.length / 3);
+      const lines=Math.ceil(lesson.students.length / studentColumns);
       const height=65+(lines ? lines*13+6 : 0);
       ensure(height+12);
       const base=y-height;
-      rect(42,base,511,height,[1,1,1]);
+      rect(42,base,contentWidth,height,[1,1,1]);
       rect(42,base,5,height,palette[lesson.colour] ?? pink);
-      rect(46,base,507,0.6,[0.85,0.87,0.90]);
+      rect(46,base,contentWidth-4,0.6,[0.85,0.87,0.90]);
       const timeMatch=lesson.when.match(/\b\d{1,2}:\d{2}-\d{1,2}:\d{2}\b/);
       textAt(timeMatch?.[0] ?? truncatePdfText(lesson.when,16),56,y-17,9.5,{bold:true,colour:pink});
-      textAt(truncatePdfText(lesson.name,58),166,y-17,10,{bold:true});
-      textAt(`${lesson.enrolled}/${lesson.capacity} seats`,462,y-32,8,{bold:true,colour:lesson.enrolled>=lesson.capacity?pink:muted});
+      textAt(truncatePdfText(lesson.name,landscape ? 86 : 58),166,y-17,10,{bold:true});
+      textAt(`${lesson.enrolled}/${lesson.capacity} seats`,rightEdge-90,y-32,8,{bold:true,colour:lesson.enrolled>=lesson.capacity?pink:muted});
       textAt(truncatePdfText(`${lesson.subject} | ${lesson.delivery}`,55),56,y-32,8,{colour:muted});
       textAt(truncatePdfText(`Tutor: ${lesson.tutorName} | Room: ${lesson.room}`,89),56,y-45,8,{colour:muted});
       textAt(truncatePdfText(`Site: ${lesson.where}`,90),56,y-58,8,{colour:muted});
       lesson.students.forEach((student,index)=>{
-        const column=index%3;
-        const row=Math.floor(index/3);
-        textAt(truncatePdfText(student.name,25),56+column*165,y-74-row*13,7.4);
+        const column=index%studentColumns;
+        const row=Math.floor(index/studentColumns);
+        textAt(truncatePdfText(student.name,25),56+column*(contentWidth/studentColumns),y-74-row*13,7.4);
       });
       y-=height+7;
     }
     y-=8;
   }
   pages.forEach((page,index)=>{
-    page.push("0.82 0.83 0.86 RG 42 39 m 553 39 l S");
+    page.push("0.82 0.83 0.86 RG 42 39 m ${rightEdge} 39 l S");
     page.push(`BT /F1 8 Tf 0.4 0.42 0.47 rg 42 25 Td (Private teaching timetable) Tj ET`);
-    page.push(`BT /F1 8 Tf 0.4 0.42 0.47 rg 510 25 Td (Page ${index+1}/${pages.length}) Tj ET`);
+    page.push(`BT /F1 8 Tf 0.4 0.42 0.47 rg ${rightEdge-43} 25 Td (Page ${index+1}/${pages.length}) Tj ET`);
   });
 
   const objects: string[] = [];
@@ -2211,7 +2240,7 @@ function createTeachingReportPdf(groups: TeachingReportGroup[], scope: string, g
     const contentId = pageId + 1;
     const stream = commands.join("\n");
     objects[pageId - 1] =
-      `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ${contentId} 0 R >>`;
+      `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ${contentId} 0 R >>`;
     objects[contentId - 1] = `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`;
   });
 
