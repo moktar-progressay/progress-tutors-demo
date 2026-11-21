@@ -115,7 +115,16 @@ function AttendanceWorkspace() {
   const selectedSession = classSessions.find((row) => row.id === sessionId) ?? (sessionId ? undefined : classSessions[0]);
   const activeSessionId = selectedSession?.id ?? "";
 
-  const roster = useMemo(() => enrolmentRows.filter((row) => row.class_id === classId && row.status === "active").map((row) => studentRows.find((student) => student.id === row.student_id)).filter((student): student is typeof studentRows[number] => Boolean(student)), [enrolmentRows, studentRows, classId]);
+  // Historical registers retain everyone with an attendance mark, even after archiving or unenrolment.
+  // Future registers only include active students in active enrolments.
+  const roster = useMemo(() => {
+    const ids = new Set(enrolmentRows.filter((row) => row.class_id === classId && row.status === "active").map((row) => row.student_id));
+    const historical = Boolean(selectedSession && selectedSession.session_date < new Date().toISOString().slice(0, 10));
+    if (historical) {
+      markRows.filter((row) => row.session_id === activeSessionId).forEach((row) => ids.add(row.student_id));
+    }
+    return studentRows.filter((student) => ids.has(student.id) && (historical || student.status === "active"));
+  }, [enrolmentRows, studentRows, classId, selectedSession, markRows, activeSessionId]);
   const marks = markRows.filter((row) => row.session_id === activeSessionId);
   const markFor = (id: string) => marks.find((row) => row.student_id === id);
   const shown = roster.filter((student) => {
