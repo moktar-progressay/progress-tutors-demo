@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { fullName, initialsOf, money, num, prettyDate, type Row } from "@/lib/db";
 import { Avatar, avatarTone } from "@/components/kit";
-import { buildPaymentPdf, downloadPaymentDocument } from "@/lib/payment-documents";
+import { downloadPaymentDocument } from "@/lib/payment-documents";
 
 export type TutorPaymentRequestLine = {
   earningId: string | null;
@@ -206,13 +206,6 @@ export function TutorPaymentRequestDialog({
       paymentLink: "",
       notes,
     } as const;
-  const [previewUrl, setPreviewUrl] = useState("");
-  useEffect(() => {
-    if (!open) return;
-    const url = URL.createObjectURL(new Blob([buildPaymentPdf(documentData)], { type: "application/pdf" }));
-    setPreviewUrl(url);
-    return () => URL.revokeObjectURL(url);
-  }, [open, tutorId, reference, notes, totalHours, totalAmount, period.from, period.until, selectedLines.length]);
   const exportPdf = () => {
     if (!validate()) return;
     downloadPaymentDocument(documentData);
@@ -271,7 +264,7 @@ export function TutorPaymentRequestDialog({
         </DialogHeader>
 
         <div className="flex gap-2 border-b p-2 xl:hidden"><Button variant={mobileTab === "edit" ? "default" : "ghost"} onClick={() => setMobileTab("edit")}>Edit</Button><Button variant={mobileTab === "preview" ? "default" : "ghost"} onClick={() => setMobileTab("preview")}>Preview</Button></div>
-        <div className="grid min-h-0 flex-1 overflow-hidden xl:grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)]">
+        <div className="grid min-h-0 flex-1 overflow-hidden xl:grid-cols-[minmax(0,1fr)_420px]">
         <div className={`min-h-0 overflow-y-auto ${mobileTab === "edit" ? "block" : "hidden"} xl:block`}>
           <aside className="space-y-4 border-b border-border p-4 lg:overflow-y-auto lg:border-r lg:border-b-0">
             <div className="relative">
@@ -521,7 +514,38 @@ export function TutorPaymentRequestDialog({
             )}
           </main>
           </div>
-          <section className={`min-h-0 overflow-auto border-l bg-muted/40 p-4 ${mobileTab === "preview" ? "block" : "hidden"} xl:block`}><h3 className="mb-3 font-bold">Live PDF preview</h3>{previewUrl ? <iframe title="Payment request PDF preview" src={previewUrl} className="h-[calc(100%-2rem)] min-h-[400px] w-full rounded-lg border bg-white" /> : null}</section>
+          <section className={`min-h-0 overflow-y-auto p-4 ${mobileTab === "preview" ? "block" : "hidden"} xl:block`}>
+            <aside className="h-fit rounded-2xl border border-border bg-muted/40 p-3">
+              <div className="mb-3">
+                <p className="text-sm font-extrabold">Payment request preview</p>
+                <p className="text-[11px] text-muted-foreground">Updates as you type</p>
+              </div>
+              <div className="rounded-xl border border-border bg-white p-5 text-slate-900 shadow-sm">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div><p className="text-lg font-black">Progress<span className="text-pink-600">Tutors</span></p><p className="mt-1 text-[10px] text-slate-500">Progressay</p></div>
+                  <div className="text-right"><p className="text-lg font-black">Payment request</p><p className="text-xs text-slate-500">{reference || "New draft"}</p></div>
+                </div>
+                <div className="mt-6 grid grid-cols-2 gap-4 text-xs">
+                  <div><p className="font-bold">Tutor</p><p className="mt-1 break-words text-slate-600">{tutor ? fullName(tutor) : "Choose a tutor"}</p></div>
+                  <div className="text-right text-slate-600"><p>From: {period.from ? prettyDate(period.from) : "Not set"}</p><p>Until: {period.until ? prettyDate(period.until) : "Not set"}</p></div>
+                </div>
+                <div className="mt-6 overflow-hidden rounded-lg border border-slate-200">
+                  <div className="grid grid-cols-[minmax(0,1fr)_35px_55px_65px] gap-1 bg-slate-100 px-2 py-2 text-[10px] font-bold"><span>Description</span><span>Hours</span><span>Rate</span><span className="text-right">Amount</span></div>
+                  {selectedLines.length === 0 ? <p className="px-3 py-6 text-center text-xs text-slate-400">Select a tutor and add worked hours</p> : selectedLines.map((line,index) => (
+                    <div key={line.earningId ?? index} className="grid grid-cols-[minmax(0,1fr)_35px_55px_65px] gap-1 border-t border-slate-100 px-2 py-2 text-[10px]">
+                      <div className="break-words"><p className="font-semibold">{line.description || "Teaching session"}</p><p className="text-slate-500">{line.date ? prettyDate(line.date) : ""}</p></div><span>{line.hours}</span><span>{money(line.hours > 0 ? line.amount / line.hours : 0)}</span><span className="text-right font-bold">{money(line.amount)}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-5 ml-auto grid max-w-[230px] grid-cols-2 gap-y-2 text-xs">
+                  <span className="text-slate-500">Total hours</span><span className="text-right">{totalHours}</span>
+                  <span className="border-t border-slate-200 pt-2 font-black">Total</span><span className="border-t border-slate-200 pt-2 text-right text-base font-black">{money(totalAmount)}</span>
+                  <span className="rounded-l-md bg-pink-50 px-2 py-2 font-bold text-pink-700">Requested amount</span><span className="rounded-r-md bg-pink-50 px-2 py-2 text-right font-black text-pink-700">{money(totalAmount)}</span>
+                </div>
+                {notes.trim() ? <div className="mt-5 text-xs"><p className="font-bold">Notes</p><p className="mt-1 whitespace-pre-wrap break-words text-slate-600">{notes}</p></div> : null}
+              </div>
+            </aside>
+          </section>
         </div>
 
         <footer className="flex flex-wrap items-center justify-end gap-2 border-t border-border px-4 py-3">
