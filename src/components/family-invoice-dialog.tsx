@@ -1,13 +1,14 @@
-import { Plus, Trash2, Users } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { FormDialog, SelectField, TextAreaField, TextField } from "@/components/form-kit";
-import { Pill } from "@/components/kit";
+import { Avatar, avatarTone, Pill } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import {
   DEMO_DATE,
   fullName,
+  initialsOf,
   money,
   num,
   useInvalidate,
@@ -60,6 +61,9 @@ export function FamilyInvoiceDialog({
   const invalidate = useInvalidate();
   const [saving, setSaving] = useState(false);
   const [parentId, setParentId] = useState("");
+  const [parentSearch, setParentSearch] = useState("");
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [addPickerOpen, setAddPickerOpen] = useState(false);
   const [periodStart, setPeriodStart] = useState(monthStart);
   const [periodEnd, setPeriodEnd] = useState(monthEnd);
   const [dueDate, setDueDate] = useState(monthEnd);
@@ -188,35 +192,28 @@ export function FamilyInvoiceDialog({
               Choose the billing contact, then add one or more linked students.
             </p>
           </div>
-          <SelectField
-            label="Parent or guardian"
-            value={parentId}
-            onChange={chooseParent}
-            options={[
-              { value: "", label: "Choose parent" },
-              ...eligibleParents.map(({ parent, childCount }) => ({
-                value: parent.id,
-                label: `${fullName(parent)} · ${childCount} ${childCount === 1 ? "child" : "children"}`,
-              })),
-            ]}
-            full
-          />
-
-          {parentId ? (
-            <div className="rounded-2xl bg-secondary/60 p-3 sm:col-span-2">
-              <div className="flex items-center gap-2 text-sm font-bold">
-                <Users className="h-4 w-4 text-primary" />
-                {children.length} linked {children.length === 1 ? "child" : "children"}
+          <div className="sm:col-span-2">
+            <p className="mb-1 text-xs font-semibold text-muted-foreground">Parent or guardian</p>
+            <button type="button" aria-expanded={pickerOpen} onClick={() => setPickerOpen(!pickerOpen)} className="flex w-full items-center gap-3 rounded-xl border p-3 text-left text-sm">
+              {parentId && <Avatar initials={initialsOf(fullName(parents.find(p => p.id === parentId)))} tone={avatarTone(fullName(parents.find(p => p.id === parentId)))} size="sm" />}
+              <span className="flex-1">{parentId ? fullName(parents.find(p => p.id === parentId)) : "Choose parent"}</span><span>⌄</span>
+            </button>
+            {pickerOpen && <div className="mt-2 rounded-xl border bg-card p-2">
+              <input aria-label="Search parents" placeholder="Search parents" value={parentSearch} onChange={e => setParentSearch(e.target.value)} className="mb-2 w-full rounded-lg border bg-background p-2 text-sm" />
+              <div className="max-h-64 overflow-y-auto">
+                {eligibleParents.filter(({parent}) => fullName(parent).toLowerCase().includes(parentSearch.toLowerCase())).map(({parent,childCount}) => <button type="button" key={parent.id} onClick={() => { if(parent.id !== parentId) chooseParent(parent.id); setPickerOpen(false); setAddPickerOpen(false); }} className="flex w-full items-center gap-3 rounded-lg p-2 text-left hover:bg-muted">
+                  <Avatar initials={initialsOf(fullName(parent))} tone={avatarTone(fullName(parent))} size="sm" /><span className="flex-1 text-sm">{fullName(parent)}<span className="block text-xs text-muted-foreground">{childCount} linked children</span></span>{parent.id === parentId && <span>✓</span>}
+                </button>)}
               </div>
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {children.map((child) => (
-                  <Pill key={child.id} tone={child.contact_type === "client" ? "green" : "amber"}>
-                    {fullName(child)} · {child.contact_type}
-                  </Pill>
-                ))}
-              </div>
-            </div>
-          ) : null}
+            </div>}
+            {parentId && <div className="ml-4 mt-3 space-y-2 border-l pl-4">
+              <p className="text-xs font-semibold text-muted-foreground">Children to include</p>
+              {children.map(child => <label key={child.id} className="flex cursor-pointer items-center gap-2 py-1 text-sm">
+                <input type="checkbox" className="accent-pink-600" checked={lines.some(line => line.student_id === child.id)} onChange={e => { const checked = e.target.checked; setLines(current => checked ? current.some(line => line.student_id === child.id) ? current : [...current,newLine(child.id)] : current.filter(line => line.student_id !== child.id)); }} />
+                <Avatar initials={initialsOf(fullName(child))} tone={avatarTone(fullName(child))} size="sm" /><span>{fullName(child)}</span>
+              </label>)}
+            </div>}
+          </div>
 
           <TextField
             label="Service start"
@@ -419,7 +416,8 @@ export function FamilyInvoiceDialog({
                 ))
               )}
             </div>
-            <Button type="button" variant="secondary" className="mt-3 w-full" disabled={children.length === 0} onClick={() => setLines((current) => [...current, newLine(children[0]?.id)])}><Plus className="h-4 w-4" /> Add item</Button>
+            <Button type="button" variant="secondary" className="mt-3 w-full" onClick={() => { if (!parentId) { setPickerOpen(true); toast.info("Choose a parent first"); return; } setAddPickerOpen(!addPickerOpen); }}><Plus className="h-4 w-4" /> Add item</Button>
+            {addPickerOpen && parentId && <div className="mt-2 rounded-lg border p-2"><p className="mb-2 text-xs font-semibold">Choose child for new charge</p>{children.map(child => <button type="button" key={child.id} className="flex w-full items-center gap-2 rounded p-2 text-left text-sm hover:bg-slate-100" onClick={() => { setLines(current => [...current,newLine(child.id)]); setAddPickerOpen(false); }}><Avatar initials={initialsOf(fullName(child))} tone={avatarTone(fullName(child))} size="sm" />{fullName(child)}</button>)}</div>}
             <div className="mt-5 ml-auto grid max-w-[230px] grid-cols-2 gap-y-2 text-xs">
               <span className="text-slate-500">Subtotal</span>
               <span className="text-right">{money(subtotal)}</span>
