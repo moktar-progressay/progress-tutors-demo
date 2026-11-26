@@ -264,9 +264,9 @@ export function TutorPaymentRequestDialog({
         </DialogHeader>
 
         <div className="flex gap-2 border-b p-2 xl:hidden"><Button variant={mobileTab === "edit" ? "default" : "ghost"} onClick={() => setMobileTab("edit")}>Edit</Button><Button variant={mobileTab === "preview" ? "default" : "ghost"} onClick={() => setMobileTab("preview")}>Preview</Button></div>
-        <div className="grid min-h-0 flex-1 overflow-hidden xl:grid-cols-[minmax(0,1fr)_420px]">
+        <div className="grid min-h-0 flex-1 overflow-hidden xl:grid-cols-[clamp(340px,25vw,460px)_minmax(0,1fr)]">
         <div className={`min-h-0 overflow-y-auto ${mobileTab === "edit" ? "block" : "hidden"} xl:block`}>
-          <aside className="space-y-4 border-b border-border p-4 lg:overflow-y-auto lg:border-r lg:border-b-0">
+          <aside className="space-y-3 border-b border-border p-4">
             <div className="relative">
               <p className="mb-1 text-xs font-bold text-muted-foreground">Tutor</p>
               <button type="button" aria-expanded={tutorPickerOpen} onClick={() => { setTutorPickerOpen(!tutorPickerOpen); setTutorSearch(""); }} className="flex min-h-12 w-full items-center gap-3 rounded-xl border border-border bg-card px-3 py-2 text-left text-sm">
@@ -395,7 +395,7 @@ export function TutorPaymentRequestDialog({
             ) : null}
           </aside>
 
-          <main className="space-y-4 p-4 lg:overflow-y-auto sm:p-5">
+          <main className="space-y-3 p-4">
             <div className="grid grid-cols-3 gap-2">
               <Summary label="Lines" value={String(selectedLines.length)} />
               <Summary label="Hours" value={String(totalHours)} />
@@ -435,7 +435,7 @@ export function TutorPaymentRequestDialog({
                     key={`${line.earningId ?? "manual"}-${index}`}
                     className={`rounded-xl border p-3 ${line.selected ? "border-primary/40 bg-primary/5" : "border-border opacity-60"}`}
                   >
-                    <div className="grid gap-2 sm:grid-cols-[auto_minmax(100px,1fr)_minmax(120px,2fr)_65px_85px_auto] sm:items-end">
+                    <div className="grid grid-cols-2 gap-2 items-end">
                       <input
                         type="checkbox"
                         checked={line.selected}
@@ -452,7 +452,7 @@ export function TutorPaymentRequestDialog({
                           className="mt-1 h-9"
                         />
                       </label>
-                      <label className="text-[10px] font-bold text-muted-foreground">
+                      <label className="col-span-2 text-xs font-bold text-muted-foreground">
                         Description
                         <Input
                           value={line.description}
@@ -514,30 +514,30 @@ export function TutorPaymentRequestDialog({
             )}
           </main>
           </div>
-          <section className={`min-h-0 overflow-y-auto p-4 ${mobileTab === "preview" ? "block" : "hidden"} xl:block`}>
-            <aside className="h-fit rounded-2xl border border-border bg-muted/40 p-3">
+          <section className={`min-h-0 min-w-0 overflow-y-auto border-l border-border bg-muted/40 p-4 sm:p-6 xl:p-8 ${mobileTab === "preview" ? "block" : "hidden"} xl:block`}>
+            <aside className="mx-auto h-fit w-full max-w-[850px]">
               <div className="mb-3">
                 <p className="text-sm font-extrabold">Payment request preview</p>
                 <p className="text-[11px] text-muted-foreground">Updates as you type</p>
               </div>
-              <div className="rounded-xl border border-border bg-white p-5 text-slate-900 shadow-sm">
+              <div className="min-h-[600px] rounded-xl border border-border bg-white p-5 text-slate-900 shadow-sm sm:p-10 xl:min-h-[1050px] xl:p-12">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div><p className="text-lg font-black">Progress<span className="text-pink-600">Tutors</span></p><p className="mt-1 text-[10px] text-slate-500">Progressay</p></div>
                   <div className="text-right"><p className="text-lg font-black">Payment request</p><p className="text-xs text-slate-500">{reference || "New draft"}</p></div>
                 </div>
-                <div className="mt-6 grid grid-cols-2 gap-4 text-xs">
+                <div className="mt-8 grid grid-cols-2 gap-4 text-sm">
                   <div><p className="font-bold">Tutor</p><p className="mt-1 break-words text-slate-600">{tutor ? fullName(tutor) : "Choose a tutor"}</p></div>
                   <div className="text-right text-slate-600"><p>From: {period.from ? prettyDate(period.from) : "Not set"}</p><p>Until: {period.until ? prettyDate(period.until) : "Not set"}</p></div>
                 </div>
                 <div className="mt-6 overflow-hidden rounded-lg border border-slate-200">
-                  <div className="grid grid-cols-[minmax(0,1fr)_35px_55px_65px] gap-1 bg-slate-100 px-2 py-2 text-[10px] font-bold"><span>Description</span><span>Hours</span><span>Rate</span><span className="text-right">Amount</span></div>
+                  <div className="grid grid-cols-[minmax(0,1fr)_40px_65px_75px] sm:grid-cols-[minmax(0,1fr)_60px_90px_100px] gap-1 bg-slate-100 px-2 py-3 text-xs font-bold"><span>Description</span><span>Hours</span><span>Rate</span><span className="text-right">Amount</span></div>
                   {selectedLines.length === 0 ? <p className="px-3 py-6 text-center text-xs text-slate-400">Select a tutor and add worked hours</p> : selectedLines.map((line,index) => (
-                    <div key={line.earningId ?? index} className="grid grid-cols-[minmax(0,1fr)_35px_55px_65px] gap-1 border-t border-slate-100 px-2 py-2 text-[10px]">
+                    <div key={line.earningId ?? index} className="grid grid-cols-[minmax(0,1fr)_40px_65px_75px] sm:grid-cols-[minmax(0,1fr)_60px_90px_100px] gap-1 border-t border-slate-100 px-2 py-3 text-xs">
                       <div className="break-words"><p className="font-semibold">{line.description || "Teaching session"}</p><p className="text-slate-500">{line.date ? prettyDate(line.date) : ""}</p></div><span>{line.hours}</span><span>{money(line.hours > 0 ? line.amount / line.hours : 0)}</span><span className="text-right font-bold">{money(line.amount)}</span>
                     </div>
                   ))}
                 </div>
-                <div className="mt-5 ml-auto grid max-w-[230px] grid-cols-2 gap-y-2 text-xs">
+                <div className="mt-8 ml-auto grid max-w-[300px] grid-cols-2 gap-y-3 text-sm">
                   <span className="text-slate-500">Total hours</span><span className="text-right">{totalHours}</span>
                   <span className="border-t border-slate-200 pt-2 font-black">Total</span><span className="border-t border-slate-200 pt-2 text-right text-base font-black">{money(totalAmount)}</span>
                   <span className="rounded-l-md bg-pink-50 px-2 py-2 font-bold text-pink-700">Requested amount</span><span className="rounded-r-md bg-pink-50 px-2 py-2 text-right font-black text-pink-700">{money(totalAmount)}</span>
