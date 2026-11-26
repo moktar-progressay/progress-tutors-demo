@@ -60,7 +60,7 @@ export function TutorPaymentRequestDialog({
   onAddTutor: (values: NewTutorValues) => Promise<Row<"tutors">>;
   onSave: (values: TutorPaymentRequestValues) => Promise<Row<"payment_requests">>;
 }) {
-  const today = new Date().toLocaleDateString("en-CA");
+  const today = new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/London", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
   const [mobileTab, setMobileTab] = useState<"edit" | "preview">("edit");
   const [tutorSearch, setTutorSearch] = useState("");
   const [tutorPickerOpen, setTutorPickerOpen] = useState(false);
@@ -126,9 +126,11 @@ export function TutorPaymentRequestDialog({
 
   };
 
+  // Reload only when the selection changes, not when parent query arrays are recreated.
+  const earningsKey = JSON.stringify(earnings.filter((earning) => earning.tutor_id === tutorId).map((earning) => [earning.id, earning.payment_request_id, earning.status, earning.earning_date, earning.hours, earning.amount, earning.class_id, earning.note]));
   useEffect(() => {
     if (open && !savedRequest) loadHours();
-  }, [open, tutorId, fromDate, untilDate, earnings, classes]);
+  }, [open, tutorId, fromDate, untilDate, earningsKey]);
 
   const updateLine = (index: number, values: Partial<TutorPaymentRequestLine>) =>
     setLines((current) =>
@@ -263,9 +265,9 @@ export function TutorPaymentRequestDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex gap-2 border-b p-2 xl:hidden"><Button variant={mobileTab === "edit" ? "default" : "ghost"} onClick={() => setMobileTab("edit")}>Edit</Button><Button variant={mobileTab === "preview" ? "default" : "ghost"} onClick={() => setMobileTab("preview")}>Preview</Button></div>
-        <div className="grid min-h-0 flex-1 overflow-hidden xl:grid-cols-[clamp(340px,25vw,460px)_minmax(0,1fr)]">
-        <div className={`min-h-0 overflow-y-auto ${mobileTab === "edit" ? "block" : "hidden"} xl:block`}>
+        <div className="flex gap-2 border-b p-2 lg:hidden"><Button variant={mobileTab === "edit" ? "default" : "ghost"} onClick={() => setMobileTab("edit")}>Edit</Button><Button variant={mobileTab === "preview" ? "default" : "ghost"} onClick={() => setMobileTab("preview")}>Preview</Button></div>
+        <div className="grid min-h-0 flex-1 overflow-hidden lg:grid-cols-[minmax(320px,25vw)_minmax(0,1fr)]">
+        <div className={`min-h-0 overflow-y-auto ${mobileTab === "edit" ? "block" : "hidden"} lg:block`}>
           <aside className="space-y-3 border-b border-border p-4">
             <div className="relative">
               <p className="mb-1 text-xs font-bold text-muted-foreground">Tutor</p>
@@ -514,7 +516,7 @@ export function TutorPaymentRequestDialog({
             )}
           </main>
           </div>
-          <section className={`min-h-0 min-w-0 overflow-y-auto border-l border-border bg-muted/40 p-4 sm:p-6 xl:p-8 ${mobileTab === "preview" ? "block" : "hidden"} xl:block`}>
+          <section className={`min-h-0 min-w-0 overflow-y-auto border-l border-border bg-muted/40 p-4 sm:p-6 xl:p-8 ${mobileTab === "preview" ? "block" : "hidden"} lg:block`}>
             <aside className="mx-auto h-fit w-full max-w-[850px]">
               <div className="mb-3">
                 <p className="text-sm font-extrabold">Payment request preview</p>
