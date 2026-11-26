@@ -31,7 +31,6 @@ export function FormDialog({
   children,
   wide,
   fullScreen,
-  splitScroll,
   dangerLabel,
   onDanger,
   dangerBusy,
@@ -46,7 +45,6 @@ export function FormDialog({
   children: ReactNode;
   wide?: boolean;
   fullScreen?: boolean;
-  splitScroll?: boolean;
   dangerLabel?: string | undefined;
   onDanger?: (() => void) | undefined;
   dangerBusy?: boolean | undefined;
@@ -67,14 +65,14 @@ export function FormDialog({
           {description ? <DialogDescription>{description}</DialogDescription> : null}
         </DialogHeader>
         <form
-          className={`grid min-h-0 flex-1 auto-rows-max content-start gap-3 overflow-y-auto overscroll-contain px-6 pt-4 ${fullScreen ? "sm:grid-cols-1" : "sm:grid-cols-2"} ${splitScroll ? "lg:flex lg:flex-col lg:overflow-hidden lg:gap-0" : ""}`}
+          className={`grid min-h-0 flex-1 auto-rows-max content-start gap-3 overflow-y-auto overscroll-contain px-6 pt-4 ${fullScreen ? "sm:grid-cols-1" : "sm:grid-cols-2"}`}
           onSubmit={(e) => {
             e.preventDefault();
             onSubmit();
           }}
         >
           {children}
-          <div className="sticky bottom-0 z-20 -mx-6 mt-1 shrink-0 grid grid-cols-2 gap-2 border-t border-border bg-background px-6 pt-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] shadow-[0_-8px_24px_rgba(0,0,0,0.06)] sm:col-span-full sm:flex sm:flex-row">
+          <div className="sticky bottom-0 z-20 -mx-6 mt-1 grid grid-cols-2 gap-2 border-t border-border bg-background px-6 pt-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] shadow-[0_-8px_24px_rgba(0,0,0,0.06)] sm:col-span-full sm:flex sm:flex-row">
             {dangerLabel && onDanger ? (
               <Button
                 type="button"
