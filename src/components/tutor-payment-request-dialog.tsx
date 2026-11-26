@@ -525,11 +525,11 @@ export function TutorPaymentRequestDialog({
               <div className="min-h-[600px] rounded-xl border border-border bg-white p-5 text-slate-900 shadow-sm sm:p-10 xl:min-h-[1050px] xl:p-12">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div><p className="text-lg font-black">Progress<span className="text-pink-600">Tutors</span></p><p className="mt-1 text-[10px] text-slate-500">Progressay</p></div>
-                  <div className="text-right"><p className="text-lg font-black">Payment request</p><p className="text-xs text-slate-500">{reference || "New draft"}</p></div>
+                  <div className="text-right"><p className="text-lg font-black">Payment request</p><p className="text-xs text-slate-500"><input aria-label="Request reference" type="text" className="max-w-full min-w-0 rounded border border-dashed border-pink-200 bg-transparent px-1" value={reference} onChange={(event) => setReference(event.target.value)} /></p></div>
                 </div>
                 <div className="mt-8 grid grid-cols-2 gap-4 text-sm">
                   <div><p className="font-bold">Tutor</p><p className="mt-1 break-words text-slate-600">{tutor ? fullName(tutor) : "Choose a tutor"}</p></div>
-                  <div className="text-right text-slate-600"><p>From: {period.from ? prettyDate(period.from) : "Not set"}</p><p>Until: {period.until ? prettyDate(period.until) : "Not set"}</p></div>
+                  <div className="text-right text-slate-600"><p>From: <input aria-label="Period start" type="date" className="max-w-full min-w-0 rounded border border-dashed border-pink-200 bg-transparent px-1" value={fromDate} onChange={(event) => setFromDate(event.target.value)} /></p><p>Until: <input aria-label="Period end" type="date" className="max-w-full min-w-0 rounded border border-dashed border-pink-200 bg-transparent px-1" value={untilDate} onChange={(event) => setUntilDate(event.target.value)} /></p></div>
                 </div>
                 <div className="mt-6 overflow-hidden rounded-lg border border-slate-200">
                   <div className="grid grid-cols-[minmax(0,1fr)_40px_65px_75px] sm:grid-cols-[minmax(0,1fr)_60px_90px_100px] gap-1 bg-slate-100 px-2 py-3 text-xs font-bold"><span>Description</span><span>Hours</span><span>Rate</span><span className="text-right">Amount</span></div>
@@ -545,7 +545,7 @@ export function TutorPaymentRequestDialog({
                   <span className="border-t border-slate-200 pt-2 font-black">Total</span><span className="border-t border-slate-200 pt-2 text-right text-base font-black">{money(totalAmount)}</span>
                   <span className="rounded-l-md bg-pink-50 px-2 py-2 font-bold text-pink-700">Requested amount</span><span className="rounded-r-md bg-pink-50 px-2 py-2 text-right font-black text-pink-700">{money(totalAmount)}</span>
                 </div>
-                {notes.trim() ? <div className="mt-5 text-xs"><p className="font-bold">Notes</p><p className="mt-1 whitespace-pre-wrap break-words text-slate-600">{notes}</p></div> : null}
+                <label className="mt-5 block text-sm font-bold">Notes<textarea aria-label="Document notes" className="mt-1 w-full max-w-full min-w-0 rounded border border-dashed border-pink-200 bg-transparent px-1" value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Add notes" /></label>
               </div>
             </aside>
           </section>
