@@ -157,17 +157,17 @@ export function InvoiceEditScreen({
         </div>
       </section>
 
-      <main className="mx-auto max-w-6xl px-4 py-6 pb-28 sm:px-8">
-        <div className="grid gap-6 lg:grid-cols-[180px_minmax(0,1fr)]">
-          <div>
+      <main className="mx-auto w-full px-4 py-6 pb-28 sm:px-8">
+        <div className="grid gap-6 lg:grid-cols-[clamp(340px,25vw,460px)_minmax(0,1fr)]">
+          <div className="lg:col-span-full">
             <h2 className="font-black">Invoice details</h2>
             <p className="mt-1 text-xs text-muted-foreground">
               Edit the invoice, client and line item.
             </p>
           </div>
 
-          <div className="max-w-4xl space-y-6">
-            <div className="grid gap-4 sm:grid-cols-4">
+          <div className="min-w-0 space-y-4">
+            <div className="grid gap-3 sm:grid-cols-2">
               <Field label="Invoice number">
                 <Input value={invoice.invoice_number} readOnly className="h-11 rounded-lg bg-muted" />
               </Field>
@@ -290,6 +290,7 @@ export function InvoiceEditScreen({
               />
             </Field>
           </div>
+          <aside className="min-w-0 rounded-xl bg-muted/40 p-4 lg:p-8"><div className="mx-auto min-h-[600px] max-w-[850px] rounded-xl border bg-white p-6 text-slate-900 shadow-sm lg:min-h-[1050px] lg:p-12"><div className="flex justify-between gap-4"><strong className="text-xl">Progress<span className="text-pink-600">Tutors</span></strong><strong className="text-xl">Invoice</strong></div><p className="mt-4 text-sm">{invoice.invoice_number}</p><p className="text-sm">Issued: {issueDate} · Due: {dueDate}</p><div className="mt-8 grid grid-cols-[minmax(0,1fr)_60px_90px] gap-2 bg-slate-100 p-2 text-sm font-bold"><span>Description</span><span>Qty</span><span>Rate</span></div><div className="grid grid-cols-[minmax(0,1fr)_60px_90px] gap-2 border-b p-2"><input aria-label="Description" className="w-full min-w-0 border border-dashed border-pink-200" value={description} onChange={(e) => setDescription(e.target.value)} /><input aria-label="Quantity" type="number" min="0.01" step="0.01" className="w-full min-w-0 border border-dashed border-pink-200" value={quantity} onChange={(e) => setQuantity(e.target.value)} /><input aria-label="Rate" type="number" min="0" step="0.01" className="w-full min-w-0 border border-dashed border-pink-200" value={unitPrice} onChange={(e) => setUnitPrice(e.target.value)} /></div><p className="mt-8 text-right text-xl font-bold">Total: {money(total)}</p><label className="mt-8 block text-sm">Notes<textarea className="mt-2 w-full border border-dashed border-pink-200 p-2" value={notes} onChange={(e) => setNotes(e.target.value)} /></label></div></aside>
         </div>
       </main>
 
