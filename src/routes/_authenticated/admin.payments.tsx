@@ -389,7 +389,7 @@ function ParentPayments() {
       return invoiceSortDirection === "asc" ? result : -result;
     });
   const filteredProducts = (billingPlans.data ?? []).filter((plan) => {
-    const linked = (classes.data ?? []).filter((lesson) => plan.class_ids.includes(lesson.id) || lesson.id === plan.class_id);
+    const linked = (classes.data ?? []).filter((lesson) => (plan.class_ids ?? []).includes(lesson.id) || lesson.id === plan.class_id);
     return [plan.name, plan.description ?? "", ...plan.subjects, ...plan.levels, ...linked.flatMap((lesson) => [lesson.name, lesson.subject ?? "", lesson.level ?? ""])]
       .join(" ").toLowerCase().includes(query.trim().toLowerCase());
   });
@@ -519,7 +519,7 @@ function ParentPayments() {
       billing_frequency: item.billing_frequency,
       children_included: String(item.children_included),
       active: String(item.active),
-      class_ids: item.class_ids.length ? item.class_ids : item.class_id ? [item.class_id] : [],
+      class_ids: item.class_ids?.length ? item.class_ids : item.class_id ? [item.class_id] : [],
       subjects: item.subjects,
       levels: item.levels,
     });
