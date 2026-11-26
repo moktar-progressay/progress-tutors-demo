@@ -179,10 +179,9 @@ export function FamilyInvoiceDialog({
       busy={saving}
       onSubmit={saveDraft}
       fullScreen
-      splitScroll
     >
-      <div className="grid gap-5 sm:col-span-full lg:min-h-0 lg:flex-1 lg:overflow-hidden lg:grid-cols-[clamp(340px,25vw,460px)_minmax(0,1fr)]">
-        <div className="grid content-start gap-3 sm:grid-cols-2 lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain lg:pr-3 lg:pb-4">
+      <div className="grid gap-5 sm:col-span-full lg:grid-cols-[clamp(340px,25vw,460px)_minmax(0,1fr)]">
+        <div className="grid content-start gap-3 sm:grid-cols-2">
           <div className="sm:col-span-2">
             <p className="text-sm font-extrabold">Client & students</p>
             <p className="text-xs text-muted-foreground">
@@ -357,7 +356,7 @@ export function FamilyInvoiceDialog({
           </div>
         </div>
 
-        <aside className="min-w-0 rounded-2xl bg-muted/40 p-4 lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain lg:p-8">
+        <aside className="min-w-0 rounded-2xl bg-muted/40 p-4 lg:p-8">
           <div className="mb-3 flex items-center justify-between">
             <div>
               <p className="text-sm font-extrabold">Invoice preview</p>
