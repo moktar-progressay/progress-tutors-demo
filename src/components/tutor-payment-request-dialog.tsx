@@ -63,6 +63,7 @@ export function TutorPaymentRequestDialog({
   const today = new Date().toLocaleDateString("en-CA");
   const [mobileTab, setMobileTab] = useState<"edit" | "preview">("edit");
   const [tutorSearch, setTutorSearch] = useState("");
+  const [tutorPickerOpen, setTutorPickerOpen] = useState(false);
   const [tutorId, setTutorId] = useState("");
   const [reference, setReference] = useState(`PR-${Date.now().toString().slice(-6)}`);
   const [notes, setNotes] = useState("");
@@ -273,27 +274,26 @@ export function TutorPaymentRequestDialog({
         <div className="grid min-h-0 flex-1 overflow-hidden xl:grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)]">
         <div className={`min-h-0 overflow-y-auto ${mobileTab === "edit" ? "block" : "hidden"} xl:block`}>
           <aside className="space-y-4 border-b border-border p-4 lg:overflow-y-auto lg:border-r lg:border-b-0">
-            <label className="block text-xs font-bold text-muted-foreground">
-              Tutor
-              <Input placeholder="Search tutors" value={tutorSearch} onChange={(event) => setTutorSearch(event.target.value)} className="mt-2" />
-              {tutor ? <div className="mt-2 flex items-center gap-2"><Avatar initials={initialsOf(fullName(tutor))} tone={avatarTone(fullName(tutor))} size="sm" /><span>{fullName(tutor)}</span></div> : null}
-              <select
-                value={tutorId}
-                onChange={(event) => {
-                  setTutorId(event.target.value);
-                  setSavedRequest(null);
-                  setLines([]);
-                }}
-                className="mt-1 h-11 w-full rounded-xl border border-border bg-card px-3 text-sm"
-              >
-                <option value="">Select tutor</option>
-                {tutors.filter((item) => item.id === tutorId || fullName(item).toLowerCase().includes(tutorSearch.toLowerCase())).map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {fullName(item)}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <div className="relative">
+              <p className="mb-1 text-xs font-bold text-muted-foreground">Tutor</p>
+              <button type="button" aria-expanded={tutorPickerOpen} onClick={() => { setTutorPickerOpen(!tutorPickerOpen); setTutorSearch(""); }} className="flex min-h-12 w-full items-center gap-3 rounded-xl border border-border bg-card px-3 py-2 text-left text-sm">
+                {tutor ? <Avatar initials={initialsOf(fullName(tutor))} tone={avatarTone(fullName(tutor))} /> : null}
+                <span className="flex-1">{tutor ? fullName(tutor) : "Select tutor"}</span><span aria-hidden="true">⌄</span>
+              </button>
+              {tutorPickerOpen ? <div className="absolute z-30 mt-1 w-full rounded-xl border border-border bg-popover p-2 shadow-lg" onKeyDown={(event) => { if (event.key === "Escape") setTutorPickerOpen(false); }}>
+                <Input autoFocus placeholder="Search tutors" aria-label="Search tutors" value={tutorSearch} onChange={(event) => setTutorSearch(event.target.value)} />
+                <div className="mt-2 max-h-64 overflow-y-auto">
+                  {tutors.filter((item) => fullName(item).toLowerCase().includes(tutorSearch.toLowerCase())).map((item) => (
+                    <button key={item.id} type="button" onClick={() => { if (item.id !== tutorId) { setTutorId(item.id); setSavedRequest(null); setLines([]); } setTutorPickerOpen(false); }} className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left text-sm hover:bg-muted focus-visible:bg-muted">
+                      <Avatar initials={initialsOf(fullName(item))} tone={avatarTone(fullName(item))} />
+                      <span className="min-w-0 flex-1 truncate">{fullName(item)}</span>
+                      {item.id === tutorId ? <Check className="h-4 w-4 text-primary" /> : null}
+                    </button>
+                  ))}
+                  {!tutors.some((item) => fullName(item).toLowerCase().includes(tutorSearch.toLowerCase())) ? <p className="p-3 text-sm text-muted-foreground">No matching tutors</p> : null}
+                </div>
+              </div> : null}
+            </div>
             <Button
               type="button"
               size="sm"
