@@ -1,5 +1,5 @@
 import { Check, Download, FileText, Plus, Save, Send, Share2, Trash2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,8 +11,9 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { DEMO_DATE, fullName, money, num, prettyDate, type Row } from "@/lib/db";
-import { downloadPaymentDocument } from "@/lib/payment-documents";
+import { fullName, initialsOf, money, num, prettyDate, type Row } from "@/lib/db";
+import { Avatar, avatarTone } from "@/components/kit";
+import { buildPaymentPdf, downloadPaymentDocument } from "@/lib/payment-documents";
 
 export type TutorPaymentRequestLine = {
   earningId: string | null;
@@ -59,11 +60,14 @@ export function TutorPaymentRequestDialog({
   onAddTutor: (values: NewTutorValues) => Promise<Row<"tutors">>;
   onSave: (values: TutorPaymentRequestValues) => Promise<Row<"payment_requests">>;
 }) {
+  const today = new Date().toLocaleDateString("en-CA");
+  const [mobileTab, setMobileTab] = useState<"edit" | "preview">("edit");
+  const [tutorSearch, setTutorSearch] = useState("");
   const [tutorId, setTutorId] = useState("");
   const [reference, setReference] = useState(`PR-${Date.now().toString().slice(-6)}`);
   const [notes, setNotes] = useState("");
   const [fromDate, setFromDate] = useState("");
-  const [untilDate, setUntilDate] = useState(DEMO_DATE);
+  const [untilDate, setUntilDate] = useState(today);
   const [lines, setLines] = useState<TutorPaymentRequestLine[]>([]);
   const [addingTutor, setAddingTutor] = useState(false);
   const [newTutor, setNewTutor] = useState({
@@ -90,7 +94,7 @@ export function TutorPaymentRequestDialog({
   }, [fromDate, selectedLines, untilDate]);
 
   const loadHours = (id = tutorId) => {
-    if (!id) {
+    if (!id || (fromDate && untilDate && fromDate > untilDate)) {
       setLines([]);
       return;
     }
@@ -99,6 +103,7 @@ export function TutorPaymentRequestDialog({
         (earning) =>
           earning.tutor_id === id &&
           !earning.payment_request_id &&
+          earning.earning_date <= today &&
           earning.status !== "paid" &&
           earning.status !== "claimed" &&
           (!fromDate || earning.earning_date >= fromDate) &&
@@ -117,8 +122,12 @@ export function TutorPaymentRequestDialog({
         selected: true,
       }));
     setLines(available);
-    if (available.length === 0) toast.info("No unclaimed worked hours found for this period");
+
   };
+
+  useEffect(() => {
+    if (open && !savedRequest) loadHours();
+  }, [open, tutorId, fromDate, untilDate, earnings, classes]);
 
   const updateLine = (index: number, values: Partial<TutorPaymentRequestLine>) =>
     setLines((current) =>
@@ -132,7 +141,7 @@ export function TutorPaymentRequestDialog({
         earningId: null,
         sessionId: null,
         description: "Additional teaching work",
-        date: untilDate || DEMO_DATE,
+        date: untilDate || today,
         hours: 1,
         amount: num(tutor?.hourly_rate),
         selected: true,
@@ -140,6 +149,7 @@ export function TutorPaymentRequestDialog({
     ]);
 
   const validate = () => {
+    if (fromDate && untilDate && fromDate > untilDate) { toast.error("End date must not precede start date"); return false; }
     if (!tutorId) {
       toast.error("Select a tutor first");
       return false;
@@ -148,7 +158,7 @@ export function TutorPaymentRequestDialog({
       toast.error("Select or add at least one worked-hours line");
       return false;
     }
-    if (selectedLines.some((line) => line.hours <= 0 || line.amount < 0)) {
+    if (selectedLines.some((line) => !line.description.trim() || !line.date || line.date > today || (fromDate && line.date < fromDate) || (untilDate && line.date > untilDate) || !Number.isFinite(line.hours) || !Number.isFinite(line.amount) || line.hours <= 0 || line.amount < 0)) {
       toast.error("Hours must be greater than zero and amounts cannot be negative");
       return false;
     }
@@ -157,6 +167,7 @@ export function TutorPaymentRequestDialog({
 
   const save = async (status: "draft" | "submitted") => {
     if (!validate()) return;
+    if (status === "submitted" && totalAmount <= 0) { toast.error("A submitted request must have a positive total"); return; }
     try {
       const request = await onSave({
         ...(savedRequest ? { requestId: savedRequest.id } : {}),
@@ -177,14 +188,12 @@ export function TutorPaymentRequestDialog({
     }
   };
 
-  const exportPdf = () => {
-    if (!validate()) return;
-    downloadPaymentDocument({
+  const documentData = {
       type: "payment_request",
       parentName: tutor ? fullName(tutor) : "Tutor",
       parentEmail: tutor?.email ?? "",
       studentName: "",
-      documentDate: DEMO_DATE,
+      documentDate: today,
       reference,
       service: `${selectedLines.length} teaching line${selectedLines.length === 1 ? "" : "s"}`,
       hours: String(totalHours),
@@ -195,7 +204,17 @@ export function TutorPaymentRequestDialog({
       dueDate: "",
       paymentLink: "",
       notes,
-    });
+    } as const;
+  const [previewUrl, setPreviewUrl] = useState("");
+  useEffect(() => {
+    if (!open) return;
+    const url = URL.createObjectURL(new Blob([buildPaymentPdf(documentData)], { type: "application/pdf" }));
+    setPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [open, tutorId, reference, notes, totalHours, totalAmount, period.from, period.until, selectedLines.length]);
+  const exportPdf = () => {
+    if (!validate()) return;
+    downloadPaymentDocument(documentData);
     toast.success("Payment request PDF downloaded");
   };
 
@@ -242,7 +261,7 @@ export function TutorPaymentRequestDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex h-[100dvh] w-screen max-w-none flex-col overflow-hidden rounded-none border-0 p-0 sm:h-[calc(100dvh-1rem)] sm:w-[calc(100vw-1rem)] sm:max-w-5xl sm:rounded-2xl sm:border">
+      <DialogContent className="flex h-[100dvh] w-screen max-w-none flex-col overflow-hidden rounded-none border-0 p-0 sm:h-[100dvh] sm:w-screen sm:max-w-none sm:rounded-none">
         <DialogHeader className="border-b border-border px-5 py-4 text-left">
           <DialogTitle>Create tutor payment request</DialogTitle>
           <DialogDescription>
@@ -250,10 +269,14 @@ export function TutorPaymentRequestDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid min-h-0 flex-1 overflow-y-auto lg:grid-cols-[360px_1fr] lg:overflow-hidden">
+        <div className="flex gap-2 border-b p-2 xl:hidden"><Button variant={mobileTab === "edit" ? "default" : "ghost"} onClick={() => setMobileTab("edit")}>Edit</Button><Button variant={mobileTab === "preview" ? "default" : "ghost"} onClick={() => setMobileTab("preview")}>Preview</Button></div>
+        <div className="grid min-h-0 flex-1 overflow-hidden xl:grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)]">
+        <div className={`min-h-0 overflow-y-auto ${mobileTab === "edit" ? "block" : "hidden"} xl:block`}>
           <aside className="space-y-4 border-b border-border p-4 lg:overflow-y-auto lg:border-r lg:border-b-0">
             <label className="block text-xs font-bold text-muted-foreground">
               Tutor
+              <Input placeholder="Search tutors" value={tutorSearch} onChange={(event) => setTutorSearch(event.target.value)} className="mt-2" />
+              {tutor ? <div className="mt-2 flex items-center gap-2"><Avatar initials={initialsOf(fullName(tutor))} tone={avatarTone(fullName(tutor))} size="sm" /><span>{fullName(tutor)}</span></div> : null}
               <select
                 value={tutorId}
                 onChange={(event) => {
@@ -264,7 +287,7 @@ export function TutorPaymentRequestDialog({
                 className="mt-1 h-11 w-full rounded-xl border border-border bg-card px-3 text-sm"
               >
                 <option value="">Select tutor</option>
-                {tutors.map((item) => (
+                {tutors.filter((item) => item.id === tutorId || fullName(item).toLowerCase().includes(tutorSearch.toLowerCase())).map((item) => (
                   <option key={item.id} value={item.id}>
                     {fullName(item)}
                   </option>
@@ -419,7 +442,7 @@ export function TutorPaymentRequestDialog({
                     key={`${line.earningId ?? "manual"}-${index}`}
                     className={`rounded-xl border p-3 ${line.selected ? "border-primary/40 bg-primary/5" : "border-border opacity-60"}`}
                   >
-                    <div className="grid gap-2 sm:grid-cols-[auto_130px_1fr_90px_110px_auto] sm:items-end">
+                    <div className="grid gap-2 sm:grid-cols-[auto_minmax(100px,1fr)_minmax(120px,2fr)_65px_85px_auto] sm:items-end">
                       <input
                         type="checkbox"
                         checked={line.selected}
@@ -454,7 +477,7 @@ export function TutorPaymentRequestDialog({
                           step="0.25"
                           value={line.hours}
                           onChange={(event) =>
-                            updateLine(index, { hours: num(event.target.value) })
+                            updateLine(index, { hours: num(event.target.value), amount: Math.round(num(event.target.value) * (line.hours > 0 ? line.amount / line.hours : num(tutor?.hourly_rate)) * 100) / 100 })
                           }
                           className="mt-1 h-9"
                         />
@@ -486,6 +509,7 @@ export function TutorPaymentRequestDialog({
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
+                    <p className="mt-1 text-xs text-muted-foreground">Hourly rate: {money(line.hours > 0 ? line.amount / line.hours : 0)}</p>
                     {line.earningId ? (
                       <p className="mt-2 text-[10px] text-muted-foreground">
                         Imported from confirmed tutor earnings · {prettyDate(line.date)}
@@ -496,6 +520,8 @@ export function TutorPaymentRequestDialog({
               </div>
             )}
           </main>
+          </div>
+          <section className={`min-h-0 overflow-auto border-l bg-muted/40 p-4 ${mobileTab === "preview" ? "block" : "hidden"} xl:block`}><h3 className="mb-3 font-bold">Live PDF preview</h3>{previewUrl ? <iframe title="Payment request PDF preview" src={previewUrl} className="h-[calc(100%-2rem)] min-h-[400px] w-full rounded-lg border bg-white" /> : null}</section>
         </div>
 
         <footer className="flex flex-wrap items-center justify-end gap-2 border-t border-border px-4 py-3">
