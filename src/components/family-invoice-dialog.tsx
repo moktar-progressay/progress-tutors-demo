@@ -180,7 +180,7 @@ export function FamilyInvoiceDialog({
       onSubmit={saveDraft}
       fullScreen
     >
-      <div className="grid gap-5 sm:col-span-full lg:grid-cols-[minmax(0,1fr)_380px]">
+      <div className="grid gap-5 sm:col-span-full lg:grid-cols-[clamp(340px,25vw,460px)_minmax(0,1fr)]">
         <div className="grid content-start gap-3 sm:grid-cols-2">
           <div className="sm:col-span-2">
             <p className="text-sm font-extrabold">Client & students</p>
@@ -257,7 +257,7 @@ export function FamilyInvoiceDialog({
                 return (
                   <div
                     key={line.key}
-                    className="grid gap-2 rounded-2xl border border-border p-3 sm:grid-cols-2 lg:grid-cols-[1.1fr_1.5fr_.65fr_.65fr_auto]"
+                    className="grid gap-2 rounded-2xl border border-border p-3 sm:grid-cols-2 lg:grid-cols-2"
                   >
                     <SelectField
                       label={`Child ${index + 1}`}
@@ -356,7 +356,7 @@ export function FamilyInvoiceDialog({
           </div>
         </div>
 
-        <aside className="h-fit rounded-2xl border border-border bg-muted/40 p-3 lg:sticky lg:top-0">
+        <aside className="min-w-0 rounded-2xl bg-muted/40 p-4 lg:p-8">
           <div className="mb-3 flex items-center justify-between">
             <div>
               <p className="text-sm font-extrabold">Invoice preview</p>
@@ -364,7 +364,7 @@ export function FamilyInvoiceDialog({
             </div>
             <Pill tone="green">Autosave on</Pill>
           </div>
-          <div className="rounded-xl border border-border bg-white p-5 text-slate-900 shadow-sm">
+          <div className="mx-auto min-h-[600px] w-full max-w-[850px] rounded-xl border border-border bg-white p-5 text-slate-900 shadow-sm lg:min-h-[1050px] lg:p-12">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-lg font-black">
@@ -408,10 +408,10 @@ export function FamilyInvoiceDialog({
                   >
                     <span className="pr-2 font-semibold">
                       {studentNamePreview(students, line.student_id)} ·{" "}
-                      {line.description || "Service"}
+                      <input aria-label="Item description" className="w-full rounded border border-dashed border-pink-200 bg-transparent px-1" value={line.description} onChange={(event) => updateLine(line.key, { description: event.target.value })} />
                     </span>
-                    <span>{line.quantity || "0"}</span>
-                    <span>{money(num(line.unit_price))}</span>
+                    <input aria-label="Quantity" type="number" min="0" step="0.01" className="min-w-0 w-full border border-dashed border-pink-200 bg-transparent" value={line.quantity} onChange={(event) => updateLine(line.key, { quantity: event.target.value })} />
+                    <input aria-label="Unit price" type="number" min="0" step="0.01" className="min-w-0 w-full border border-dashed border-pink-200 bg-transparent" value={line.unit_price} onChange={(event) => updateLine(line.key, { unit_price: event.target.value })} />
                     <span className="text-right font-bold">
                       {money(num(line.quantity) * num(line.unit_price) - num(line.discount_amount))}
                     </span>
@@ -419,6 +419,7 @@ export function FamilyInvoiceDialog({
                 ))
               )}
             </div>
+            <Button type="button" variant="secondary" className="mt-3 w-full" disabled={children.length === 0} onClick={() => setLines((current) => [...current, newLine(children[0]?.id)])}><Plus className="h-4 w-4" /> Add item</Button>
             <div className="mt-5 ml-auto grid max-w-[230px] grid-cols-2 gap-y-2 text-xs">
               <span className="text-slate-500">Subtotal</span>
               <span className="text-right">{money(subtotal)}</span>
