@@ -385,12 +385,12 @@ export function FamilyInvoiceDialog({
                 </p>
               </div>
               <div className="text-right text-slate-600">
-                <p>Service: {periodStart || "Not set"}</p>
-                <p>Due: {dueDate || "Not set"}</p>
+                <p>Service: <input aria-label="Service start" type="date" className="max-w-full min-w-0 rounded border border-dashed border-pink-200 bg-transparent px-1" value={periodStart} onChange={(event) => setPeriodStart(event.target.value)} /></p>
+                <p>Until: <input aria-label="Service end" type="date" className="max-w-full min-w-0 rounded border border-dashed border-pink-200 bg-transparent px-1" value={periodEnd} onChange={(event) => setPeriodEnd(event.target.value)} /></p><p>Due: <input aria-label="Payment due" type="date" className="max-w-full min-w-0 rounded border border-dashed border-pink-200 bg-transparent px-1" value={dueDate} onChange={(event) => setDueDate(event.target.value)} /></p>
               </div>
             </div>
             <div className="mt-6 overflow-hidden rounded-lg border border-slate-200">
-              <div className="grid grid-cols-[1fr_35px_65px_70px] bg-slate-100 px-2 py-2 text-[10px] font-bold">
+              <div className="grid grid-cols-[minmax(0,1fr)_40px_65px_70px] sm:grid-cols-[minmax(0,1fr)_60px_90px_100px] bg-slate-100 px-2 py-2 text-[10px] font-bold">
                 <span>Description</span>
                 <span>Qty</span>
                 <span>Rate</span>
@@ -404,7 +404,7 @@ export function FamilyInvoiceDialog({
                 lines.map((line) => (
                   <div
                     key={line.key}
-                    className="grid grid-cols-[1fr_35px_65px_70px] border-t border-slate-100 px-2 py-2 text-[10px]"
+                    className="grid grid-cols-[minmax(0,1fr)_40px_65px_70px] sm:grid-cols-[minmax(0,1fr)_60px_90px_100px] border-t border-slate-100 px-2 py-2 text-[10px]"
                   >
                     <span className="pr-2 font-semibold">
                       {studentNamePreview(students, line.student_id)} ·{" "}
