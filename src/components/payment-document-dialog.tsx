@@ -487,12 +487,12 @@ function InvoicePreview({ data, onCommit }: { data: PaymentDocumentData; onCommi
           PAY ONLINE
         </div>
       ) : null}
-      {data.notes ? (
+      {(
         <div className="mt-6">
           <p className="font-bold">Notes</p>
           <p><InlineField field="notes" value={data.notes} placeholder="Notes" onCommit={onCommit} /></p>
         </div>
-      ) : null}
+      )}
     </div>
   );
 }
