@@ -170,7 +170,7 @@ export function PaymentDocumentDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex h-[100dvh] w-screen max-w-none flex-col overflow-hidden rounded-none border-0 p-0 sm:h-[calc(100dvh-1rem)] sm:w-[calc(100vw-1rem)] sm:max-w-none sm:rounded-2xl sm:border">
+      <DialogContent className="flex h-[100dvh] w-screen max-w-none flex-col overflow-hidden rounded-none border-0 p-0 sm:h-[100dvh] sm:w-screen sm:max-w-none sm:rounded-none">
         <DialogHeader className="shrink-0 border-b border-border px-5 py-3 text-left">
           <div className="flex flex-wrap items-center justify-between gap-3 pr-8">
             <div><DialogTitle className="flex items-center gap-2"><FileText className="h-5 w-5 text-primary" />{title}</DialogTitle>
@@ -182,8 +182,8 @@ export function PaymentDocumentDialog({
             </div>
           </div>
         </DialogHeader>
-        <div className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden lg:grid-cols-[360px_minmax(0,1fr)]">
-          <div className="min-h-0 space-y-3 overflow-y-auto border-b border-border p-4 lg:border-r lg:border-b-0">
+        <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto lg:overflow-hidden lg:grid-cols-[clamp(340px,25vw,460px)_minmax(0,1fr)]">
+          <div className="min-h-0 space-y-3 lg:overflow-y-auto border-b border-border p-4 lg:border-r lg:border-b-0">
             <Field label="Document type">
               <select
                 value={data.type}
@@ -207,7 +207,7 @@ export function PaymentDocumentDialog({
               <label className="text-xs font-semibold">Saved drafts</label>
               <select className="h-10 w-full rounded-xl border border-border bg-card px-3 text-sm" value={activeDraftId ?? ""} onChange={(event) => { if (event.target.value) restoreDraft(event.target.value); }}><option value="">New document / choose a draft</option>{drafts.map((draft) => <option key={draft.id} value={draft.id}>{(draft.document_data as PaymentDocumentData).parentName || "Untitled"} · {(draft.document_data as PaymentDocumentData).type} · {new Date(draft.updated_at).toLocaleDateString("en-GB")}</option>)}</select>
             </div>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3">
               <Field label="Find parent">
                 <Input value={parentSearch} onChange={(event) => setParentSearch(event.target.value)} placeholder="Search name or email"/>
                 <select value={parentId} onChange={(event) => chooseParent(event.target.value)} className="mt-1 h-10 w-full rounded-xl border border-border bg-card px-3 text-sm"><option value="">Select parent</option>{parents.filter((item) => item.id === parentId || [fullName(item),item.email ?? ""].join(" ").toLowerCase().includes(parentSearch.toLowerCase())).slice(0,60).map((item) => <option key={item.id} value={item.id}>{fullName(item)}</option>)}</select>
@@ -335,13 +335,13 @@ export function PaymentDocumentDialog({
             )}
           </div>
 
-          <div className="min-h-0 overflow-y-auto bg-muted p-3 sm:p-6">
-            <div className="mx-auto aspect-[210/297] w-full max-w-[720px] rounded-lg bg-white shadow-lg">
+          <div className="min-h-0 lg:overflow-y-auto bg-muted p-3 sm:p-6">
+            <div className="mx-auto aspect-[210/297] w-full max-w-[850px] rounded-lg bg-white shadow-lg">
               <div className="flex h-full flex-col text-slate-900">
                 <div className="bg-primary px-6 py-5 text-xl font-extrabold text-white sm:px-10 sm:text-2xl">
                   {title.toUpperCase()}
                 </div>
-                <div className="flex flex-1 flex-col p-5 text-[9px] sm:p-10 sm:text-xs">
+                <div className="flex flex-1 flex-col p-5 text-xs sm:p-12 sm:text-sm">
                   <div className="flex justify-between gap-4">
                     <div>
                       <p className="font-bold">Progressay Impact CIC</p>
